@@ -93,12 +93,49 @@ maximize.Size = UDim2.new(0, 45, 0, 40)
 maximize.Position = UDim2.new(1, -100, 0, 10)
 maximize.BackgroundTransparency = 1
 maximize.BorderSizePixel = 0
-maximize.Text = "□"
-maximize.TextColor3 = Color3.fromRGB(190, 195, 200)
-maximize.TextSize = 21
-maximize.Font = Enum.Font.GothamMedium
+maximize.Text = ""
 maximize.AutoButtonColor = false
 maximize.Parent = topBar
+
+--// Maximize Icon Container
+local maxIcon = Instance.new("Frame")
+maxIcon.Name = "MaxIcon"
+maxIcon.Size = UDim2.new(0, 18, 0, 18)
+maxIcon.Position = UDim2.new(0.5, -9, 0.5, -9)
+maxIcon.BackgroundTransparency = 1
+maxIcon.Parent = maximize
+
+--// Normal Maximize Icon □
+local normalIcon = Instance.new("Frame")
+normalIcon.Name = "NormalIcon"
+normalIcon.Size = UDim2.new(0, 13, 0, 13)
+normalIcon.Position = UDim2.new(0.5, -6, 0.5, -6)
+normalIcon.BackgroundTransparency = 1
+normalIcon.BorderSizePixel = 1
+normalIcon.BorderColor3 = Color3.fromRGB(190, 195, 200)
+normalIcon.Parent = maxIcon
+
+--// Restore Icon - Back Square
+local restoreBack = Instance.new("Frame")
+restoreBack.Name = "RestoreBack"
+restoreBack.Size = UDim2.new(0, 11, 0, 11)
+restoreBack.Position = UDim2.new(0, 5, 0, 2)
+restoreBack.BackgroundTransparency = 1
+restoreBack.BorderSizePixel = 1
+restoreBack.BorderColor3 = Color3.fromRGB(190, 195, 200)
+restoreBack.Visible = false
+restoreBack.Parent = maxIcon
+
+--// Restore Icon - Front Square
+local restoreFront = Instance.new("Frame")
+restoreFront.Name = "RestoreFront"
+restoreFront.Size = UDim2.new(0, 11, 0, 11)
+restoreFront.Position = UDim2.new(0, 2, 0, 5)
+restoreFront.BackgroundColor3 = Color3.fromRGB(24, 29, 34)
+restoreFront.BorderSizePixel = 1
+restoreFront.BorderColor3 = Color3.fromRGB(190, 195, 200)
+restoreFront.Visible = false
+restoreFront.Parent = maxIcon
 
 --// Close
 local close = Instance.new("TextButton")
@@ -114,7 +151,10 @@ close.Font = Enum.Font.GothamMedium
 close.AutoButtonColor = false
 close.Parent = topBar
 
---// Hover Effects
+----------------------------------------------------------------
+--// TOP BUTTON HOVER
+----------------------------------------------------------------
+
 local function setupTopButton(button, normalColor, hoverColor)
 	button.MouseEnter:Connect(function()
 		button.TextColor3 = hoverColor
@@ -132,16 +172,23 @@ setupTopButton(
 )
 
 setupTopButton(
-	maximize,
-	Color3.fromRGB(190, 195, 200),
-	Color3.fromRGB(245, 245, 245)
-)
-
-setupTopButton(
 	close,
 	Color3.fromRGB(210, 215, 220),
 	Color3.fromRGB(255, 95, 95)
 )
+
+--// Maximize Hover
+maximize.MouseEnter:Connect(function()
+	normalIcon.BorderColor3 = Color3.fromRGB(245, 245, 245)
+	restoreBack.BorderColor3 = Color3.fromRGB(245, 245, 245)
+	restoreFront.BorderColor3 = Color3.fromRGB(245, 245, 245)
+end)
+
+maximize.MouseLeave:Connect(function()
+	normalIcon.BorderColor3 = Color3.fromRGB(190, 195, 200)
+	restoreBack.BorderColor3 = Color3.fromRGB(190, 195, 200)
+	restoreFront.BorderColor3 = Color3.fromRGB(190, 195, 200)
+end)
 
 ----------------------------------------------------------------
 --// SIDEBAR
@@ -568,11 +615,26 @@ maximize.MouseButton1Click:Connect(function()
 	maximized = not maximized
 
 	if maximized then
+
+		--// Maximize Window
 		main.Size = UDim2.new(1, -40, 1, -40)
 		main.Position = UDim2.new(0, 20, 0, 20)
+
+		--// Change □ to two overlapping squares
+		normalIcon.Visible = false
+		restoreBack.Visible = true
+		restoreFront.Visible = true
+
 	else
+
+		--// Restore Window
 		main.Size = normalSize
 		main.Position = normalPosition
+
+		--// Change back to □
+		normalIcon.Visible = true
+		restoreBack.Visible = false
+		restoreFront.Visible = false
 	end
 end)
 
