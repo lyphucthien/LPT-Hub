@@ -68,9 +68,7 @@ separator.BackgroundTransparency = 0.5
 separator.BorderSizePixel = 0
 separator.Parent = topBar
 
-----------------------------------------------------------------
 --// TOP RIGHT BUTTONS
-----------------------------------------------------------------
 
 --// Minimize
 local minimize = Instance.new("TextButton")
@@ -86,7 +84,7 @@ minimize.Font = Enum.Font.GothamMedium
 minimize.AutoButtonColor = false
 minimize.Parent = topBar
 
---// Maximize
+--// Maximize Button
 local maximize = Instance.new("TextButton")
 maximize.Name = "MaximizeButton"
 maximize.Size = UDim2.new(0, 45, 0, 40)
@@ -100,42 +98,57 @@ maximize.Parent = topBar
 --// Maximize Icon Container
 local maxIcon = Instance.new("Frame")
 maxIcon.Name = "MaxIcon"
-maxIcon.Size = UDim2.new(0, 18, 0, 18)
-maxIcon.Position = UDim2.new(0.5, -9, 0.5, -9)
+maxIcon.Size = UDim2.new(0, 20, 0, 20)
+maxIcon.Position = UDim2.new(0.5, -10, 0.5, -10)
 maxIcon.BackgroundTransparency = 1
+maxIcon.BorderSizePixel = 0
 maxIcon.Parent = maximize
 
---// Normal Maximize Icon □
+--// Normal Icon: □
 local normalIcon = Instance.new("Frame")
 normalIcon.Name = "NormalIcon"
 normalIcon.Size = UDim2.new(0, 13, 0, 13)
 normalIcon.Position = UDim2.new(0.5, -6, 0.5, -6)
 normalIcon.BackgroundTransparency = 1
-normalIcon.BorderSizePixel = 1
-normalIcon.BorderColor3 = Color3.fromRGB(190, 195, 200)
+normalIcon.BorderSizePixel = 0
 normalIcon.Parent = maxIcon
+
+local normalStroke = Instance.new("UIStroke")
+normalStroke.Thickness = 1.5
+normalStroke.Color = Color3.fromRGB(190, 195, 200)
+normalStroke.Parent = normalIcon
 
 --// Restore Icon - Back Square
 local restoreBack = Instance.new("Frame")
 restoreBack.Name = "RestoreBack"
 restoreBack.Size = UDim2.new(0, 11, 0, 11)
-restoreBack.Position = UDim2.new(0, 5, 0, 2)
+restoreBack.Position = UDim2.new(0, 6, 0, 2)
 restoreBack.BackgroundTransparency = 1
-restoreBack.BorderSizePixel = 1
-restoreBack.BorderColor3 = Color3.fromRGB(190, 195, 200)
+restoreBack.BorderSizePixel = 0
 restoreBack.Visible = false
+restoreBack.ZIndex = 2
 restoreBack.Parent = maxIcon
+
+local restoreBackStroke = Instance.new("UIStroke")
+restoreBackStroke.Thickness = 1.5
+restoreBackStroke.Color = Color3.fromRGB(190, 195, 200)
+restoreBackStroke.Parent = restoreBack
 
 --// Restore Icon - Front Square
 local restoreFront = Instance.new("Frame")
 restoreFront.Name = "RestoreFront"
 restoreFront.Size = UDim2.new(0, 11, 0, 11)
-restoreFront.Position = UDim2.new(0, 2, 0, 5)
+restoreFront.Position = UDim2.new(0, 2, 0, 6)
 restoreFront.BackgroundColor3 = Color3.fromRGB(24, 29, 34)
-restoreFront.BorderSizePixel = 1
-restoreFront.BorderColor3 = Color3.fromRGB(190, 195, 200)
+restoreFront.BorderSizePixel = 0
 restoreFront.Visible = false
+restoreFront.ZIndex = 3
 restoreFront.Parent = maxIcon
+
+local restoreFrontStroke = Instance.new("UIStroke")
+restoreFrontStroke.Thickness = 1.5
+restoreFrontStroke.Color = Color3.fromRGB(190, 195, 200)
+restoreFrontStroke.Parent = restoreFront
 
 --// Close
 local close = Instance.new("TextButton")
@@ -151,9 +164,7 @@ close.Font = Enum.Font.GothamMedium
 close.AutoButtonColor = false
 close.Parent = topBar
 
-----------------------------------------------------------------
 --// TOP BUTTON HOVER
-----------------------------------------------------------------
 
 local function setupTopButton(button, normalColor, hoverColor)
 	button.MouseEnter:Connect(function()
@@ -179,20 +190,18 @@ setupTopButton(
 
 --// Maximize Hover
 maximize.MouseEnter:Connect(function()
-	normalIcon.BorderColor3 = Color3.fromRGB(245, 245, 245)
-	restoreBack.BorderColor3 = Color3.fromRGB(245, 245, 245)
-	restoreFront.BorderColor3 = Color3.fromRGB(245, 245, 245)
+	normalStroke.Color = Color3.fromRGB(245, 245, 245)
+	restoreBackStroke.Color = Color3.fromRGB(245, 245, 245)
+	restoreFrontStroke.Color = Color3.fromRGB(245, 245, 245)
 end)
 
 maximize.MouseLeave:Connect(function()
-	normalIcon.BorderColor3 = Color3.fromRGB(190, 195, 200)
-	restoreBack.BorderColor3 = Color3.fromRGB(190, 195, 200)
-	restoreFront.BorderColor3 = Color3.fromRGB(190, 195, 200)
+	normalStroke.Color = Color3.fromRGB(190, 195, 200)
+	restoreBackStroke.Color = Color3.fromRGB(190, 195, 200)
+	restoreFrontStroke.Color = Color3.fromRGB(190, 195, 200)
 end)
 
-----------------------------------------------------------------
 --// SIDEBAR
-----------------------------------------------------------------
 
 local sidebar = Instance.new("Frame")
 sidebar.Name = "Sidebar"
@@ -220,9 +229,7 @@ content.Position = UDim2.new(0, 220, 0, 60)
 content.BackgroundTransparency = 1
 content.Parent = main
 
-----------------------------------------------------------------
 --// PAGES
-----------------------------------------------------------------
 
 local pages = {}
 
@@ -244,9 +251,7 @@ local serverPage = createPage("Server")
 local hopPage = createPage("HopAuto")
 local settingsPage = createPage("Settings")
 
-----------------------------------------------------------------
 --// PAGE TITLE
-----------------------------------------------------------------
 
 local function createPageTitle(parent, text)
 	local label = Instance.new("TextLabel")
@@ -263,9 +268,7 @@ local function createPageTitle(parent, text)
 	return label
 end
 
-----------------------------------------------------------------
 --// FARM PAGE
-----------------------------------------------------------------
 
 createPageTitle(farmPage, "Farm")
 
@@ -305,9 +308,7 @@ trickDescription.TextXAlignment = Enum.TextXAlignment.Left
 trickDescription.TextYAlignment = Enum.TextYAlignment.Top
 trickDescription.Parent = trick
 
-----------------------------------------------------------------
 --// TOGGLE FUNCTION
-----------------------------------------------------------------
 
 local function createToggle(parent, text, position, default)
 	local row = Instance.new("Frame")
@@ -380,9 +381,7 @@ local function createToggle(parent, text, position, default)
 	return row
 end
 
-----------------------------------------------------------------
 --// FARM TOGGLES
-----------------------------------------------------------------
 
 createToggle(
 	farmPage,
@@ -398,9 +397,7 @@ createToggle(
 	true
 )
 
-----------------------------------------------------------------
 --// SERVER PAGE
-----------------------------------------------------------------
 
 createPageTitle(serverPage, "Server")
 
@@ -427,9 +424,7 @@ serverText.Font = Enum.Font.GothamMedium
 serverText.TextXAlignment = Enum.TextXAlignment.Left
 serverText.Parent = serverCard
 
-----------------------------------------------------------------
 --// HOP AUTO PAGE
-----------------------------------------------------------------
 
 createPageTitle(hopPage, "Hop Auto")
 
@@ -447,9 +442,7 @@ createToggle(
 	false
 )
 
-----------------------------------------------------------------
 --// SETTINGS PAGE
-----------------------------------------------------------------
 
 createPageTitle(settingsPage, "Settings")
 
@@ -467,9 +460,7 @@ createToggle(
 	true
 )
 
-----------------------------------------------------------------
 --// SIDEBAR BUTTONS
-----------------------------------------------------------------
 
 local currentPage = nil
 local buttons = {}
@@ -573,18 +564,14 @@ local function createSidebarButton(text, icon, order, pageName)
 	return button
 end
 
-----------------------------------------------------------------
 --// SIDEBAR BUTTONS
-----------------------------------------------------------------
 
 createSidebarButton("Server", "▣", 1, "Server")
 createSidebarButton("Hop Auto", "⌂", 2, "HopAuto")
 createSidebarButton("Farm", "▱", 3, "Farm")
 createSidebarButton("Settings", "⚙", 4, "Settings")
 
-----------------------------------------------------------------
 --// DEFAULT PAGE = FARM
-----------------------------------------------------------------
 
 currentPage = "Farm"
 farmPage.Visible = true
@@ -594,17 +581,13 @@ buttons["Farm"].indicator.Visible = true
 buttons["Farm"].icon.TextColor3 = Color3.fromRGB(220, 230, 235)
 buttons["Farm"].label.TextColor3 = Color3.fromRGB(235, 240, 245)
 
-----------------------------------------------------------------
 --// CLOSE
-----------------------------------------------------------------
 
 close.MouseButton1Click:Connect(function()
 	screenGui:Destroy()
 end)
 
-----------------------------------------------------------------
 --// MAXIMIZE
-----------------------------------------------------------------
 
 local maximized = false
 
@@ -612,47 +595,51 @@ local normalSize = UDim2.new(0, 780, 0, 500)
 local normalPosition = UDim2.new(0.5, -390, 0.5, -250)
 
 maximize.MouseButton1Click:Connect(function()
+	if minimized then
+		minimized = false
+		sidebar.Visible = true
+		content.Visible = true
+	end
+
 	maximized = not maximized
 
 	if maximized then
-
 		--// Maximize Window
 		main.Size = UDim2.new(1, -40, 1, -40)
 		main.Position = UDim2.new(0, 20, 0, 20)
 
-		--// Change □ to two overlapping squares
+		--// Show two overlapping squares
 		normalIcon.Visible = false
 		restoreBack.Visible = true
 		restoreFront.Visible = true
-
 	else
-
 		--// Restore Window
 		main.Size = normalSize
 		main.Position = normalPosition
 
-		--// Change back to □
+		--// Show normal square
 		normalIcon.Visible = true
 		restoreBack.Visible = false
 		restoreFront.Visible = false
 	end
 end)
 
-----------------------------------------------------------------
 --// MINIMIZE
-----------------------------------------------------------------
 
 local minimized = false
 
 minimize.MouseButton1Click:Connect(function()
 	minimized = not minimized
 
-	sidebar.Visible = not minimized
-	content.Visible = not minimized
-
 	if minimized then
+		sidebar.Visible = false
+		content.Visible = false
+
 		main.Size = UDim2.new(0, 780, 0, 60)
 	else
+		sidebar.Visible = true
+		content.Visible = true
+
 		if maximized then
 			main.Size = UDim2.new(1, -40, 1, -40)
 		else
@@ -661,9 +648,7 @@ minimize.MouseButton1Click:Connect(function()
 	end
 end)
 
-----------------------------------------------------------------
 --// DRAG WINDOW
-----------------------------------------------------------------
 
 local dragging = false
 local dragStart
