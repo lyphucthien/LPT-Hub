@@ -68,40 +68,85 @@ separator.BackgroundTransparency = 0.5
 separator.BorderSizePixel = 0
 separator.Parent = topBar
 
+----------------------------------------------------------------
+--// TOP RIGHT BUTTONS
+----------------------------------------------------------------
+
 --// Minimize
 local minimize = Instance.new("TextButton")
+minimize.Name = "MinimizeButton"
 minimize.Size = UDim2.new(0, 45, 0, 40)
 minimize.Position = UDim2.new(1, -145, 0, 10)
 minimize.BackgroundTransparency = 1
-minimize.Text = "—"
-minimize.TextColor3 = Color3.fromRGB(180, 185, 190)
-minimize.TextSize = 20
-minimize.Font = Enum.Font.Gotham
+minimize.BorderSizePixel = 0
+minimize.Text = "−"
+minimize.TextColor3 = Color3.fromRGB(190, 195, 200)
+minimize.TextSize = 25
+minimize.Font = Enum.Font.GothamMedium
+minimize.AutoButtonColor = false
 minimize.Parent = topBar
 
 --// Maximize
 local maximize = Instance.new("TextButton")
+maximize.Name = "MaximizeButton"
 maximize.Size = UDim2.new(0, 45, 0, 40)
 maximize.Position = UDim2.new(1, -100, 0, 10)
 maximize.BackgroundTransparency = 1
+maximize.BorderSizePixel = 0
 maximize.Text = "□"
-maximize.TextColor3 = Color3.fromRGB(180, 185, 190)
-maximize.TextSize = 18
-maximize.Font = Enum.Font.Gotham
+maximize.TextColor3 = Color3.fromRGB(190, 195, 200)
+maximize.TextSize = 21
+maximize.Font = Enum.Font.GothamMedium
+maximize.AutoButtonColor = false
 maximize.Parent = topBar
 
 --// Close
 local close = Instance.new("TextButton")
+close.Name = "CloseButton"
 close.Size = UDim2.new(0, 45, 0, 40)
 close.Position = UDim2.new(1, -55, 0, 10)
 close.BackgroundTransparency = 1
+close.BorderSizePixel = 0
 close.Text = "×"
 close.TextColor3 = Color3.fromRGB(210, 215, 220)
-close.TextSize = 25
-close.Font = Enum.Font.Gotham
+close.TextSize = 29
+close.Font = Enum.Font.GothamMedium
+close.AutoButtonColor = false
 close.Parent = topBar
 
---// Sidebar
+--// Hover Effects
+local function setupTopButton(button, normalColor, hoverColor)
+	button.MouseEnter:Connect(function()
+		button.TextColor3 = hoverColor
+	end)
+
+	button.MouseLeave:Connect(function()
+		button.TextColor3 = normalColor
+	end)
+end
+
+setupTopButton(
+	minimize,
+	Color3.fromRGB(190, 195, 200),
+	Color3.fromRGB(245, 245, 245)
+)
+
+setupTopButton(
+	maximize,
+	Color3.fromRGB(190, 195, 200),
+	Color3.fromRGB(245, 245, 245)
+)
+
+setupTopButton(
+	close,
+	Color3.fromRGB(210, 215, 220),
+	Color3.fromRGB(255, 95, 95)
+)
+
+----------------------------------------------------------------
+--// SIDEBAR
+----------------------------------------------------------------
+
 local sidebar = Instance.new("Frame")
 sidebar.Name = "Sidebar"
 sidebar.Size = UDim2.new(0, 220, 1, -60)
@@ -128,7 +173,10 @@ content.Position = UDim2.new(0, 220, 0, 60)
 content.BackgroundTransparency = 1
 content.Parent = main
 
---// Pages
+----------------------------------------------------------------
+--// PAGES
+----------------------------------------------------------------
+
 local pages = {}
 
 local function createPage(name)
@@ -149,7 +197,10 @@ local serverPage = createPage("Server")
 local hopPage = createPage("HopAuto")
 local settingsPage = createPage("Settings")
 
---// Page title function
+----------------------------------------------------------------
+--// PAGE TITLE
+----------------------------------------------------------------
+
 local function createPageTitle(parent, text)
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.new(1, -50, 0, 55)
@@ -165,10 +216,13 @@ local function createPageTitle(parent, text)
 	return label
 end
 
---// Farm title
+----------------------------------------------------------------
+--// FARM PAGE
+----------------------------------------------------------------
+
 createPageTitle(farmPage, "Farm")
 
---// Trick card
+--// Trick Card
 local trick = Instance.new("Frame")
 trick.Size = UDim2.new(1, -50, 0, 90)
 trick.Position = UDim2.new(0, 25, 0, 75)
@@ -204,7 +258,10 @@ trickDescription.TextXAlignment = Enum.TextXAlignment.Left
 trickDescription.TextYAlignment = Enum.TextYAlignment.Top
 trickDescription.Parent = trick
 
---// Toggle function
+----------------------------------------------------------------
+--// TOGGLE FUNCTION
+----------------------------------------------------------------
+
 local function createToggle(parent, text, position, default)
 	local row = Instance.new("Frame")
 	row.Size = UDim2.new(1, -50, 0, 60)
@@ -229,7 +286,7 @@ local function createToggle(parent, text, position, default)
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Parent = row
 
-	-- Toggle background
+	--// Toggle Background
 	local toggle = Instance.new("TextButton")
 	toggle.Size = UDim2.new(0, 54, 0, 28)
 	toggle.Position = UDim2.new(1, -68, 0.5, -14)
@@ -245,7 +302,7 @@ local function createToggle(parent, text, position, default)
 	toggleCorner.CornerRadius = UDim.new(1, 0)
 	toggleCorner.Parent = toggle
 
-	-- Circle
+	--// Circle
 	local circle = Instance.new("Frame")
 	circle.Size = UDim2.new(0, 22, 0, 22)
 	circle.Position = default
@@ -276,7 +333,10 @@ local function createToggle(parent, text, position, default)
 	return row
 end
 
---// Farm toggles
+----------------------------------------------------------------
+--// FARM TOGGLES
+----------------------------------------------------------------
+
 createToggle(
 	farmPage,
 	"Teleport to Fruits",
@@ -291,7 +351,10 @@ createToggle(
 	true
 )
 
---// Server Page
+----------------------------------------------------------------
+--// SERVER PAGE
+----------------------------------------------------------------
+
 createPageTitle(serverPage, "Server")
 
 local serverCard = Instance.new("Frame")
@@ -317,7 +380,10 @@ serverText.Font = Enum.Font.GothamMedium
 serverText.TextXAlignment = Enum.TextXAlignment.Left
 serverText.Parent = serverCard
 
---// Hop Auto Page
+----------------------------------------------------------------
+--// HOP AUTO PAGE
+----------------------------------------------------------------
+
 createPageTitle(hopPage, "Hop Auto")
 
 createToggle(
@@ -334,7 +400,10 @@ createToggle(
 	false
 )
 
---// Settings Page
+----------------------------------------------------------------
+--// SETTINGS PAGE
+----------------------------------------------------------------
+
 createPageTitle(settingsPage, "Settings")
 
 createToggle(
@@ -351,9 +420,11 @@ createToggle(
 	true
 )
 
---// Sidebar button function
-local currentPage = nil
+----------------------------------------------------------------
+--// SIDEBAR BUTTONS
+----------------------------------------------------------------
 
+local currentPage = nil
 local buttons = {}
 
 local function createSidebarButton(text, icon, order, pageName)
@@ -372,7 +443,7 @@ local function createSidebarButton(text, icon, order, pageName)
 	corner.CornerRadius = UDim.new(0, 8)
 	corner.Parent = button
 
-	-- Icon
+	--// Icon
 	local iconLabel = Instance.new("TextLabel")
 	iconLabel.Size = UDim2.new(0, 35, 1, 0)
 	iconLabel.Position = UDim2.new(0, 12, 0, 0)
@@ -383,7 +454,7 @@ local function createSidebarButton(text, icon, order, pageName)
 	iconLabel.Font = Enum.Font.Gotham
 	iconLabel.Parent = button
 
-	-- Text
+	--// Text
 	local textLabel = Instance.new("TextLabel")
 	textLabel.Size = UDim2.new(1, -55, 1, 0)
 	textLabel.Position = UDim2.new(0, 48, 0, 0)
@@ -395,7 +466,7 @@ local function createSidebarButton(text, icon, order, pageName)
 	textLabel.TextXAlignment = Enum.TextXAlignment.Left
 	textLabel.Parent = button
 
-	-- Blue indicator
+	--// Blue Indicator
 	local indicator = Instance.new("Frame")
 	indicator.Size = UDim2.new(0, 3, 0, 32)
 	indicator.Position = UDim2.new(0, 0, 0.5, -16)
@@ -408,6 +479,7 @@ local function createSidebarButton(text, icon, order, pageName)
 	indicatorCorner.CornerRadius = UDim.new(1, 0)
 	indicatorCorner.Parent = indicator
 
+	--// Hover
 	button.MouseEnter:Connect(function()
 		if currentPage ~= pageName then
 			button.BackgroundTransparency = 0.75
@@ -420,6 +492,7 @@ local function createSidebarButton(text, icon, order, pageName)
 		end
 	end)
 
+	--// Click
 	button.MouseButton1Click:Connect(function()
 
 		for name, data in pairs(buttons) do
@@ -453,13 +526,19 @@ local function createSidebarButton(text, icon, order, pageName)
 	return button
 end
 
---// Sidebar buttons
+----------------------------------------------------------------
+--// SIDEBAR BUTTONS
+----------------------------------------------------------------
+
 createSidebarButton("Server", "▣", 1, "Server")
 createSidebarButton("Hop Auto", "⌂", 2, "HopAuto")
 createSidebarButton("Farm", "▱", 3, "Farm")
 createSidebarButton("Settings", "⚙", 4, "Settings")
 
---// Default page = Farm
+----------------------------------------------------------------
+--// DEFAULT PAGE = FARM
+----------------------------------------------------------------
+
 currentPage = "Farm"
 farmPage.Visible = true
 
@@ -468,13 +547,20 @@ buttons["Farm"].indicator.Visible = true
 buttons["Farm"].icon.TextColor3 = Color3.fromRGB(220, 230, 235)
 buttons["Farm"].label.TextColor3 = Color3.fromRGB(235, 240, 245)
 
---// Close
+----------------------------------------------------------------
+--// CLOSE
+----------------------------------------------------------------
+
 close.MouseButton1Click:Connect(function()
 	screenGui:Destroy()
 end)
 
---// Maximize
+----------------------------------------------------------------
+--// MAXIMIZE
+----------------------------------------------------------------
+
 local maximized = false
+
 local normalSize = UDim2.new(0, 780, 0, 500)
 local normalPosition = UDim2.new(0.5, -390, 0.5, -250)
 
@@ -490,7 +576,10 @@ maximize.MouseButton1Click:Connect(function()
 	end
 end)
 
---// Minimize
+----------------------------------------------------------------
+--// MINIMIZE
+----------------------------------------------------------------
+
 local minimized = false
 
 minimize.MouseButton1Click:Connect(function()
@@ -510,13 +599,15 @@ minimize.MouseButton1Click:Connect(function()
 	end
 end)
 
---// Drag window
+----------------------------------------------------------------
+--// DRAG WINDOW
+----------------------------------------------------------------
+
 local dragging = false
 local dragStart
 local startPos
 
 topBar.InputBegan:Connect(function(input)
-
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		dragging = true
 		dragStart = input.Position
@@ -525,14 +616,12 @@ topBar.InputBegan:Connect(function(input)
 end)
 
 topBar.InputEnded:Connect(function(input)
-
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		dragging = false
 	end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-
 	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
 
 		local delta = input.Position - dragStart
