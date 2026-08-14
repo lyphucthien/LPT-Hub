@@ -1,4 +1,4 @@
-local KEY_UI_URL = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/KeyUI.luau"
+local Loader_Key = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/KeyUI.luau"
 
 local function loadRaw(url)
 	local success, result = pcall(function()
@@ -20,7 +20,7 @@ local function loadRaw(url)
 	return result
 end
 
-local keyUI = loadRaw(KEY_UI_URL)
+local keyUI = loadRaw(Loader_Key)
 
 if keyUI then
 	local success, err = pcall(keyUI)
