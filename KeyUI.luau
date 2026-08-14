@@ -213,28 +213,27 @@ local function showNotification(titleText, messageText, notificationType)
 		Enum.EasingStyle.Linear
 	)
 
-	-- Sau 3 giây trượt ra
 	task.delay(3, function()
 		if not notification.Parent then
 			return
 		end
 
+		-- Trượt xuống dưới, không làm mờ
 		tween(
 			notification,
 			{
 				Position = UDim2.new(
 					shownPosition.X.Scale,
-					shownPosition.X.Offset + 330,
+					shownPosition.X.Offset,
 					shownPosition.Y.Scale,
-					shownPosition.Y.Offset
+					shownPosition.Y.Offset + 100
 				),
-				BackgroundTransparency = 1,
 			},
-			0.25,
+			0.3,
 			Enum.EasingStyle.Quart
 		)
 
-		task.wait(0.28)
+		task.wait(0.32)
 
 		if notification.Parent then
 			notification:Destroy()
