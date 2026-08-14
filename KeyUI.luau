@@ -129,6 +129,8 @@ local function showNotification(titleText, messageText, notificationType)
 	local notification = Instance.new("Frame")
 	notification.Name = "Notification"
 
+	notification.AnchorPoint = Vector2.new(1, 1)
+
 	notification.Size = UDim2.new(
 		0,
 		NOTIFICATION_WIDTH,
@@ -141,7 +143,6 @@ local function showNotification(titleText, messageText, notificationType)
 		1,
 		40,
 		1,
-		getNotificationY(1)
 	)
 
 	notification.BackgroundColor3 = Color3.fromRGB(10, 18, 30)
@@ -237,15 +238,14 @@ local function showNotification(titleText, messageText, notificationType)
 	-- Đưa notification cũ lên
 	updateNotificationPositions()
 
-	-- Notification mới trượt từ phải vào đúng góc phải dưới
 	tween(
 		notification,
 		{
 			Position = UDim2.new(
 				1,
-				-NOTIFICATION_WIDTH - 20,
+				-20,
 				1,
-				getNotificationY(1)
+				-20
 			)
 		},
 		0.3,
@@ -275,7 +275,7 @@ local function showNotification(titleText, messageText, notificationType)
 			{
 				Position = UDim2.new(
 					1,
-					-NOTIFICATION_WIDTH - 20,
+					- 20,
 					1,
 					80
 				)
