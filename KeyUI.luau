@@ -8,7 +8,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 --// CONFIG
 --// ============================================================
 
-local MAIN_UI = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/LPT_Hub.luau"
+local MAIN_UI = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/MainUI.luau"
 
 local VALID_KEYS = {
 	["LPT-HUB"] = true,
