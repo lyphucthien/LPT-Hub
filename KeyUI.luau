@@ -65,6 +65,7 @@ local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "LPTKeyUI"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.IgnoreGuiInset = true
 screenGui.Parent = playerGui
 
 --// ============================================================
@@ -73,11 +74,8 @@ screenGui.Parent = playerGui
 
 local notificationHolder = Instance.new("Frame")
 notificationHolder.Name = "NotificationHolder"
-
--- phủ toàn bộ màn hình
 notificationHolder.Size = UDim2.new(1, 0, 1, 0)
 notificationHolder.Position = UDim2.new(0, 0, 0, 0)
-
 notificationHolder.BackgroundTransparency = 1
 notificationHolder.BorderSizePixel = 0
 notificationHolder.ZIndex = 100
@@ -89,8 +87,16 @@ local NOTIFICATION_WIDTH = 310
 local NOTIFICATION_HEIGHT = 74
 local NOTIFICATION_GAP = 10
 
-local function getNotificationY(index)
-	return -20 - ((index - 1) * (NOTIFICATION_HEIGHT + NOTIFICATION_GAP))
+local RIGHT_MARGIN = 20
+local BOTTOM_MARGIN = 20
+
+local function getNotificationPosition(index)
+	return UDim2.new(
+		1,
+		-RIGHT_MARGIN,
+		1,
+		-BOTTOM_MARGIN - ((index - 1) * (NOTIFICATION_HEIGHT + NOTIFICATION_GAP))
+	)
 end
 
 local function updateNotificationPositions()
@@ -99,12 +105,7 @@ local function updateNotificationPositions()
 			tween(
 				notification,
 				{
-					Position = UDim2.new(
-						1,
-						-NOTIFICATION_WIDTH - 20,
-						1,
-						getNotificationY(index)
-					)
+					Position = getNotificationPosition(index)
 				},
 				0.25,
 				Enum.EasingStyle.Quart
@@ -129,6 +130,8 @@ local function showNotification(titleText, messageText, notificationType)
 	local notification = Instance.new("Frame")
 	notification.Name = "Notification"
 
+	-- QUAN TRỌNG
+	-- Neo theo góc phải dưới
 	notification.AnchorPoint = Vector2.new(1, 1)
 
 	notification.Size = UDim2.new(
@@ -141,9 +144,9 @@ local function showNotification(titleText, messageText, notificationType)
 	-- Bắt đầu ngoài màn hình bên phải
 	notification.Position = UDim2.new(
 		1,
-		40,
+		NOTIFICATION_WIDTH + 50,
 		1,
-		-20
+		-BOTTOM_MARGIN
 	)
 
 	notification.BackgroundColor3 = Color3.fromRGB(10, 18, 30)
@@ -224,7 +227,7 @@ local function showNotification(titleText, messageText, notificationType)
 	notificationMessage.ZIndex = 102
 	notificationMessage.Parent = notification
 
-	-- Progress
+	-- Progress bar
 	local progress = Instance.new("Frame")
 	progress.Size = UDim2.new(1, 0, 0, 2)
 	progress.Position = UDim2.new(0, 0, 1, -2)
@@ -233,27 +236,23 @@ local function showNotification(titleText, messageText, notificationType)
 	progress.ZIndex = 103
 	progress.Parent = notification
 
-	-- Thêm vào danh sách
+	-- Thêm notification mới
 	table.insert(activeNotifications, 1, notification)
 
-	-- Đưa notification cũ lên
+	-- Cập nhật notification cũ
 	updateNotificationPositions()
 
+	-- Trượt từ bên phải vào
 	tween(
 		notification,
 		{
-			Position = UDim2.new(
-				1,
-				-20,
-				1,
-				-20
-			)
+			Position = getNotificationPosition(1)
 		},
 		0.3,
 		Enum.EasingStyle.Quart
 	)
 
-	-- Thanh thời gian
+	-- Progress 3 giây
 	tween(
 		progress,
 		{
@@ -263,29 +262,28 @@ local function showNotification(titleText, messageText, notificationType)
 		Enum.EasingStyle.Linear
 	)
 
-	-- Hết thời gian
+	-- Sau 3 giây: trượt xuống dưới
 	task.delay(3, function()
 
 		if not notification.Parent then
 			return
 		end
 
-		-- Trượt xuống dưới
 		tween(
 			notification,
 			{
 				Position = UDim2.new(
 					1,
-					- 20,
+					-RIGHT_MARGIN,
 					1,
-					80
+					NOTIFICATION_HEIGHT + 30
 				)
 			},
 			0.35,
 			Enum.EasingStyle.Quart
 		)
 
-		task.wait(0.38)
+		task.wait(0.4)
 
 		if notification.Parent then
 			notification:Destroy()
@@ -299,7 +297,6 @@ local function showNotification(titleText, messageText, notificationType)
 			end
 		end
 
-		-- Sắp xếp lại các notification còn lại
 		updateNotificationPositions()
 	end)
 end
