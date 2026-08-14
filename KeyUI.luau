@@ -143,6 +143,7 @@ local function showNotification(titleText, messageText, notificationType)
 		1,
 		40,
 		1,
+		-20
 	)
 
 	notification.BackgroundColor3 = Color3.fromRGB(10, 18, 30)
