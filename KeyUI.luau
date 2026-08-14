@@ -74,19 +74,35 @@ screenGui.Parent = playerGui
 local notificationHolder = Instance.new("Frame")
 notificationHolder.Name = "NotificationHolder"
 notificationHolder.Size = UDim2.new(0, 330, 0, 260)
-notificationHolder.Position = UDim2.new(1, -345, 1, -275)
+notificationHolder.Position = UDim2.new(1, -330, 1, -260)
 notificationHolder.BackgroundTransparency = 1
 notificationHolder.BorderSizePixel = 0
 notificationHolder.ZIndex = 100
 notificationHolder.Parent = screenGui
 
-local notificationLayout = Instance.new("UIListLayout")
-notificationLayout.FillDirection = Enum.FillDirection.Vertical
-notificationLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-notificationLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
-notificationLayout.Padding = UDim.new(0, 10)
-notificationLayout.SortOrder = Enum.SortOrder.LayoutOrder
-notificationLayout.Parent = notificationHolder
+local activeNotifications = {}
+
+local function updateNotificationPositions()
+	for index, notification in ipairs(activeNotifications) do
+		if notification and notification.Parent then
+			local targetY = -((index - 1) * 84 + 10)
+
+			tween(
+				notification,
+				{
+					Position = UDim2.new(
+						1,
+						-310,
+						1,
+						targetY
+					)
+				},
+				0.25,
+				Enum.EasingStyle.Quart
+			)
+		end
+	end
+end
 
 local function showNotification(titleText, messageText, notificationType)
 	local accentColor = COLORS.Success
@@ -103,6 +119,10 @@ local function showNotification(titleText, messageText, notificationType)
 	local notification = Instance.new("Frame")
 	notification.Name = "Notification"
 	notification.Size = UDim2.new(0, 310, 0, 74)
+
+	-- Bắt đầu ngoài màn hình bên phải
+	notification.Position = UDim2.new(1, 330, 1, -10)
+
 	notification.BackgroundColor3 = Color3.fromRGB(10, 18, 30)
 	notification.BackgroundTransparency = 0.04
 	notification.BorderSizePixel = 0
@@ -119,14 +139,13 @@ local function showNotification(titleText, messageText, notificationType)
 	stroke.Transparency = 0.15
 	stroke.Parent = notification
 
-	-- Thanh màu bên trái
+	-- Accent bar
 	local accentBar = Instance.new("Frame")
 	accentBar.Size = UDim2.new(0, 4, 1, -18)
 	accentBar.Position = UDim2.new(0, 0, 0.5, 0)
 	accentBar.AnchorPoint = Vector2.new(0, 0.5)
 	accentBar.BackgroundColor3 = accentColor
 	accentBar.BorderSizePixel = 0
-	accentBar.ZIndex = 102
 	accentBar.Parent = notification
 
 	local accentCorner = Instance.new("UICorner")
@@ -144,7 +163,6 @@ local function showNotification(titleText, messageText, notificationType)
 	icon.TextColor3 = accentColor
 	icon.TextSize = 15
 	icon.Font = Enum.Font.GothamBold
-	icon.ZIndex = 102
 	icon.Parent = notification
 
 	local iconCorner = Instance.new("UICorner")
@@ -161,10 +179,9 @@ local function showNotification(titleText, messageText, notificationType)
 	notificationTitle.TextSize = 13
 	notificationTitle.Font = Enum.Font.GothamBold
 	notificationTitle.TextXAlignment = Enum.TextXAlignment.Left
-	notificationTitle.ZIndex = 102
 	notificationTitle.Parent = notification
 
-	-- Nội dung
+	-- Message
 	local notificationMessage = Instance.new("TextLabel")
 	notificationMessage.Size = UDim2.new(1, -62, 0, 30)
 	notificationMessage.Position = UDim2.new(0, 55, 0, 32)
@@ -176,40 +193,43 @@ local function showNotification(titleText, messageText, notificationType)
 	notificationMessage.TextWrapped = true
 	notificationMessage.TextXAlignment = Enum.TextXAlignment.Left
 	notificationMessage.TextYAlignment = Enum.TextYAlignment.Top
-	notificationMessage.ZIndex = 102
 	notificationMessage.Parent = notification
 
+	-- Progress bar
 	local progress = Instance.new("Frame")
 	progress.Size = UDim2.new(1, 0, 0, 2)
 	progress.Position = UDim2.new(0, 0, 1, -2)
 	progress.BackgroundColor3 = accentColor
 	progress.BorderSizePixel = 0
-	progress.ZIndex = 103
 	progress.Parent = notification
 
-	local shownPosition = notification.Position
+	table.insert(activeNotifications, 1, notification)
 
-	notification.Position = UDim2.new(
-		shownPosition.X.Scale,
-		shownPosition.X.Offset + 330,
-		shownPosition.Y.Scale,
-		shownPosition.Y.Offset
-	)
+	-- Đưa các notification cũ lên trên
+	updateNotificationPositions()
 
-	-- Slide vào
+	-- Notification mới trượt từ phải vào
 	tween(
 		notification,
 		{
-			Position = shownPosition
+			Position = UDim2.new(
+				1,
+				-310,
+				1,
+				-10
+			)
 		},
 		0.3,
 		Enum.EasingStyle.Quart
 	)
 
-	-- Thanh progress
+	-- Progress chạy trong 3 giây
 	tween(
 		progress,
-		{Size = UDim2.new(0, 0, 0, 2)},3,
+		{
+			Size = UDim2.new(0, 0, 0, 2)
+		},
+		3,
 		Enum.EasingStyle.Linear
 	)
 
@@ -218,26 +238,35 @@ local function showNotification(titleText, messageText, notificationType)
 			return
 		end
 
-		-- Trượt xuống dưới, không làm mờ
+		-- Trượt xuống dưới, KHÔNG fade
 		tween(
 			notification,
 			{
 				Position = UDim2.new(
-					shownPosition.X.Scale,
-					shownPosition.X.Offset,
-					shownPosition.Y.Scale,
-					shownPosition.Y.Offset + 100
-				),
+					1,
+					-310,
+					1,
+					80
+				)
 			},
-			0.3,
+			0.35,
 			Enum.EasingStyle.Quart
 		)
 
-		task.wait(0.32)
+		task.wait(0.38)
 
 		if notification.Parent then
 			notification:Destroy()
 		end
+
+		for i, item in ipairs(activeNotifications) do
+			if item == notification then
+				table.remove(activeNotifications, i)
+				break
+			end
+		end
+
+		updateNotificationPositions()
 	end)
 end
 
@@ -590,10 +619,11 @@ local function attemptSubmit()
 	if checkKey(key) then
 		showNotification(
 			"Key Valid!",
-			"Key hợp lệ, đang mở LPT Hub...",
+			"Key hợp lệ, đang mở...",
 			"success"
 		)
 
+		submitting = false
 		openMainUI()
 	else
 		keyStatus.TextColor3 = COLORS.Danger
