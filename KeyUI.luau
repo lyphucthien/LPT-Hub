@@ -4,10 +4,6 @@ local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
---// ============================================================
---// CONFIG
---// ============================================================
-
 local MAIN_UI = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/MainUI.luau"
 
 local VALID_KEYS = {
@@ -70,6 +66,181 @@ screenGui.Name = "LPTKeyUI"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = playerGui
+
+--// ============================================================
+--// NOTIFICATION SYSTEM
+--// ============================================================
+
+local notificationHolder = Instance.new("Frame")
+notificationHolder.Name = "NotificationHolder"
+notificationHolder.Size = UDim2.new(0, 330, 0, 260)
+notificationHolder.Position = UDim2.new(1, -345, 1, -275)
+notificationHolder.BackgroundTransparency = 1
+notificationHolder.BorderSizePixel = 0
+notificationHolder.ZIndex = 100
+notificationHolder.Parent = screenGui
+
+local notificationLayout = Instance.new("UIListLayout")
+notificationLayout.FillDirection = Enum.FillDirection.Vertical
+notificationLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+notificationLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+notificationLayout.Padding = UDim.new(0, 10)
+notificationLayout.SortOrder = Enum.SortOrder.LayoutOrder
+notificationLayout.Parent = notificationHolder
+
+local function showNotification(titleText, messageText, notificationType)
+	local accentColor = COLORS.Success
+	local iconText = "✓"
+
+	if notificationType == "error" then
+		accentColor = COLORS.Danger
+		iconText = "!"
+	elseif notificationType == "info" then
+		accentColor = COLORS.Accent
+		iconText = "i"
+	end
+
+	local notification = Instance.new("Frame")
+	notification.Name = "Notification"
+	notification.Size = UDim2.new(0, 310, 0, 74)
+	notification.BackgroundColor3 = Color3.fromRGB(10, 18, 30)
+	notification.BackgroundTransparency = 0.04
+	notification.BorderSizePixel = 0
+	notification.ZIndex = 101
+	notification.Parent = notificationHolder
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 12)
+	corner.Parent = notification
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = COLORS.Border
+	stroke.Thickness = 1
+	stroke.Transparency = 0.15
+	stroke.Parent = notification
+
+	-- Thanh màu bên trái
+	local accentBar = Instance.new("Frame")
+	accentBar.Size = UDim2.new(0, 4, 1, -18)
+	accentBar.Position = UDim2.new(0, 0, 0.5, 0)
+	accentBar.AnchorPoint = Vector2.new(0, 0.5)
+	accentBar.BackgroundColor3 = accentColor
+	accentBar.BorderSizePixel = 0
+	accentBar.ZIndex = 102
+	accentBar.Parent = notification
+
+	local accentCorner = Instance.new("UICorner")
+	accentCorner.CornerRadius = UDim.new(1, 0)
+	accentCorner.Parent = accentBar
+
+	-- Icon
+	local icon = Instance.new("TextLabel")
+	icon.Size = UDim2.new(0, 30, 0, 30)
+	icon.Position = UDim2.new(0, 13, 0, 12)
+	icon.BackgroundColor3 = accentColor
+	icon.BackgroundTransparency = 0.82
+	icon.BorderSizePixel = 0
+	icon.Text = iconText
+	icon.TextColor3 = accentColor
+	icon.TextSize = 15
+	icon.Font = Enum.Font.GothamBold
+	icon.ZIndex = 102
+	icon.Parent = notification
+
+	local iconCorner = Instance.new("UICorner")
+	iconCorner.CornerRadius = UDim.new(1, 0)
+	iconCorner.Parent = icon
+
+	-- Title
+	local notificationTitle = Instance.new("TextLabel")
+	notificationTitle.Size = UDim2.new(1, -62, 0, 21)
+	notificationTitle.Position = UDim2.new(0, 55, 0, 10)
+	notificationTitle.BackgroundTransparency = 1
+	notificationTitle.Text = titleText
+	notificationTitle.TextColor3 = COLORS.Text
+	notificationTitle.TextSize = 13
+	notificationTitle.Font = Enum.Font.GothamBold
+	notificationTitle.TextXAlignment = Enum.TextXAlignment.Left
+	notificationTitle.ZIndex = 102
+	notificationTitle.Parent = notification
+
+	-- Nội dung
+	local notificationMessage = Instance.new("TextLabel")
+	notificationMessage.Size = UDim2.new(1, -62, 0, 30)
+	notificationMessage.Position = UDim2.new(0, 55, 0, 32)
+	notificationMessage.BackgroundTransparency = 1
+	notificationMessage.Text = messageText
+	notificationMessage.TextColor3 = COLORS.TextDim
+	notificationMessage.TextSize = 11
+	notificationMessage.Font = Enum.Font.Gotham
+	notificationMessage.TextWrapped = true
+	notificationMessage.TextXAlignment = Enum.TextXAlignment.Left
+	notificationMessage.TextYAlignment = Enum.TextYAlignment.Top
+	notificationMessage.ZIndex = 102
+	notificationMessage.Parent = notification
+
+	local progress = Instance.new("Frame")
+	progress.Size = UDim2.new(1, 0, 0, 2)
+	progress.Position = UDim2.new(0, 0, 1, -2)
+	progress.BackgroundColor3 = accentColor
+	progress.BorderSizePixel = 0
+	progress.ZIndex = 103
+	progress.Parent = notification
+
+	local shownPosition = notification.Position
+
+	notification.Position = UDim2.new(
+		shownPosition.X.Scale,
+		shownPosition.X.Offset + 330,
+		shownPosition.Y.Scale,
+		shownPosition.Y.Offset
+	)
+
+	-- Slide vào
+	tween(
+		notification,
+		{
+			Position = shownPosition
+		},
+		0.3,
+		Enum.EasingStyle.Quart
+	)
+
+	-- Thanh progress
+	tween(
+		progress,
+		{Size = UDim2.new(0, 0, 0, 2)},3,
+		Enum.EasingStyle.Linear
+	)
+
+	-- Sau 3 giây trượt ra
+	task.delay(3, function()
+		if not notification.Parent then
+			return
+		end
+
+		tween(
+			notification,
+			{
+				Position = UDim2.new(
+					shownPosition.X.Scale,
+					shownPosition.X.Offset + 330,
+					shownPosition.Y.Scale,
+					shownPosition.Y.Offset
+				),
+				BackgroundTransparency = 1,
+			},
+			0.25,
+			Enum.EasingStyle.Quart
+		)
+
+		task.wait(0.28)
+
+		if notification.Parent then
+			notification:Destroy()
+		end
+	end)
+end
 
 --// ============================================================
 --// KEY UI
@@ -269,6 +440,13 @@ getKeyButton.MouseButton1Click:Connect(function()
 	if setclipboard then
 		setclipboard(GET_KEY_LINK)
 
+		-- Hiện notification NGAY LẬP TỨC
+		showNotification(
+			"Link Copied!",
+			"link đã được copy",
+			"success"
+		)
+
 		getKeyButton.Text = "LINK COPIED!"
 
 		task.delay(1.2, function()
@@ -276,6 +454,12 @@ getKeyButton.MouseButton1Click:Connect(function()
 				getKeyButton.Text = "GET KEY"
 			end
 		end)
+	else
+		showNotification(
+			"Copy Failed",
+			"Không thể copy link.",
+			"error"
+		)
 	end
 end)
 
@@ -405,6 +589,12 @@ local function attemptSubmit()
 	end
 
 	if checkKey(key) then
+		showNotification(
+			"Key Valid!",
+			"Key hợp lệ, đang mở LPT Hub...",
+			"success"
+		)
+
 		openMainUI()
 	else
 		keyStatus.TextColor3 = COLORS.Danger
