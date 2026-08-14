@@ -1,8 +1,42 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+
+--// PALETTE (more vibrant)
+local COLORS = {
+	Background = Color3.fromRGB(10, 11, 16),
+	Surface = Color3.fromRGB(14, 15, 21),
+	SurfaceLight = Color3.fromRGB(40, 44, 58),
+	Card = Color3.fromRGB(34, 38, 50),
+	Accent = Color3.fromRGB(168, 105, 245),   -- purple
+	AccentB = Color3.fromRGB(236, 72, 153),   -- pink (gradient partner)
+	Text = Color3.fromRGB(240, 241, 245),
+	TextDim = Color3.fromRGB(150, 157, 170),
+	Border = Color3.fromRGB(52, 56, 70),
+	Danger = Color3.fromRGB(255, 92, 108),
+	Online = Color3.fromRGB(52, 211, 153), -- xanh lá cho chấm trạng thái
+
+	-- per-page accent colors
+	PageServer = Color3.fromRGB(96, 165, 250),   -- blue
+	PageHop = Color3.fromRGB(168, 105, 245),     -- purple
+	PageFarm = Color3.fromRGB(74, 222, 128),     -- green
+	PageSettings = Color3.fromRGB(251, 146, 60), -- orange
+}
+
+local function tween(obj, props, time, style)
+	TweenService:Create(obj, TweenInfo.new(time or 0.18, style or Enum.EasingStyle.Quad), props):Play()
+end
+
+local function applyGradient(guiObject, colorA, colorB, rotation)
+	local gradient = Instance.new("UIGradient")
+	gradient.Color = ColorSequence.new(colorA, colorB)
+	gradient.Rotation = rotation or 45
+	gradient.Parent = guiObject
+	return gradient
+end
 
 --// ScreenGui
 local screenGui = Instance.new("ScreenGui")
@@ -16,86 +50,142 @@ local main = Instance.new("Frame")
 main.Name = "MainWindow"
 main.Size = UDim2.new(0, 780, 0, 500)
 main.Position = UDim2.new(0.5, -390, 0.5, -250)
-main.BackgroundColor3 = Color3.fromRGB(27, 33, 39)
-main.BackgroundTransparency = 0.05
+main.BackgroundColor3 = COLORS.Background
 main.BorderSizePixel = 0
 main.ClipsDescendants = true
 main.Parent = screenGui
 
 local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.CornerRadius = UDim.new(0, 20)
 mainCorner.Parent = main
+
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = COLORS.Border
+mainStroke.Thickness = 1.5
+mainStroke.Transparency = 0.2
+mainStroke.Parent = main
+applyGradient(mainStroke, COLORS.Accent, COLORS.AccentB, 45)
 
 --// Top Bar
 local topBar = Instance.new("Frame")
 topBar.Name = "TopBar"
-topBar.Size = UDim2.new(1, 0, 0, 60)
-topBar.BackgroundColor3 = Color3.fromRGB(24, 29, 34)
-topBar.BackgroundTransparency = 0.08
+topBar.Size = UDim2.new(1, 0, 0, 38)
+topBar.BackgroundColor3 = COLORS.Surface
 topBar.BorderSizePixel = 0
 topBar.Parent = main
 
+local topBarCorner = Instance.new("UICorner")
+topBarCorner.CornerRadius = UDim.new(0, 20)
+topBarCorner.Parent = topBar
+
+local topBarMask = Instance.new("Frame")
+topBarMask.Name = "BottomMask"
+topBarMask.Size = UDim2.new(1, 0, 0, 20)
+topBarMask.Position = UDim2.new(0, 0, 1, -20)
+topBarMask.BackgroundColor3 = COLORS.Surface
+topBarMask.BorderSizePixel = 0
+topBarMask.ZIndex = topBar.ZIndex
+topBarMask.Parent = topBar
+
 --// Title
+local titleDot = Instance.new("Frame")
+titleDot.Size = UDim2.new(0, 8, 0, 8)
+titleDot.Position = UDim2.new(0, 20, 0.5, -4)
+titleDot.BackgroundColor3 = COLORS.Online
+titleDot.BorderSizePixel = 0
+titleDot.ZIndex = 2
+titleDot.Parent = topBar
+
+local titleDotCorner = Instance.new("UICorner")
+titleDotCorner.CornerRadius = UDim.new(1, 0)
+titleDotCorner.Parent = titleDot
+
+local titleDotPulse = Instance.new("Frame")
+titleDotPulse.Size = UDim2.new(0, 8, 0, 8)
+titleDotPulse.Position = UDim2.new(0.5, -4, 0.5, -4)
+titleDotPulse.BackgroundColor3 = COLORS.Online
+titleDotPulse.BackgroundTransparency = 0.3
+titleDotPulse.BorderSizePixel = 0
+titleDotPulse.ZIndex = 1
+titleDotPulse.Parent = titleDot
+
+local titleDotPulseCorner = Instance.new("UICorner")
+titleDotPulseCorner.CornerRadius = UDim.new(1, 0)
+titleDotPulseCorner.Parent = titleDotPulse
+
+task.spawn(function()
+	while titleDotPulse.Parent do
+		titleDotPulse.Size = UDim2.new(0, 8, 0, 8)
+		titleDotPulse.Position = UDim2.new(0.5, -4, 0.5, -4)
+		titleDotPulse.BackgroundTransparency = 0.3
+		tween(titleDotPulse, {
+			Size = UDim2.new(0, 22, 0, 22),
+			Position = UDim2.new(0.5, -11, 0.5, -11),
+			BackgroundTransparency = 1,
+		}, 1.1, Enum.EasingStyle.Quad)
+		task.wait(1.1)
+	end
+end)
+
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(0, 105, 1, 0)
-title.Position = UDim2.new(0, 22, 0, 0)
+title.Position = UDim2.new(0, 36, 0, 0)
 title.BackgroundTransparency = 1
 title.Text = "LPT Hub"
-title.TextColor3 = Color3.fromRGB(225, 225, 225)
-title.TextSize = 18
-title.Font = Enum.Font.GothamMedium
+title.TextColor3 = COLORS.Text
+title.TextSize = 17
+title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = topBar
+
+applyGradient(title, COLORS.Accent, COLORS.AccentB, 0)
 
 --// Author
 local author = Instance.new("TextLabel")
 author.Size = UDim2.new(0, 170, 1, 0)
-author.Position = UDim2.new(0, 110, 0, 0)
+author.Position = UDim2.new(0, 120, 0, 0)
 author.BackgroundTransparency = 1
 author.Text = "by Ly Phuc Thien"
-author.TextColor3 = Color3.fromRGB(135, 142, 150)
-author.TextSize = 13
+author.TextColor3 = COLORS.TextDim
+author.TextSize = 11
 author.Font = Enum.Font.Gotham
 author.TextXAlignment = Enum.TextXAlignment.Left
 author.Parent = topBar
 
---// Top separator
 local separator = Instance.new("Frame")
 separator.Size = UDim2.new(1, 0, 0, 1)
 separator.Position = UDim2.new(0, 0, 1, -1)
-separator.BackgroundColor3 = Color3.fromRGB(60, 67, 74)
-separator.BackgroundTransparency = 0.5
+separator.BackgroundColor3 = COLORS.Border
 separator.BorderSizePixel = 0
 separator.Parent = topBar
 
 --// TOP RIGHT BUTTONS
+local function topButton(name, xOffset, text, textSize)
+	local button = Instance.new("TextButton")
+	button.Name = name
+	button.Size = UDim2.new(0, 30, 0, 26)
+	button.Position = UDim2.new(1, xOffset, 0.5, -13)
+	button.BackgroundColor3 = COLORS.SurfaceLight
+	button.BackgroundTransparency = 1
+	button.BorderSizePixel = 0
+	button.Text = text
+	button.TextColor3 = COLORS.TextDim
+	button.TextSize = textSize
+	button.Font = Enum.Font.GothamMedium
+	button.AutoButtonColor = false
+	button.Parent = topBar
 
---// Minimize
-local minimize = Instance.new("TextButton")
-minimize.Name = "MinimizeButton"
-minimize.Size = UDim2.new(0, 45, 0, 40)
-minimize.Position = UDim2.new(1, -145, 0, 10)
-minimize.BackgroundTransparency = 1
-minimize.BorderSizePixel = 0
-minimize.Text = "−"
-minimize.TextColor3 = Color3.fromRGB(190, 195, 200)
-minimize.TextSize = 25
-minimize.Font = Enum.Font.GothamMedium
-minimize.AutoButtonColor = false
-minimize.Parent = topBar
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = button
 
---// Maximize Button
-local maximize = Instance.new("TextButton")
-maximize.Name = "MaximizeButton"
-maximize.Size = UDim2.new(0, 45, 0, 40)
-maximize.Position = UDim2.new(1, -100, 0, 10)
-maximize.BackgroundTransparency = 1
-maximize.BorderSizePixel = 0
-maximize.Text = ""
-maximize.AutoButtonColor = false
-maximize.Parent = topBar
+	return button
+end
 
---// Maximize Icon Container
+local minimize = topButton("MinimizeButton", -110, "—", 13)
+local maximize = topButton("MaximizeButton", -76, "", 0)
+local close = topButton("CloseButton", -40, "×", 17)
+
 local maxIcon = Instance.new("Frame")
 maxIcon.Name = "MaxIcon"
 maxIcon.Size = UDim2.new(0, 20, 0, 20)
@@ -104,7 +194,6 @@ maxIcon.BackgroundTransparency = 1
 maxIcon.BorderSizePixel = 0
 maxIcon.Parent = maximize
 
---// Normal Icon: □
 local normalIcon = Instance.new("Frame")
 normalIcon.Name = "NormalIcon"
 normalIcon.Size = UDim2.new(0, 13, 0, 13)
@@ -113,12 +202,15 @@ normalIcon.BackgroundTransparency = 1
 normalIcon.BorderSizePixel = 0
 normalIcon.Parent = maxIcon
 
+local normalCorner = Instance.new("UICorner")
+normalCorner.CornerRadius = UDim.new(0, 3)
+normalCorner.Parent = normalIcon
+
 local normalStroke = Instance.new("UIStroke")
 normalStroke.Thickness = 1.5
-normalStroke.Color = Color3.fromRGB(190, 195, 200)
+normalStroke.Color = COLORS.TextDim
 normalStroke.Parent = normalIcon
 
---// Restore Icon - Back Square
 local restoreBack = Instance.new("Frame")
 restoreBack.Name = "RestoreBack"
 restoreBack.Size = UDim2.new(0, 11, 0, 11)
@@ -129,218 +221,250 @@ restoreBack.Visible = false
 restoreBack.ZIndex = 2
 restoreBack.Parent = maxIcon
 
+local restoreBackCorner = Instance.new("UICorner")
+restoreBackCorner.CornerRadius = UDim.new(0, 2)
+restoreBackCorner.Parent = restoreBack
+
 local restoreBackStroke = Instance.new("UIStroke")
 restoreBackStroke.Thickness = 1.5
-restoreBackStroke.Color = Color3.fromRGB(190, 195, 200)
+restoreBackStroke.Color = COLORS.TextDim
 restoreBackStroke.Parent = restoreBack
 
---// Restore Icon - Front Square
 local restoreFront = Instance.new("Frame")
 restoreFront.Name = "RestoreFront"
 restoreFront.Size = UDim2.new(0, 11, 0, 11)
 restoreFront.Position = UDim2.new(0, 2, 0, 6)
-restoreFront.BackgroundColor3 = Color3.fromRGB(24, 29, 34)
+restoreFront.BackgroundColor3 = COLORS.Surface
 restoreFront.BorderSizePixel = 0
 restoreFront.Visible = false
 restoreFront.ZIndex = 3
 restoreFront.Parent = maxIcon
 
+local restoreFrontCorner = Instance.new("UICorner")
+restoreFrontCorner.CornerRadius = UDim.new(0, 2)
+restoreFrontCorner.Parent = restoreFront
+
 local restoreFrontStroke = Instance.new("UIStroke")
 restoreFrontStroke.Thickness = 1.5
-restoreFrontStroke.Color = Color3.fromRGB(190, 195, 200)
+restoreFrontStroke.Color = COLORS.TextDim
 restoreFrontStroke.Parent = restoreFront
 
---// Close
-local close = Instance.new("TextButton")
-close.Name = "CloseButton"
-close.Size = UDim2.new(0, 45, 0, 40)
-close.Position = UDim2.new(1, -55, 0, 10)
-close.BackgroundTransparency = 1
-close.BorderSizePixel = 0
-close.Text = "×"
-close.TextColor3 = Color3.fromRGB(210, 215, 220)
-close.TextSize = 29
-close.Font = Enum.Font.GothamMedium
-close.AutoButtonColor = false
-close.Parent = topBar
-
---// TOP BUTTON HOVER
-
-local function setupTopButton(button, normalColor, hoverColor)
+local function setupTopButton(button, hoverColor, hoverBg)
 	button.MouseEnter:Connect(function()
-		button.TextColor3 = hoverColor
+		tween(button, {TextColor3 = hoverColor, BackgroundTransparency = 0})
+		tween(button, {BackgroundColor3 = hoverBg or COLORS.SurfaceLight})
 	end)
-
 	button.MouseLeave:Connect(function()
-		button.TextColor3 = normalColor
+		tween(button, {TextColor3 = COLORS.TextDim, BackgroundTransparency = 1})
 	end)
 end
 
-setupTopButton(
-	minimize,
-	Color3.fromRGB(190, 195, 200),
-	Color3.fromRGB(245, 245, 245)
-)
+setupTopButton(minimize, COLORS.Text)
+setupTopButton(close, Color3.new(1, 1, 1), COLORS.Danger)
 
-setupTopButton(
-	close,
-	Color3.fromRGB(210, 215, 220),
-	Color3.fromRGB(255, 95, 95)
-)
-
---// Maximize Hover
 maximize.MouseEnter:Connect(function()
-	normalStroke.Color = Color3.fromRGB(245, 245, 245)
-	restoreBackStroke.Color = Color3.fromRGB(245, 245, 245)
-	restoreFrontStroke.Color = Color3.fromRGB(245, 245, 245)
+	tween(maximize, {BackgroundTransparency = 0})
+	tween(normalStroke, {Color = COLORS.Text})
+	tween(restoreBackStroke, {Color = COLORS.Text})
+	tween(restoreFrontStroke, {Color = COLORS.Text})
 end)
 
 maximize.MouseLeave:Connect(function()
-	normalStroke.Color = Color3.fromRGB(190, 195, 200)
-	restoreBackStroke.Color = Color3.fromRGB(190, 195, 200)
-	restoreFrontStroke.Color = Color3.fromRGB(190, 195, 200)
+	tween(maximize, {BackgroundTransparency = 1})
+	tween(normalStroke, {Color = COLORS.TextDim})
+	tween(restoreBackStroke, {Color = COLORS.TextDim})
+	tween(restoreFrontStroke, {Color = COLORS.TextDim})
 end)
 
 --// SIDEBAR
-
 local sidebar = Instance.new("Frame")
 sidebar.Name = "Sidebar"
-sidebar.Size = UDim2.new(0, 220, 1, -60)
-sidebar.Position = UDim2.new(0, 0, 0, 60)
-sidebar.BackgroundColor3 = Color3.fromRGB(23, 29, 34)
-sidebar.BackgroundTransparency = 0.08
+sidebar.Size = UDim2.new(0, 220, 1, -38)
+sidebar.Position = UDim2.new(0, 0, 0, 38)
+sidebar.BackgroundColor3 = COLORS.Surface
 sidebar.BorderSizePixel = 0
 sidebar.Parent = main
 
---// Sidebar right line
+local sidebarCorner = Instance.new("UICorner")
+sidebarCorner.CornerRadius = UDim.new(0, 20)
+sidebarCorner.Parent = sidebar
+
+local sidebarTopMask = Instance.new("Frame")
+sidebarTopMask.Size = UDim2.new(1, 0, 0, 20)
+sidebarTopMask.Position = UDim2.new(0, 0, 0, 0)
+sidebarTopMask.BackgroundColor3 = COLORS.Surface
+sidebarTopMask.BorderSizePixel = 0
+sidebarTopMask.Parent = sidebar
+
+local sidebarInnerMask = Instance.new("Frame")
+sidebarInnerMask.Size = UDim2.new(0, 20, 0, 20)
+sidebarInnerMask.Position = UDim2.new(1, -20, 1, -20)
+sidebarInnerMask.BackgroundColor3 = COLORS.Surface
+sidebarInnerMask.BorderSizePixel = 0
+sidebarInnerMask.Parent = sidebar
+
 local sideLine = Instance.new("Frame")
 sideLine.Size = UDim2.new(0, 1, 1, 0)
 sideLine.Position = UDim2.new(1, -1, 0, 0)
-sideLine.BackgroundColor3 = Color3.fromRGB(55, 62, 69)
-sideLine.BackgroundTransparency = 0.5
+sideLine.BackgroundColor3 = COLORS.Border
 sideLine.BorderSizePixel = 0
 sideLine.Parent = sidebar
 
 --// Content
 local content = Instance.new("Frame")
 content.Name = "Content"
-content.Size = UDim2.new(1, -220, 1, -60)
-content.Position = UDim2.new(0, 220, 0, 60)
+content.Size = UDim2.new(1, -220, 1, -38)
+content.Position = UDim2.new(0, 220, 0, 38)
 content.BackgroundTransparency = 1
 content.Parent = main
 
 --// PAGES
-
 local pages = {}
 
 local function createPage(name)
-	local page = Instance.new("Frame")
+	local page = Instance.new("ScrollingFrame")
 	page.Name = name
 	page.Size = UDim2.new(1, 0, 1, 0)
 	page.BackgroundTransparency = 1
+	page.BorderSizePixel = 0
+	page.ScrollBarThickness = 3
+	page.ScrollBarImageColor3 = COLORS.Accent
+	page.CanvasSize = UDim2.new(0, 0, 0, 0)
 	page.Visible = false
 	page.Parent = content
 
 	pages[name] = page
-
 	return page
 end
 
-local farmPage = createPage("Farm")
 local serverPage = createPage("Server")
-local hopPage = createPage("HopAuto")
 local settingsPage = createPage("Settings")
 
 --// PAGE TITLE
-
-local function createPageTitle(parent, text)
+local function createPageTitle(parent, text, subtitle)
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, -50, 0, 55)
-	label.Position = UDim2.new(0, 25, 0, 15)
+	label.Size = UDim2.new(1, -50, 0, 38)
+	label.Position = UDim2.new(0, 28, 0, 20)
 	label.BackgroundTransparency = 1
 	label.Text = text
-	label.TextColor3 = Color3.fromRGB(240, 240, 240)
-	label.TextSize = 34
+	label.TextColor3 = COLORS.Text
+	label.TextSize = 28
 	label.Font = Enum.Font.GothamBold
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Parent = parent
 
+	if subtitle then
+		local sub = Instance.new("TextLabel")
+		sub.Size = UDim2.new(1, -50, 0, 20)
+		sub.Position = UDim2.new(0, 28, 0, 54)
+		sub.BackgroundTransparency = 1
+		sub.Text = subtitle
+		sub.TextColor3 = COLORS.TextDim
+		sub.TextSize = 14
+		sub.Font = Enum.Font.Gotham
+		sub.TextXAlignment = Enum.TextXAlignment.Left
+		sub.Parent = parent
+	end
+
 	return label
 end
 
---// FARM PAGE
+--// GENERIC CARD
+local function createCard(parent, yPos, titleText, bodyText, height, accentColor)
+	local card = Instance.new("Frame")
+	card.Size = UDim2.new(1, -56, 0, height or 90)
+	card.Position = UDim2.new(0, 28, 0, yPos)
+	card.BackgroundColor3 = COLORS.Card
+	card.BorderSizePixel = 0
+	card.Parent = parent
 
-createPageTitle(farmPage, "Farm")
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 14)
+	corner.Parent = card
 
---// Trick Card
-local trick = Instance.new("Frame")
-trick.Size = UDim2.new(1, -50, 0, 90)
-trick.Position = UDim2.new(0, 25, 0, 75)
-trick.BackgroundColor3 = Color3.fromRGB(48, 55, 62)
-trick.BackgroundTransparency = 0.12
-trick.BorderSizePixel = 0
-trick.Parent = farmPage
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = COLORS.Border
+	stroke.Thickness = 1
+	stroke.Transparency = 0.15
+	stroke.Parent = card
 
-local trickCorner = Instance.new("UICorner")
-trickCorner.CornerRadius = UDim.new(0, 8)
-trickCorner.Parent = trick
+	local accentBar = Instance.new("Frame")
+	accentBar.Size = UDim2.new(0, 4, 1, -20)
+	accentBar.Position = UDim2.new(0, 0, 0.5, 0)
+	accentBar.AnchorPoint = Vector2.new(0, 0.5)
+	accentBar.BackgroundColor3 = accentColor or COLORS.Accent
+	accentBar.BorderSizePixel = 0
+	accentBar.Parent = card
 
-local trickTitle = Instance.new("TextLabel")
-trickTitle.Size = UDim2.new(1, -30, 0, 25)
-trickTitle.Position = UDim2.new(0, 15, 0, 12)
-trickTitle.BackgroundTransparency = 1
-trickTitle.Text = "Trick"
-trickTitle.TextColor3 = Color3.fromRGB(220, 225, 230)
-trickTitle.TextSize = 16
-trickTitle.Font = Enum.Font.GothamMedium
-trickTitle.TextXAlignment = Enum.TextXAlignment.Left
-trickTitle.Parent = trick
+	local accentCorner = Instance.new("UICorner")
+	accentCorner.CornerRadius = UDim.new(1, 0)
+	accentCorner.Parent = accentBar
 
-local trickDescription = Instance.new("TextLabel")
-trickDescription.Size = UDim2.new(1, -30, 0, 40)
-trickDescription.Position = UDim2.new(0, 15, 0, 38)
-trickDescription.BackgroundTransparency = 1
-trickDescription.Text = "You find Auto Hop Boss or Auto Farm Boss?\nAuto Hop and Auto Farm Boss in Hop Auto Tab"
-trickDescription.TextColor3 = Color3.fromRGB(140, 148, 156)
-trickDescription.TextSize = 13
-trickDescription.Font = Enum.Font.Gotham
-trickDescription.TextXAlignment = Enum.TextXAlignment.Left
-trickDescription.TextYAlignment = Enum.TextYAlignment.Top
-trickDescription.Parent = trick
+	applyGradient(accentBar, accentColor or COLORS.Accent, COLORS.AccentB, 90)
 
---// TOGGLE FUNCTION
+	local cardTitle = Instance.new("TextLabel")
+	cardTitle.Size = UDim2.new(1, -40, 0, 22)
+	cardTitle.Position = UDim2.new(0, 18, 0, 12)
+	cardTitle.BackgroundTransparency = 1
+	cardTitle.Text = titleText
+	cardTitle.TextColor3 = COLORS.Text
+	cardTitle.TextSize = 15
+	cardTitle.Font = Enum.Font.GothamBold
+	cardTitle.TextXAlignment = Enum.TextXAlignment.Left
+	cardTitle.Parent = card
 
-local function createToggle(parent, text, position, default)
+	local cardBody = Instance.new("TextLabel")
+	cardBody.Size = UDim2.new(1, -40, 1, -40)
+	cardBody.Position = UDim2.new(0, 18, 0, 36)
+	cardBody.BackgroundTransparency = 1
+	cardBody.Text = bodyText
+	cardBody.TextColor3 = COLORS.TextDim
+	cardBody.TextSize = 13
+	cardBody.Font = Enum.Font.Gotham
+	cardBody.TextXAlignment = Enum.TextXAlignment.Left
+	cardBody.TextYAlignment = Enum.TextYAlignment.Top
+	cardBody.TextWrapped = true
+	cardBody.Parent = card
+
+	return card
+end
+
+--// TOGGLE
+local function createToggle(parent, text, yPos, default, accentColor)
+	accentColor = accentColor or COLORS.Accent
+
 	local row = Instance.new("Frame")
-	row.Size = UDim2.new(1, -50, 0, 60)
-	row.Position = position
-	row.BackgroundColor3 = Color3.fromRGB(48, 55, 62)
-	row.BackgroundTransparency = 0.12
+	row.Size = UDim2.new(1, -56, 0, 56)
+	row.Position = UDim2.new(0, 28, 0, yPos)
+	row.BackgroundColor3 = COLORS.Card
 	row.BorderSizePixel = 0
 	row.Parent = parent
 
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
+	corner.CornerRadius = UDim.new(0, 14)
 	corner.Parent = row
 
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = COLORS.Border
+	stroke.Thickness = 1
+	stroke.Transparency = 0.15
+	stroke.Parent = row
+
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, -80, 1, 0)
-	label.Position = UDim2.new(0, 15, 0, 0)
+	label.Size = UDim2.new(1, -90, 1, 0)
+	label.Position = UDim2.new(0, 18, 0, 0)
 	label.BackgroundTransparency = 1
 	label.Text = text
-	label.TextColor3 = Color3.fromRGB(220, 225, 230)
-	label.TextSize = 15
+	label.TextColor3 = COLORS.Text
+	label.TextSize = 14
 	label.Font = Enum.Font.GothamMedium
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Parent = row
 
-	--// Toggle Background
 	local toggle = Instance.new("TextButton")
-	toggle.Size = UDim2.new(0, 54, 0, 28)
-	toggle.Position = UDim2.new(1, -68, 0.5, -14)
-	toggle.BackgroundColor3 = default
-		and Color3.fromRGB(75, 190, 245)
-		or Color3.fromRGB(65, 72, 78)
+	toggle.Size = UDim2.new(0, 50, 0, 26)
+	toggle.Position = UDim2.new(1, -68, 0.5, -13)
+	toggle.BackgroundColor3 = default and accentColor or COLORS.SurfaceLight
 	toggle.BorderSizePixel = 0
 	toggle.Text = ""
 	toggle.AutoButtonColor = false
@@ -350,13 +474,13 @@ local function createToggle(parent, text, position, default)
 	toggleCorner.CornerRadius = UDim.new(1, 0)
 	toggleCorner.Parent = toggle
 
-	--// Circle
+	local toggleGradient = applyGradient(toggle, accentColor, COLORS.AccentB, 0)
+	toggleGradient.Enabled = default
+
 	local circle = Instance.new("Frame")
-	circle.Size = UDim2.new(0, 22, 0, 22)
-	circle.Position = default
-		and UDim2.new(1, -25, 0.5, -11)
-		or UDim2.new(0, 3, 0.5, -11)
-	circle.BackgroundColor3 = Color3.fromRGB(220, 225, 230)
+	circle.Size = UDim2.new(0, 20, 0, 20)
+	circle.Position = default and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 3, 0.5, -10)
+	circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	circle.BorderSizePixel = 0
 	circle.Parent = toggle
 
@@ -370,107 +494,42 @@ local function createToggle(parent, text, position, default)
 		enabled = not enabled
 
 		if enabled then
-			toggle.BackgroundColor3 = Color3.fromRGB(75, 190, 245)
-			circle.Position = UDim2.new(1, -25, 0.5, -11)
+			toggleGradient.Enabled = true
+			tween(toggle, {BackgroundColor3 = accentColor})
+			tween(circle, {Position = UDim2.new(1, -23, 0.5, -10)})
 		else
-			toggle.BackgroundColor3 = Color3.fromRGB(65, 72, 78)
-			circle.Position = UDim2.new(0, 3, 0.5, -11)
+			tween(toggle, {BackgroundColor3 = COLORS.SurfaceLight})
+			tween(circle, {Position = UDim2.new(0, 3, 0.5, -10)})
+			task.delay(0.18, function()
+				if not enabled then toggleGradient.Enabled = false end
+			end)
 		end
 	end)
 
-	return row
+	return row, function() return enabled end
 end
 
---// FARM TOGGLES
-
-createToggle(
-	farmPage,
-	"Teleport to Fruits",
-	UDim2.new(0, 25, 0, 175),
-	false
-)
-
-createToggle(
-	farmPage,
-	"Teleport to Berry",
-	UDim2.new(0, 25, 0, 245),
-	true
-)
-
 --// SERVER PAGE
-
-createPageTitle(serverPage, "Server")
-
-local serverCard = Instance.new("Frame")
-serverCard.Size = UDim2.new(1, -50, 0, 90)
-serverCard.Position = UDim2.new(0, 25, 0, 85)
-serverCard.BackgroundColor3 = Color3.fromRGB(48, 55, 62)
-serverCard.BackgroundTransparency = 0.12
-serverCard.BorderSizePixel = 0
-serverCard.Parent = serverPage
-
-local serverCorner = Instance.new("UICorner")
-serverCorner.CornerRadius = UDim.new(0, 8)
-serverCorner.Parent = serverCard
-
-local serverText = Instance.new("TextLabel")
-serverText.Size = UDim2.new(1, -30, 1, 0)
-serverText.Position = UDim2.new(0, 15, 0, 0)
-serverText.BackgroundTransparency = 1
-serverText.Text = "Server\nManage server information here."
-serverText.TextColor3 = Color3.fromRGB(210, 215, 220)
-serverText.TextSize = 15
-serverText.Font = Enum.Font.GothamMedium
-serverText.TextXAlignment = Enum.TextXAlignment.Left
-serverText.Parent = serverCard
-
---// HOP AUTO PAGE
-
-createPageTitle(hopPage, "Hop Auto")
-
-createToggle(
-	hopPage,
-	"Auto Hop",
-	UDim2.new(0, 25, 0, 85),
-	false
-)
-
-createToggle(
-	hopPage,
-	"Auto Farm Boss",
-	UDim2.new(0, 25, 0, 155),
-	false
-)
+createPageTitle(serverPage, "Server", "Server info & tools")
+createCard(serverPage, 95, "Server", "Manage server information here.", 90, COLORS.PageServer)
 
 --// SETTINGS PAGE
-
-createPageTitle(settingsPage, "Settings")
-
-createToggle(
-	settingsPage,
-	"UI Blur",
-	UDim2.new(0, 25, 0, 85),
-	false
-)
-
-createToggle(
-	settingsPage,
-	"Notifications",
-	UDim2.new(0, 25, 0, 155),
-	true
-)
+createPageTitle(settingsPage, "Settings", "Customize your experience")
+createToggle(settingsPage, "UI Blur", 95, false, COLORS.PageSettings)
+createToggle(settingsPage, "Notifications", 163, true, COLORS.PageSettings)
 
 --// SIDEBAR BUTTONS
-
 local currentPage = nil
 local buttons = {}
 
-local function createSidebarButton(text, icon, order, pageName)
+local function createSidebarButton(text, icon, order, pageName, accentColor)
+	accentColor = accentColor or COLORS.Accent
+
 	local button = Instance.new("TextButton")
 	button.Name = pageName .. "Button"
-	button.Size = UDim2.new(1, -20, 0, 52)
-	button.Position = UDim2.new(0, 10, 0, 15 + ((order - 1) * 58))
-	button.BackgroundColor3 = Color3.fromRGB(45, 52, 60)
+	button.Size = UDim2.new(1, -24, 0, 48)
+	button.Position = UDim2.new(0, 12, 0, 16 + ((order - 1) * 54))
+	button.BackgroundColor3 = COLORS.SurfaceLight
 	button.BackgroundTransparency = 1
 	button.BorderSizePixel = 0
 	button.Text = ""
@@ -478,37 +537,34 @@ local function createSidebarButton(text, icon, order, pageName)
 	button.Parent = sidebar
 
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
+	corner.CornerRadius = UDim.new(0, 12)
 	corner.Parent = button
 
-	--// Icon
 	local iconLabel = Instance.new("TextLabel")
-	iconLabel.Size = UDim2.new(0, 35, 1, 0)
-	iconLabel.Position = UDim2.new(0, 12, 0, 0)
+	iconLabel.Size = UDim2.new(0, 32, 1, 0)
+	iconLabel.Position = UDim2.new(0, 14, 0, 0)
 	iconLabel.BackgroundTransparency = 1
 	iconLabel.Text = icon
-	iconLabel.TextColor3 = Color3.fromRGB(175, 182, 188)
-	iconLabel.TextSize = 19
+	iconLabel.TextColor3 = COLORS.TextDim
+	iconLabel.TextSize = 17
 	iconLabel.Font = Enum.Font.Gotham
 	iconLabel.Parent = button
 
-	--// Text
 	local textLabel = Instance.new("TextLabel")
 	textLabel.Size = UDim2.new(1, -55, 1, 0)
 	textLabel.Position = UDim2.new(0, 48, 0, 0)
 	textLabel.BackgroundTransparency = 1
 	textLabel.Text = text
-	textLabel.TextColor3 = Color3.fromRGB(190, 195, 200)
-	textLabel.TextSize = 15
+	textLabel.TextColor3 = COLORS.TextDim
+	textLabel.TextSize = 14
 	textLabel.Font = Enum.Font.GothamMedium
 	textLabel.TextXAlignment = Enum.TextXAlignment.Left
 	textLabel.Parent = button
 
-	--// Blue Indicator
 	local indicator = Instance.new("Frame")
-	indicator.Size = UDim2.new(0, 3, 0, 32)
-	indicator.Position = UDim2.new(0, 0, 0.5, -16)
-	indicator.BackgroundColor3 = Color3.fromRGB(75, 190, 245)
+	indicator.Size = UDim2.new(0, 4, 0, 28)
+	indicator.Position = UDim2.new(0, 0, 0.5, -14)
+	indicator.BackgroundColor3 = accentColor
 	indicator.BorderSizePixel = 0
 	indicator.Visible = false
 	indicator.Parent = button
@@ -517,39 +573,36 @@ local function createSidebarButton(text, icon, order, pageName)
 	indicatorCorner.CornerRadius = UDim.new(1, 0)
 	indicatorCorner.Parent = indicator
 
-	--// Hover
 	button.MouseEnter:Connect(function()
 		if currentPage ~= pageName then
-			button.BackgroundTransparency = 0.75
+			tween(button, {BackgroundTransparency = 0.7})
 		end
 	end)
 
 	button.MouseLeave:Connect(function()
 		if currentPage ~= pageName then
-			button.BackgroundTransparency = 1
+			tween(button, {BackgroundTransparency = 1})
 		end
 	end)
 
-	--// Click
 	button.MouseButton1Click:Connect(function()
-
-		for name, data in pairs(buttons) do
-			data.button.BackgroundTransparency = 1
+		for _, data in pairs(buttons) do
+			tween(data.button, {BackgroundTransparency = 1})
 			data.indicator.Visible = false
-			data.icon.TextColor3 = Color3.fromRGB(175, 182, 188)
-			data.label.TextColor3 = Color3.fromRGB(190, 195, 200)
+			tween(data.icon, {TextColor3 = COLORS.TextDim})
+			tween(data.label, {TextColor3 = COLORS.TextDim})
 		end
 
-		for name, page in pairs(pages) do
+		for _, page in pairs(pages) do
 			page.Visible = false
 		end
 
 		currentPage = pageName
 
-		button.BackgroundTransparency = 0.15
+		tween(button, {BackgroundTransparency = 0.1})
 		indicator.Visible = true
-		iconLabel.TextColor3 = Color3.fromRGB(220, 230, 235)
-		textLabel.TextColor3 = Color3.fromRGB(235, 240, 245)
+		tween(iconLabel, {TextColor3 = accentColor})
+		tween(textLabel, {TextColor3 = COLORS.Text})
 
 		pages[pageName].Visible = true
 	end)
@@ -558,38 +611,34 @@ local function createSidebarButton(text, icon, order, pageName)
 		button = button,
 		indicator = indicator,
 		icon = iconLabel,
-		label = textLabel
+		label = textLabel,
+		accent = accentColor
 	}
 
 	return button
 end
 
---// SIDEBAR BUTTONS
+createSidebarButton("Server", "▣", 1, "Server", COLORS.PageServer)
+createSidebarButton("Settings", "⚙", 2, "Settings", COLORS.PageSettings)
 
-createSidebarButton("Server", "▣", 1, "Server")
-createSidebarButton("Hop Auto", "⌂", 2, "HopAuto")
-createSidebarButton("Farm", "▱", 3, "Farm")
-createSidebarButton("Settings", "⚙", 4, "Settings")
-
---// DEFAULT PAGE = FARM
-
-currentPage = "Farm"
-farmPage.Visible = true
-
-buttons["Farm"].button.BackgroundTransparency = 0.15
-buttons["Farm"].indicator.Visible = true
-buttons["Farm"].icon.TextColor3 = Color3.fromRGB(220, 230, 235)
-buttons["Farm"].label.TextColor3 = Color3.fromRGB(235, 240, 245)
+--// DEFAULT PAGE = SERVER
+currentPage = "Server"
+serverPage.Visible = true
+buttons["Server"].button.BackgroundTransparency = 0.1
+buttons["Server"].indicator.Visible = true
+buttons["Server"].icon.TextColor3 = COLORS.PageServer
+buttons["Server"].label.TextColor3 = COLORS.Text
 
 --// CLOSE
-
 close.MouseButton1Click:Connect(function()
+	tween(main, {BackgroundTransparency = 1}, 0.15)
+	task.wait(0.15)
 	screenGui:Destroy()
 end)
 
 --// MAXIMIZE
-
 local maximized = false
+local minimized = false
 
 local normalSize = UDim2.new(0, 780, 0, 500)
 local normalPosition = UDim2.new(0.5, -390, 0.5, -250)
@@ -604,20 +653,20 @@ maximize.MouseButton1Click:Connect(function()
 	maximized = not maximized
 
 	if maximized then
-		--// Maximize Window
-		main.Size = UDim2.new(1, -40, 1, -40)
-		main.Position = UDim2.new(0, 20, 0, 20)
+		tween(main, {
+			Size = UDim2.new(1, -40, 1, -40),
+			Position = UDim2.new(0, 20, 0, 20)
+		}, 0.25)
 
-		--// Show two overlapping squares
 		normalIcon.Visible = false
 		restoreBack.Visible = true
 		restoreFront.Visible = true
 	else
-		--// Restore Window
-		main.Size = normalSize
-		main.Position = normalPosition
+		tween(main, {
+			Size = normalSize,
+			Position = normalPosition
+		}, 0.25)
 
-		--// Show normal square
 		normalIcon.Visible = true
 		restoreBack.Visible = false
 		restoreFront.Visible = false
@@ -625,31 +674,26 @@ maximize.MouseButton1Click:Connect(function()
 end)
 
 --// MINIMIZE
-
-local minimized = false
-
 minimize.MouseButton1Click:Connect(function()
 	minimized = not minimized
 
 	if minimized then
 		sidebar.Visible = false
 		content.Visible = false
-
-		main.Size = UDim2.new(0, 780, 0, 60)
+		tween(main, {Size = UDim2.new(0, 780, 0, 38)}, 0.2)
 	else
 		sidebar.Visible = true
 		content.Visible = true
 
-		if maximized then
-			main.Size = UDim2.new(1, -40, 1, -40)
-		else
-			main.Size = normalSize
-		end
+		tween(
+			main,
+			{Size = maximized and UDim2.new(1, -40, 1, -40) or normalSize},
+			0.2
+		)
 	end
 end)
 
 --// DRAG WINDOW
-
 local dragging = false
 local dragStart
 local startPos
@@ -670,7 +714,6 @@ end)
 
 UserInputService.InputChanged:Connect(function(input)
 	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-
 		local delta = input.Position - dragStart
 
 		main.Position = UDim2.new(
@@ -681,3 +724,5 @@ UserInputService.InputChanged:Connect(function(input)
 		)
 	end
 end)
+
+--// MainUI is intentionally visible immediately when this file is loaded.
