@@ -13,6 +13,28 @@ local VALID_KEYS = {
 local GET_KEY_LINK = "https://link4sub.com/owycAYxKdu"
 
 --// ============================================================
+--// KEY SAVE / LOAD
+--// ============================================================
+
+local KEY_FILE = "lpt_hub_key.txt"
+
+local function getSavedKey()
+	if isfile and isfile(KEY_FILE) then
+		local data = readfile(KEY_FILE)
+		if data and data ~= "" then
+			return data
+		end
+	end
+	return nil
+end
+
+local function saveKey(key)
+	if writefile then
+		writefile(KEY_FILE, key)
+	end
+end
+
+--// ============================================================
 --// PALETTE
 --// ============================================================
 
@@ -310,7 +332,7 @@ keyFrame.Name = "KeyUI"
 keyFrame.Size = UDim2.new(0, 340, 0, 330)
 keyFrame.Position = UDim2.new(0.5, -170, 0.5, -165)
 keyFrame.BackgroundColor3 = COLORS.Background
-keyFrame.BackgroundTransparency = 0.08
+keyFrame.BackgroundTransparency = 0.2
 keyFrame.BorderSizePixel = 0
 keyFrame.ClipsDescendants = true
 keyFrame.ZIndex = 10
@@ -600,6 +622,9 @@ local function openMainUI()
 	keyStatus.TextColor3 = COLORS.Success
 	keyStatus.Text = "Key hợp lệ! Đang mở..."
 
+	-- Lưu key lại để lần sau tự động điền
+	saveKey(keyInput.Text)
+
 	task.wait(0.4)
 
 	keyFrame.Visible = false
@@ -688,6 +713,21 @@ submitButton.MouseButton1Click:Connect(attemptSubmit)
 
 keyInput.FocusLost:Connect(function(enterPressed)
 	if enterPressed then
+		attemptSubmit()
+	end
+end)
+
+task.spawn(function()
+	local savedKey = getSavedKey()
+
+	if savedKey and savedKey ~= "" then
+		task.wait(0.3)
+
+		keyInput.Text = savedKey
+		keyStatus.TextColor3 = COLORS.TextDim
+		keyStatus.Text = "Đang xác thực key..."
+
+		task.wait(0.4)
 		attemptSubmit()
 	end
 end)
