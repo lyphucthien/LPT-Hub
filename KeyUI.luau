@@ -356,40 +356,33 @@ applyGradient(
 )
 
 --// ============================================================
---// LOGO
+--// LPT LOGO
 --// ============================================================
 
-local keyLogo = Instance.new("Frame")
+local keyLogo = Instance.new("ImageLabel")
 keyLogo.Name = "KeyLogo"
 keyLogo.Size = UDim2.new(0, 54, 0, 54)
 keyLogo.Position = UDim2.new(0, 24, 0, 24)
-keyLogo.BackgroundColor3 = COLORS.SurfaceLight
+keyLogo.BackgroundColor3 = Color3.fromRGB(8, 8, 10)
+keyLogo.BackgroundTransparency = 0
 keyLogo.BorderSizePixel = 0
+keyLogo.Image = "rbxassetid://86498268964550"
+keyLogo.ImageTransparency = 0
+keyLogo.ScaleType = Enum.ScaleType.Crop
 keyLogo.ZIndex = 11
 keyLogo.Parent = keyFrame
 
+-- Bo tròn logo
 local keyLogoCorner = Instance.new("UICorner")
 keyLogoCorner.CornerRadius = UDim.new(1, 0)
 keyLogoCorner.Parent = keyLogo
 
+-- Viền logo
 local keyLogoStroke = Instance.new("UIStroke")
 keyLogoStroke.Color = COLORS.Border
 keyLogoStroke.Thickness = 1
 keyLogoStroke.Transparency = 0.15
 keyLogoStroke.Parent = keyLogo
-
-local keyLogoText = Instance.new("TextLabel")
-keyLogoText.Name = "LogoText"
-keyLogoText.Size = UDim2.new(1, 0, 1, 0)
-keyLogoText.BackgroundTransparency = 1
-keyLogoText.Text = "L"
-keyLogoText.TextColor3 = COLORS.Text
-keyLogoText.TextSize = 24
-keyLogoText.Font = Enum.Font.GothamBold
-keyLogoText.TextXAlignment = Enum.TextXAlignment.Center
-keyLogoText.TextYAlignment = Enum.TextYAlignment.Center
-keyLogoText.ZIndex = 12
-keyLogoText.Parent = keyLogo
 
 --// ============================================================
 --// HEADER
