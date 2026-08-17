@@ -103,13 +103,13 @@ local function applyCharacterSettings()
 end
 
 --========================================================
--- WALK SPEED
+-- WALK SPEED / JUMP POWER
 --========================================================
 
 function Module.SetWalkSpeed(value)
 	State.WalkSpeed = getNumber(
 		value,
-		1,
+		0,
 		500,
 		State.WalkSpeed
 	)
@@ -123,14 +123,10 @@ function Module.GetWalkSpeed()
 	return State.WalkSpeed
 end
 
---========================================================
--- JUMP POWER
---========================================================
-
 function Module.SetJumpPower(value)
 	State.JumpPower = getNumber(
 		value,
-		1,
+		0,
 		500,
 		State.JumpPower
 	)
@@ -288,15 +284,33 @@ end
 
 local function extractWinValue(text)
 	local normalized = normalize(text)
-	local value = normalized:match(
-		"%+%s*(%d+)%s*win"
+
+	normalized = normalized:gsub(",", "")
+
+	local number, suffix = normalized:match(
+		"%+%s*([%d%.]+)%s*([km]?)%s*win"
 	)
 
-	if value then
-		return tonumber(value)
+	if not number then
+		return nil
 	end
 
-	return nil
+	local value = tonumber(number)
+
+	if not value then
+		return nil
+	end
+
+	suffix = suffix or ""
+
+	if suffix == "k" then
+		value = value * 1000
+
+	elseif suffix == "m" then
+		value = value * 1000000
+	end
+
+	return math.floor(value + 0.5)
 end
 
 -- FIND PART FROM GUI
@@ -314,41 +328,105 @@ local function findPartFromGui(gui)
 		return nil
 	end
 
+	local currentGui = gui
+
+	while currentGui do
+
+		if currentGui:IsA("SurfaceGui")
+			or currentGui:IsA("BillboardGui")
+		then
+
+			local adornee = currentGui.Adornee
+
+			if adornee then
+
+				if adornee:IsA("BasePart") then
+					return adornee, value
+				end
+
+				if adornee:IsA("Model") then
+
+					if adornee.PrimaryPart then
+						return adornee.PrimaryPart, value
+					end
+
+					local part =
+						adornee:FindFirstChildWhichIsA(
+							"BasePart",
+							true
+						)
+
+					if part then
+						return part, value
+					end
+				end
+			end
+		end
+
+		currentGui = currentGui.Parent
+	end
+
 	local parent = gui.Parent
 
 	while parent and parent ~= workspace do
 
+		-- BasePart
 		if parent:IsA("BasePart") then
 			return parent, value
 		end
 
+		-- Model
 		if parent:IsA("Model") then
 
-			-- PrimaryPart
 			if parent.PrimaryPart then
 				return parent.PrimaryPart, value
 			end
 
-			-- Hitbox
-			local hitbox = parent:FindFirstChild("Hitbox")
+			local hitbox =
+				parent:FindFirstChild("Hitbox")
 
 			if hitbox and hitbox:IsA("BasePart") then
 				return hitbox, value
 			end
 
-			-- Bất kỳ BasePart nào
-			local anyPart =
+			local buttonPart =
+				parent:FindFirstChild(
+					"Button",
+					true
+				)
+
+			if buttonPart
+				and buttonPart:IsA("BasePart")
+			then
+				return buttonPart, value
+			end
+
+			local part =
 				parent:FindFirstChildWhichIsA(
 					"BasePart",
 					true
 				)
 
-			if anyPart then
-				return anyPart, value
+			if part then
+				return part, value
 			end
 		end
 
 		parent = parent.Parent
+	end
+
+	local guiParent = gui.Parent
+
+	if guiParent then
+
+		for _, object in ipairs(
+			guiParent:GetDescendants()
+		) do
+
+			if object:IsA("BasePart") then
+				return object, value
+			end
+		end
 	end
 
 	return nil
@@ -359,8 +437,6 @@ function Module.RefreshTargets()
 	local targets = {}
 
 	for _, object in ipairs(workspace:GetDescendants()) do
-
-		-- Target là BasePart có tên +X Win
 		if object:IsA("BasePart") then
 
 			local value =
@@ -370,7 +446,6 @@ function Module.RefreshTargets()
 				targets[value] = object
 			end
 
-		-- Target là GUI
 		elseif object:IsA("TextLabel")
 			or object:IsA("TextButton")
 		then
@@ -415,7 +490,6 @@ end
 
 -- TARGET POSITION
 local function targetPosition(part)
-
 	if not part then
 		return nil
 	end
@@ -428,13 +502,16 @@ local function targetPosition(part)
 		return nil
 	end
 
-	-- FlyHeight chỉ là OFFSET theo trục Y.
-	return part.Position
-		+ Vector3.new(
-			0,
-			State.FlyHeight,
-			0
-		)
+	local topY =
+		part.Position.Y
+		+ (part.Size.Y / 2)
+		+ State.FlyHeight
+
+	return Vector3.new(
+		part.Position.X,
+		topY,
+		part.Position.Z
+	)
 end
 
 -- STOP FLYING

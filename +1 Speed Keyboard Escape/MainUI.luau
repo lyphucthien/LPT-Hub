@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -836,25 +837,116 @@ local function createNumberControl(parent, titleText, yPos, defaultValue, minVal
 	return row, valueLabel, setValue
 end
 
-local speedValue = 16
-local jumpValue = 50
-local flySpeedValue = 90
-local flyHeightValue = 5
+--========================================================
+-- SETTINGS SAVE / LOAD
+--========================================================
+
+local SETTINGS_FILE = "LPT_Hub_Settings.json"
+
+local DEFAULT_SETTINGS = {
+	WalkSpeed = 16,
+	JumpPower = 50,
+	FlySpeed = 90,
+	FlyHeight = 5,
+
+	InfiniteJump = false,
+	NoClip = false,
+
+	SelectedWinTarget = nil,
+}
+
+local function loadSavedSettings()
+	local settings = {}
+
+	-- Default trước
+	for key, value in pairs(DEFAULT_SETTINGS) do
+		settings[key] = value
+	end
+
+	-- Executor có filesystem
+	if not (isfile and readfile) then
+		return settings
+	end
+
+	local ok, exists = pcall(function()
+		return isfile(SETTINGS_FILE)
+	end)
+
+	if not ok or not exists then
+		return settings
+	end
+
+	local success, result = pcall(function()
+		return HttpService:JSONDecode(
+			readfile(SETTINGS_FILE)
+		)
+	end)
+
+	if success and type(result) == "table" then
+		for key, value in pairs(result) do
+			settings[key] = value
+		end
+	end
+
+	return settings
+end
+
+local Loaded = loadSavedSettings()
+
+local speedValue = tonumber(Loaded.WalkSpeed) or 16
+local jumpValue = tonumber(Loaded.JumpPower) or 50
+local flySpeedValue = tonumber(Loaded.FlySpeed) or 90
+local flyHeightValue = tonumber(Loaded.FlyHeight) or 5
+local selectedWinTarget = tonumber(Loaded.SelectedWinTarget)
+
+local function saveSettings()
+	if not (writefile and HttpService) then
+		return
+	end
+
+	local settings = {
+		WalkSpeed = speedValue or 16,
+		JumpPower = jumpValue or 50,
+		FlySpeed = flySpeedValue or 90,
+		FlyHeight = flyHeightValue or 5,
+
+		InfiniteJump = infiniteJumpEnabled
+			and infiniteJumpEnabled()
+			or false,
+
+		NoClip = noClipEnabled
+			and noClipEnabled()
+			or false,
+
+		SelectedWinTarget = selectedWinTarget,
+	}
+
+	pcall(function()
+		writefile(
+			SETTINGS_FILE,
+			HttpService:JSONEncode(settings)
+		)
+	end)
+end
 
 local _, speedBox, applySpeed = createNumberControl(
 	movementPage,
 	"Walk Speed",
 	95,
 	speedValue,
-	1,
+	0,
 	500,
 	COLORS.PageFarm,
 	function(value)
 		speedValue = value
+
 		local module = loadMovementModule()
+
 		if module and module.SetWalkSpeed then
 			module.SetWalkSpeed(value)
 		end
+
+		task.defer(saveSettings)
 	end
 )
 
@@ -863,15 +955,19 @@ local _, jumpBox, applyJump = createNumberControl(
 	"Jump Power",
 	183,
 	jumpValue,
-	1,
+	0,
 	500,
 	COLORS.PageFarm,
 	function(value)
 		jumpValue = value
+
 		local module = loadMovementModule()
+
 		if module and module.SetJumpPower then
 			module.SetJumpPower(value)
 		end
+
+		task.defer(saveSettings)
 	end
 )
 
@@ -885,10 +981,14 @@ local _, flySpeedBox, applyFlySpeed = createNumberControl(
 	COLORS.PageServer,
 	function(value)
 		flySpeedValue = value
+
 		local module = loadMovementModule()
+
 		if module and module.SetFlySpeed then
 			module.SetFlySpeed(value)
 		end
+
+		task.defer(saveSettings)
 	end
 )
 
@@ -902,33 +1002,96 @@ local _, flyHeightBox, applyFlyHeight = createNumberControl(
 	COLORS.PageServer,
 	function(value)
 		flyHeightValue = value
+
 		local module = loadMovementModule()
+
 		if module and module.SetFlyHeight then
 			module.SetFlyHeight(value)
 		end
+
+		task.defer(saveSettings)
 	end
 )
 
-local _, infiniteJumpEnabled = createToggle(
+local _, infiniteJumpEnabled, setInfiniteJumpUI = createRadioToggle(
 	movementPage,
 	"Infinite Jump",
 	447,
-	false,
-	COLORS.PageFarm
+	COLORS.PageFarm,
+	function(enabled)
+		local module = loadMovementModule()
+
+		if module and module.SetInfiniteJump then
+			module.SetInfiniteJump(enabled)
+		end
+
+		task.defer(saveSettings)
+	end
 )
 
-local _, noClipEnabled = createToggle(
+local _, noClipEnabled, setNoClipUI = createRadioToggle(
 	movementPage,
 	"No Clip",
 	515,
-	false,
-	COLORS.PageServer
+	COLORS.PageServer,
+	function(enabled)
+		local module = loadMovementModule()
+
+		if module and module.SetNoClip then
+			module.SetNoClip(enabled)
+		end
+
+		task.defer(saveSettings)
+	end
 )
 
+--========================================================
+-- APPLY LOADED SETTINGS
+--========================================================
+
+task.defer(function()
+	local module = loadMovementModule()
+
+	if module then
+		-- Áp dụng Speed
+		if module.SetWalkSpeed then
+			module.SetWalkSpeed(speedValue)
+		end
+
+		-- Áp dụng Jump Power
+		if module.SetJumpPower then
+			module.SetJumpPower(jumpValue)
+		end
+
+		-- Áp dụng Fly Speed
+		if module.SetFlySpeed then
+			module.SetFlySpeed(flySpeedValue)
+		end
+
+		-- Áp dụng Fly Height
+		if module.SetFlyHeight then
+			module.SetFlyHeight(flyHeightValue)
+		end
+	end
+
+	-- Khôi phục Infinite Jump
+	if Loaded.InfiniteJump == true then
+		setInfiniteJumpUI(true, true)
+	end
+
+	-- Khôi phục No Clip
+	if Loaded.NoClip == true then
+		setNoClipUI(true, true)
+	end
+end)
+
+--========================================================
 --// AUTO WIN
+--========================================================
+
 local winTitle = Instance.new("TextLabel")
 winTitle.Size = UDim2.new(1, -190, 0, 26)
-winTitle.Position = UDim2.new(0, 28, 0, 653)
+winTitle.Position = UDim2.new(0, 28, 0, 585)
 winTitle.BackgroundTransparency = 1
 winTitle.Text = "AUTO WIN"
 winTitle.TextColor3 = COLORS.Text
@@ -937,11 +1100,13 @@ winTitle.Font = Enum.Font.GothamBold
 winTitle.TextXAlignment = Enum.TextXAlignment.Left
 winTitle.Parent = movementPage
 
+
 local winHint = Instance.new("TextLabel")
-winHint.Size = UDim2.new(1, -56, 0, 32)
-winHint.Position = UDim2.new(0, 28, 0, 681)
+winHint.Size = UDim2.new(1, -56, 0, 30)
+winHint.Position = UDim2.new(0, 28, 0, 611)
+
 winHint.BackgroundTransparency = 1
-winHint.Text = "Gạt Cần Để Bay Đến Nút Win Được Gạt"
+winHint.Text = "Chọn Stage để tự động bay tới nút Win tương ứng."
 winHint.TextColor3 = COLORS.TextDim
 winHint.TextSize = 12
 winHint.Font = Enum.Font.Gotham
@@ -949,11 +1114,14 @@ winHint.TextXAlignment = Enum.TextXAlignment.Left
 winHint.TextWrapped = true
 winHint.Parent = movementPage
 
+--========================================================
+-- REFRESH TARGETS
+--========================================================
 
---// REFRESH TARGETS
 local refreshTargets = Instance.new("TextButton")
 refreshTargets.Size = UDim2.new(0, 125, 0, 34)
-refreshTargets.Position = UDim2.new(1, -153, 0, 649)
+refreshTargets.Position = UDim2.new(1, -153, 0, 581)
+
 refreshTargets.BackgroundColor3 = COLORS.PageServer
 refreshTargets.BorderSizePixel = 0
 refreshTargets.Text = "Refresh"
@@ -993,55 +1161,186 @@ refreshTargets.MouseButton1Click:Connect(function()
 	end
 end)
 
+local WIN_STAGES = {
+	{
+		stage = 1,
+		value = 1,
+		text = "Stage 1 (+1 Win)"
+	},
 
---// WIN TARGETS
-local WIN_TARGET_VALUES = {1, 3, 10, 25, 50, 100}
+	{
+		stage = 2,
+		value = 3,
+		text = "Stage 2 (+3 Wins)"
+	},
+
+	{
+		stage = 3,
+		value = 10,
+		text = "Stage 3 (+10 Wins)"
+	},
+
+	{
+		stage = 4,
+		value = 20,
+		text = "Stage 4 (+20 Wins)"
+	},
+
+	{
+		stage = 5,
+		value = 60,
+		text = "Stage 5 (+60 Wins)"
+	},
+
+	{
+		stage = 6,
+		value = 100,
+		text = "Stage 6 (+100 Wins)"
+	},
+
+	{
+		stage = 7,
+		value = 150,
+		text = "Stage 7 (+150 Wins)"
+	},
+
+	{
+		stage = 8,
+		value = 300,
+		text = "Stage 8 (+300 Wins)"
+	},
+
+	{
+		stage = 9,
+		value = 500,
+		text = "Stage 9 (+500 Wins)"
+	},
+
+	{
+		stage = 10,
+		value = 1000,
+		text = "Stage 10 (+1K Wins)"
+	},
+
+	{
+		stage = 11,
+		value = 2500,
+		text = "Stage 11 (+2.5K Wins)"
+	},
+
+	{
+		stage = 12,
+		value = 10000,
+		text = "Stage 12 (+10K Wins)"
+	},
+
+	{
+		stage = 13,
+		value = 25000,
+		text = "Stage 13 (+25K Wins)"
+	},
+
+	{
+		stage = 14,
+		value = 50000,
+		text = "Stage 14 (+50K Wins)"
+	},
+
+	{
+		stage = 15,
+		value = 150000,
+		text = "Stage 15 (+150K Wins)"
+	},
+}
+
 local WIN_TARGET_ROW_HEIGHT = 56
 local WIN_TARGET_ROW_GAP = 10
-
 local winTargetRows = {}
-local selectedWinTarget = nil
 
--- Bắt đầu SAU phần AUTO WIN + hint
-local WIN_TARGET_START_Y = 720
+--========================================================
+-- STAGE ROWS
+--========================================================
 
-for index, value in ipairs(WIN_TARGET_VALUES) do
-	local rowY = WIN_TARGET_START_Y
-		+ (index - 1) * (WIN_TARGET_ROW_HEIGHT + WIN_TARGET_ROW_GAP)
+local WIN_TARGET_START_Y = 651
+
+for index, stageData in ipairs(WIN_STAGES) do
+
+	local rowY =
+		WIN_TARGET_START_Y
+		+ (index - 1)
+		* (WIN_TARGET_ROW_HEIGHT + WIN_TARGET_ROW_GAP)
 
 	local _, _, forceState = createRadioToggle(
 		movementPage,
-		"+" .. tostring(value) .. " Win",
+
+		stageData.text,
+
 		rowY,
+
 		COLORS.PageServer,
 
 		function(isEnabled)
-			if isEnabled then
-				selectedWinTarget = value
 
-				-- Chỉ cho phép 1 Win Target được bật
+			if isEnabled then
+
+				selectedWinTarget = stageData.value
+
 				for _, entry in ipairs(winTargetRows) do
-					if entry.value ~= value then
-						entry.forceState(false)
+					if entry.index ~= index then
+						entry.forceState(false, false)
 					end
 				end
 
-			elseif selectedWinTarget == value then
+				local module = loadMovementModule()
+
+				if module and module.RefreshTargets then
+					module.RefreshTargets()
+				end
+
+				task.defer(saveSettings)
+
+			elseif selectedWinTarget == stageData.value then
+
 				selectedWinTarget = nil
+
+				local module = loadMovementModule()
+
+				if module and module.StopFlying then
+					module.StopFlying()
+				end
+
+				task.defer(saveSettings)
 			end
 		end
 	)
 
 	table.insert(winTargetRows, {
-		value = value,
-		forceState = forceState
+		index = index,
+		stage = stageData.stage,
+		value = stageData.value,
+		forceState = forceState,
 	})
+
 end
 
+if selectedWinTarget then
+
+	for _, entry in ipairs(winTargetRows) do
+
+		if entry.value == selectedWinTarget then
+			entry.forceState(true, false)
+			break
+		end
+
+	end
+
+end
 
 --// AUTO WIN LOOP
 task.spawn(function()
+
 	while movementPage.Parent do
+
 		task.wait(0.1)
 
 		local module = Movement
@@ -1050,31 +1349,58 @@ task.spawn(function()
 			continue
 		end
 
-		-- Infinite Jump
+		--====================================================
+		-- INFINITE JUMP
+		--====================================================
+
 		if module.SetInfiniteJump then
-			module.SetInfiniteJump(infiniteJumpEnabled())
+			module.SetInfiniteJump(
+				infiniteJumpEnabled()
+			)
 		end
 
-		-- No Clip
+		--====================================================
+		-- NO CLIP
+		--====================================================
+
 		if module.SetNoClip then
-			module.SetNoClip(noClipEnabled())
+			module.SetNoClip(
+				noClipEnabled()
+			)
 		end
 
-		-- Auto Win
+		--====================================================
+		-- AUTO WIN
+		--====================================================
+
 		if selectedWinTarget then
 
-			-- Nếu chưa bay thì bắt đầu bay tới target
+			if module.RefreshTargets then
+				-- Chỉ refresh khi chưa có target.
+				local target = module.GetTarget
+					and module.GetTarget(selectedWinTarget)
+
+				if not target then
+					module.RefreshTargets()
+				end
+			end
+
 			if module.IsFlying
 				and module.FlyToWin
 				and not module.IsFlying()
 			then
-				module.FlyToWin(selectedWinTarget)
+
+				module.FlyToWin(
+					selectedWinTarget
+				)
 			end
 
 		else
 
-			-- Nếu bỏ chọn target thì dừng bay
-			if module.IsFlying and module.IsFlying() then
+			if module.IsFlying
+				and module.IsFlying()
+			then
+
 				if module.StopFlying then
 					module.StopFlying()
 				end
@@ -1087,8 +1413,8 @@ end)
 --// CANVAS SIZE
 local winTargetsBottom =
 	WIN_TARGET_START_Y
-	+ (#WIN_TARGET_VALUES * WIN_TARGET_ROW_HEIGHT)
-	+ ((#WIN_TARGET_VALUES - 1) * WIN_TARGET_ROW_GAP)
+	+ (#WIN_STAGES * WIN_TARGET_ROW_HEIGHT)
+	+ ((#WIN_STAGES - 1) * WIN_TARGET_ROW_GAP)
 
 movementPage.CanvasSize = UDim2.new(
 	0,
@@ -1210,9 +1536,24 @@ buttons["Server"].label.TextColor3 = COLORS.Text
 
 --// CLOSE
 close.MouseButton1Click:Connect(function()
-	tween(main, {BackgroundTransparency = 1}, 0.15)
+
+	-- Lưu toàn bộ settings trước khi đóng.
+	saveSettings()
+
+	local module = loadMovementModule()
+
+	if module and module.StopFlying then
+		module.StopFlying()
+	end
+
+	tween(main, {
+		BackgroundTransparency = 1
+	}, 0.15)
+
 	task.wait(0.15)
+
 	screenGui:Destroy()
+
 end)
 
 --// MAXIMIZE
