@@ -43,7 +43,7 @@ local function disconnect(name)
 end
 
 --========================================================
--- CHARACTER HELPERS
+-- CHARACTER
 --========================================================
 
 local function getCharacter()
@@ -185,26 +185,30 @@ end
 --========================================================
 
 function Module.SetInfiniteJump(enabled)
+
 	State.InfiniteJump = enabled == true
 
 	if State.InfiniteJump then
 
 		if not Connections.InfiniteJump then
+
 			Connections.InfiniteJump =
-				UserInputService.JumpRequest:Connect(function()
+				UserInputService.JumpRequest:Connect(
+					function()
 
-					if not State.InfiniteJump then
-						return
+						if not State.InfiniteJump then
+							return
+						end
+
+						local humanoid = getHumanoid()
+
+						if humanoid then
+							humanoid:ChangeState(
+								Enum.HumanoidStateType.Jumping
+							)
+						end
 					end
-
-					local humanoid = getHumanoid()
-
-					if humanoid then
-						humanoid:ChangeState(
-							Enum.HumanoidStateType.Jumping
-						)
-					end
-				end)
+				)
 		end
 
 	else
@@ -223,11 +227,14 @@ end
 --========================================================
 
 local function rememberCollision(character)
+
 	if not character then
 		return
 	end
 
-	for _, object in ipairs(character:GetDescendants()) do
+	for _, object in ipairs(
+		character:GetDescendants()
+	) do
 
 		if object:IsA("BasePart") then
 
@@ -235,17 +242,19 @@ local function rememberCollision(character)
 				OriginalCollision[object] =
 					object.CanCollide
 			end
-
 		end
 	end
 end
 
 local function restoreCollision(character)
+
 	if not character then
 		return
 	end
 
-	for _, object in ipairs(character:GetDescendants()) do
+	for _, object in ipairs(
+		character:GetDescendants()
+	) do
 
 		if object:IsA("BasePart") then
 
@@ -254,9 +263,7 @@ local function restoreCollision(character)
 
 			if original ~= nil then
 				object.CanCollide = original
-				OriginalCollision[object] = nil
 			end
-
 		end
 	end
 
@@ -264,6 +271,7 @@ local function restoreCollision(character)
 end
 
 function Module.SetNoClip(enabled)
+
 	State.NoClip = enabled == true
 
 	local character = getCharacter()
@@ -293,31 +301,36 @@ end
 --========================================================
 
 local function cleanText(text)
+
 	text = tostring(text or "")
 
-	return text
+	text = text
 		:gsub(",", "")
 		:gsub("％", "%")
 		:gsub("%s+", " ")
-		:lower()
+
+	return text:lower()
 end
 
 local function extractWinValue(text)
-	local normalized = cleanText(text)
+
+	local normalized =
+		cleanText(text)
 
 	-- +1 Win
 	-- +3 Wins
+	-- +10 Win
 	-- +1K Win
 	-- +1M Win
-	-- +1
 
 	local number, suffix =
 		normalized:match(
 			"%+%s*([%d%.]+)%s*([km]?)%s*wins?"
 		)
 
-	-- Nếu không có chữ Win
+	-- Chỉ +1
 	if not number then
+
 		number, suffix =
 			normalized:match(
 				"%+%s*([%d%.]+)%s*([km]?)"
@@ -328,7 +341,8 @@ local function extractWinValue(text)
 		return nil
 	end
 
-	local value = tonumber(number)
+	local value =
+		tonumber(number)
 
 	if not value then
 		return nil
@@ -347,76 +361,167 @@ local function extractWinValue(text)
 end
 
 --========================================================
--- FIND BEST PART
+-- GET CLOSEST PART
 --========================================================
 
-local function findBestPart(container)
-	if not container then
+local function getClosestPart(position, container)
+
+	if not position or not container then
 		return nil
 	end
 
-	-- Chính nó là Part
-	if container:IsA("BasePart") then
-		return container
-	end
+	local closest = nil
+	local closestDistance = math.huge
 
-	if not container:IsA("Model") then
-		return nil
-	end
-
-	-- Ưu tiên Hitbox
-	local hitbox =
-		container:FindFirstChild(
-			"Hitbox",
-			true
-		)
-
-	if hitbox and hitbox:IsA("BasePart") then
-		return hitbox
-	end
-
-	-- Ưu tiên Button
-	local button =
-		container:FindFirstChild(
-			"Button",
-			true
-		)
-
-	if button and button:IsA("BasePart") then
-		return button
-	end
-
-	-- PrimaryPart
-	if container.PrimaryPart then
-		return container.PrimaryPart
-	end
-
-	-- Part có tên liên quan
 	for _, object in ipairs(
 		container:GetDescendants()
 	) do
 
 		if object:IsA("BasePart") then
 
-			local name =
-				object.Name:lower()
+			local distance =
+				(object.Position - position).Magnitude
 
-			if name:find("hitbox")
-				or name:find("button")
-				or name:find("win")
-				or name:find("award")
-			then
-				return object
+			if distance < closestDistance then
+				closestDistance = distance
+				closest = object
 			end
-
 		end
 	end
 
-	-- Cuối cùng
-	return container:FindFirstChildWhichIsA(
-		"BasePart",
-		true
-	)
+	return closest
+end
+
+--========================================================
+-- FIND PART DIRECTLY AROUND GUI
+--========================================================
+
+local function findDirectPart(gui)
+
+	if not gui then
+		return nil
+	end
+
+	--====================================================
+	-- 1. GUI Parent
+	--====================================================
+
+	local parent = gui.Parent
+
+	if parent and parent:IsA("BasePart") then
+		return parent
+	end
+
+	--====================================================
+	-- 2. Parent Model
+	--====================================================
+
+	if parent and parent:IsA("Model") then
+
+		-- Nếu parent có đúng 1 BasePart
+		local parts = {}
+
+		for _, object in ipairs(
+			parent:GetDescendants()
+		) do
+
+			if object:IsA("BasePart") then
+				table.insert(parts, object)
+			end
+		end
+
+		if #parts == 1 then
+			return parts[1]
+		end
+	end
+
+	--====================================================
+	-- 3. BillboardGui / SurfaceGui
+	--====================================================
+
+	local current = gui
+
+	while current and current ~= workspace do
+
+		if current:IsA("BillboardGui")
+			or current:IsA("SurfaceGui")
+		then
+
+			-- Adornee là chính xác nhất
+			if current.Adornee then
+
+				local adornee =
+					current.Adornee
+
+				if adornee:IsA("BasePart") then
+					return adornee
+				end
+
+				if adornee:IsA("Model") then
+
+					-- Ưu tiên part có tên Button
+					local button =
+						adornee:FindFirstChild(
+							"Button",
+							true
+						)
+
+					if button
+						and button:IsA("BasePart")
+					then
+						return button
+					end
+
+					-- Hitbox
+					local hitbox =
+						adornee:FindFirstChild(
+							"Hitbox",
+							true
+						)
+
+					if hitbox
+						and hitbox:IsA("BasePart")
+					then
+						return hitbox
+					end
+
+					-- Nếu model chỉ có 1 part
+					local parts = {}
+
+					for _, object in ipairs(
+						adornee:GetDescendants()
+					) do
+
+						if object:IsA("BasePart") then
+							table.insert(
+								parts,
+								object
+							)
+						end
+					end
+
+					if #parts == 1 then
+						return parts[1]
+					end
+				end
+			end
+
+			-- Parent của BillboardGui
+			local guiParent =
+				current.Parent
+
+			if guiParent then
+
+				if guiParent:IsA("BasePart") then
+					return guiParent
+				end
+			end
+		end
+
+		current = current.Parent
+	end
+
+	return nil
 end
 
 --========================================================
@@ -438,10 +543,26 @@ local function findPartFromGui(gui)
 		return nil
 	end
 
+	--====================================================
+	-- FIRST: direct / exact target
+	--====================================================
+
+	local direct =
+		findDirectPart(gui)
+
+	if direct then
+		return direct, value
+	end
+
+	--====================================================
+	-- FIND BILLBOARD / SURFACE GUI
+	--====================================================
+
 	local current = gui
 
-	-- Leo lên BillboardGui / SurfaceGui
-	while current and current ~= workspace do
+	while current
+		and current ~= workspace
+	do
 
 		if current:IsA("BillboardGui")
 			or current:IsA("SurfaceGui")
@@ -450,41 +571,53 @@ local function findPartFromGui(gui)
 			-- Adornee
 			if current.Adornee then
 
-				local part =
-					findBestPart(
-						current.Adornee
-					)
+				local adornee =
+					current.Adornee
 
-				if part then
-					return part, value
+				if adornee:IsA("BasePart") then
+					return adornee, value
+				end
+
+				if adornee:IsA("Model") then
+
+					local position =
+						adornee:GetPivot().Position
+
+					local closest =
+						getClosestPart(
+							position,
+							adornee
+						)
+
+					if closest then
+						return closest, value
+					end
 				end
 			end
 
-			-- Parent
+			-- Parent của GUI
 			local parent =
 				current.Parent
 
-			local part =
-				findBestPart(parent)
+			if parent then
 
-			if part then
-				return part, value
+				if parent:IsA("BasePart") then
+					return parent, value
+				end
+
+				if parent:IsA("Model") then
+
+					local closest =
+						getClosestPart(
+							parent:GetPivot().Position,
+							parent
+						)
+
+					if closest then
+						return closest, value
+					end
+				end
 			end
-		end
-
-		current = current.Parent
-	end
-
-	-- Leo Parent
-	current = gui.Parent
-
-	while current and current ~= workspace do
-
-		local part =
-			findBestPart(current)
-
-		if part then
-			return part, value
 		end
 
 		current = current.Parent
@@ -494,7 +627,84 @@ local function findPartFromGui(gui)
 end
 
 --========================================================
--- REFRESH WIN TARGETS
+-- FIND TARGET BY INSTANCE NAME
+--========================================================
+
+local function findTargetByName(object)
+
+	if not object then
+		return nil
+	end
+
+	local value =
+		extractWinValue(object.Name)
+
+	if not value then
+		return nil
+	end
+
+	if object:IsA("BasePart") then
+		return value, object
+	end
+
+	if object:IsA("Model") then
+
+		-- Button
+		local button =
+			object:FindFirstChild(
+				"Button",
+				true
+			)
+
+		if button
+			and button:IsA("BasePart")
+		then
+			return value, button
+		end
+
+		-- Hitbox
+		local hitbox =
+			object:FindFirstChild(
+				"Hitbox",
+				true
+			)
+
+		if hitbox
+			and hitbox:IsA("BasePart")
+		then
+			return value, hitbox
+		end
+
+		-- Part tên Win
+		for _, part in ipairs(
+			object:GetDescendants()
+		) do
+
+			if part:IsA("BasePart") then
+
+				local name =
+					part.Name:lower()
+
+				if name:find("win")
+					or name:find("button")
+					or name:find("hitbox")
+				then
+					return value, part
+				end
+			end
+		end
+
+		-- Chỉ dùng PrimaryPart nếu thực sự cần
+		if object.PrimaryPart then
+			return value, object.PrimaryPart
+		end
+	end
+
+	return nil
+end
+
+--========================================================
+-- REFRESH TARGETS
 --========================================================
 
 function Module.RefreshTargets()
@@ -502,26 +712,25 @@ function Module.RefreshTargets()
 	local targets = {}
 
 	--====================================================
-	-- 1. MODEL
+	-- PASS 1
+	-- MODEL / PART NAME
 	--====================================================
 
 	for _, object in ipairs(
 		workspace:GetDescendants()
 	) do
 
-		if object:IsA("Model") then
+		if object:IsA("Model")
+			or object:IsA("BasePart")
+		then
 
-			local value =
-				extractWinValue(
-					object.Name
-				)
+			local value, part =
+				findTargetByName(object)
 
-			if value then
+			if value and part then
 
-				local part =
-					findBestPart(object)
-
-				if part then
+				-- Chỉ nhận target hợp lệ
+				if not targets[value] then
 					targets[value] = part
 				end
 			end
@@ -529,32 +738,8 @@ function Module.RefreshTargets()
 	end
 
 	--====================================================
-	-- 2. PART
-	--====================================================
-
-	for _, object in ipairs(
-		workspace:GetDescendants()
-	) do
-
-		if object:IsA("BasePart") then
-
-			local value =
-				extractWinValue(
-					object.Name
-				)
-
-			if value then
-
-				-- Không ghi đè target từ Model
-				if not targets[value] then
-					targets[value] = object
-				end
-			end
-		end
-	end
-
-	--====================================================
-	-- 3. GUI
+	-- PASS 2
+	-- GUI
 	--====================================================
 
 	for _, object in ipairs(
@@ -568,17 +753,86 @@ function Module.RefreshTargets()
 			local part, value =
 				findPartFromGui(object)
 
-			if part and value then
+			if part
+				and value
+				and part:IsA("BasePart")
+			then
 
-				-- GUI chỉ dùng làm fallback
-				if not targets[value] then
-					targets[value] = part
-				end
+				-- GUI có thể chính xác hơn
+				-- target lấy từ tên.
+				targets[value] = part
 			end
 		end
 	end
 
+	--====================================================
+	-- CLEAN INVALID
+	--====================================================
+
+	for value, part in pairs(targets) do
+
+		if not part
+			or not part.Parent
+			or not part:IsA("BasePart")
+		then
+
+			targets[value] = nil
+		end
+	end
+
 	State.TargetCache = targets
+
+	--====================================================
+	-- DEBUG
+	--====================================================
+
+	print("")
+	print("===== WIN TARGETS =====")
+
+	local count = 0
+
+	local sortedValues = {}
+
+	for value in pairs(targets) do
+		table.insert(
+			sortedValues,
+			value
+		)
+	end
+
+	table.sort(
+		sortedValues,
+		function(a, b)
+			return a < b
+		end
+	)
+
+	for _, value in ipairs(
+		sortedValues
+	) do
+
+		local part =
+			targets[value]
+
+		count += 1
+
+		print(
+			("Target +%s Win -> %s | Position: %s")
+				:format(
+					tostring(value),
+					part:GetFullName(),
+					tostring(part.Position)
+				)
+		)
+	end
+
+	print(
+		"Total targets:",
+		count
+	)
+
+	print("=======================")
+	print("")
 
 	return targets
 end
@@ -602,10 +856,10 @@ function Module.GetTarget(value)
 		and target.Parent
 		and target:IsA("BasePart")
 	then
+
 		return target
 	end
 
-	-- Target chưa có / đã bị xoá
 	Module.RefreshTargets()
 
 	return State.TargetCache[value]
@@ -628,27 +882,26 @@ end
 
 local function targetPosition(part)
 
-	if not part then
+	if not part
+		or not part.Parent
+		or not part:IsA("BasePart")
+	then
 		return nil
 	end
 
-	if not part.Parent then
-		return nil
-	end
+	--====================================================
+	-- QUAN TRỌNG:
+	-- Không cộng Size.Y của award model.
+	-- Chỉ lấy vị trí chính xác của part target.
+	--====================================================
 
-	if not part:IsA("BasePart") then
-		return nil
-	end
-
-	local topY =
-		part.Position.Y
-		+ (part.Size.Y / 2)
-		+ State.FlyHeight
+	local position =
+		part.Position
 
 	return Vector3.new(
-		part.Position.X,
-		topY,
-		part.Position.Z
+		position.X,
+		position.Y + State.FlyHeight,
+		position.Z
 	)
 end
 
@@ -675,18 +928,28 @@ function Module.FlyToPart(part)
 	if not part
 		or not part:IsA("BasePart")
 	then
-		return false, "Invalid target part."
+
+		return false,
+			"Invalid target part."
 	end
 
-	local root = getRoot()
-	local humanoid = getHumanoid()
+	local root =
+		getRoot()
 
-	if not root or not humanoid then
-		return false, "Character is not ready."
+	local humanoid =
+		getHumanoid()
+
+	if not root
+		or not humanoid
+	then
+
+		return false,
+			"Character is not ready."
 	end
 
 	if State.Flying then
-		return false, "Already flying."
+		return false,
+			"Already flying."
 	end
 
 	State.Flying = true
@@ -701,10 +964,14 @@ function Module.FlyToPart(part)
 	humanoid.AutoRotate = false
 	humanoid.PlatformStand = true
 
-	local started = os.clock()
-	local timeout = 30
+	local started =
+		os.clock()
 
-	local reached = false
+	local timeout =
+		30
+
+	local reached =
+		false
 
 	while State.Flying
 		and root.Parent
@@ -728,9 +995,11 @@ function Module.FlyToPart(part)
 		local distance =
 			offset.Magnitude
 
-		-- Đã đến gần
-		if distance <= 3 then
+		-- Đã tới
+		if distance <= 2.5 then
+
 			reached = true
+
 			break
 		end
 
@@ -747,10 +1016,13 @@ function Module.FlyToPart(part)
 			break
 		end
 
+		local speed =
+			State.FlySpeed
+
 		local step =
 			math.min(
 				distance,
-				State.FlySpeed * deltaTime
+				speed * deltaTime
 			)
 
 		if offset.Magnitude > 0 then
@@ -759,6 +1031,7 @@ function Module.FlyToPart(part)
 				current
 				+ offset.Unit * step
 
+			-- Xóa physics
 			root.AssemblyLinearVelocity =
 				Vector3.zero
 
@@ -766,12 +1039,14 @@ function Module.FlyToPart(part)
 				Vector3.zero
 
 			root.CFrame =
-				CFrame.new(nextPosition)
+				CFrame.new(
+					nextPosition
+				)
 		end
 	end
 
 	--====================================================
-	-- FINAL POSITION
+	-- SNAP ĐÚNG TARGET
 	--====================================================
 
 	if reached
@@ -792,15 +1067,19 @@ function Module.FlyToPart(part)
 				Vector3.zero
 
 			root.CFrame =
-				CFrame.new(destination)
+				CFrame.new(
+					destination
+				)
 		end
 	end
 
 	--====================================================
-	-- RESTORE HUMANOID
+	-- RESTORE
 	--====================================================
 
-	if humanoid and humanoid.Parent then
+	if humanoid
+		and humanoid.Parent
+	then
 
 		humanoid.AutoRotate =
 			previousAutoRotate
@@ -825,18 +1104,26 @@ end
 
 function Module.FlyToWin(winAmount)
 
-	winAmount = tonumber(winAmount)
+	winAmount =
+		tonumber(winAmount)
 
 	if not winAmount then
-		return false, "Invalid Win amount."
+
+		return false,
+			"Invalid Win amount."
 	end
 
 	if State.Flying then
-		return false, "Already flying."
+
+		return false,
+			"Already flying."
 	end
 
+	-- Refresh target
+	Module.RefreshTargets()
+
 	local target =
-		Module.GetTarget(winAmount)
+		State.TargetCache[winAmount]
 
 	if not target then
 
@@ -845,9 +1132,32 @@ function Module.FlyToWin(winAmount)
 				:format(winAmount)
 	end
 
-	task.spawn(function()
-		Module.FlyToPart(target)
-	end)
+	print(
+		("[FlyToWin] +%d -> %s")
+			:format(
+				winAmount,
+				target:GetFullName()
+			)
+	)
+
+	task.spawn(
+		function()
+
+			local success, reason =
+				Module.FlyToPart(
+					target
+				)
+
+			print(
+				("[FlyToWin] Finished +%d | success=%s | reason=%s")
+					:format(
+						winAmount,
+						tostring(success),
+						tostring(reason or "")
+					)
+			)
+		end
+	)
 
 	return true
 end
@@ -860,16 +1170,13 @@ Connections.CharacterAdded =
 	LocalPlayer.CharacterAdded:Connect(
 		function(character)
 
-			-- Dừng fly
 			State.Flying = false
 			State.CurrentTarget = nil
 
-			-- Xoá collision cũ
 			table.clear(
 				OriginalCollision
 			)
 
-			-- Target cũ có thể không còn hợp lệ
 			table.clear(
 				State.TargetCache
 			)
@@ -900,65 +1207,73 @@ Connections.CharacterAdded =
 --========================================================
 
 Connections.NoClip =
-	RunService.Stepped:Connect(function()
+	RunService.Stepped:Connect(
+		function()
 
-		if not State.NoClip then
-			return
-		end
+			if not State.NoClip then
+				return
+			end
 
-		local character =
-			getCharacter()
+			local character =
+				getCharacter()
 
-		if not character then
-			return
-		end
+			if not character then
+				return
+			end
 
-		rememberCollision(character)
+			rememberCollision(
+				character
+			)
 
-		for _, object in ipairs(
-			character:GetDescendants()
-		) do
+			for _, object in ipairs(
+				character:GetDescendants()
+			) do
 
-			if object:IsA("BasePart") then
-				object.CanCollide = false
+				if object:IsA("BasePart") then
+					object.CanCollide = false
+				end
 			end
 		end
-	end)
+	)
 
 --========================================================
 -- INITIAL
 --========================================================
 
-task.defer(function()
+task.defer(
+	function()
 
-	applyCharacterSettings()
+		applyCharacterSettings()
 
-	local character =
-		getCharacter()
+		local character =
+			getCharacter()
 
-	if State.NoClip
-		and character
-	then
-		rememberCollision(character)
+		if State.NoClip
+			and character
+		then
+
+			rememberCollision(
+				character
+			)
+		end
 	end
-end)
+)
+
+--========================================================
+-- PUBLIC STATE
+--========================================================
 
 function Module.GetState()
 
 	return {
 		WalkSpeed = State.WalkSpeed,
 		JumpPower = State.JumpPower,
-
 		InfiniteJump = State.InfiniteJump,
 		NoClip = State.NoClip,
-
 		Flying = State.Flying,
-
 		FlySpeed = State.FlySpeed,
 		FlyHeight = State.FlyHeight,
-
-		CurrentTarget =
-			State.CurrentTarget,
+		CurrentTarget = State.CurrentTarget,
 	}
 end
 
