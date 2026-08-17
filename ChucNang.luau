@@ -11,8 +11,8 @@ local State = {
 	JumpPower = 50,
 
 	InfiniteJump = false,
+	NoClip = false,
 
-	AutoFlyEnabled = false,
 	Flying = false,
 
 	FlySpeed = 90,
@@ -146,18 +146,26 @@ function Module.GetInfiniteJump()
 	return State.InfiniteJump
 end
 
-function Module.SetAutoFlyEnabled(enabled)
-	State.AutoFlyEnabled = enabled == true
+function Module.SetNoClip(enabled)
+	State.NoClip = enabled == true
 
-	if not State.AutoFlyEnabled then
-		Module.StopFlying()
+	if not State.NoClip then
+		local character = getCharacter()
+
+		if character then
+			for _, object in ipairs(character:GetDescendants()) do
+				if object:IsA("BasePart") then
+					object.CanCollide = true
+				end
+			end
+		end
 	end
 
-	return State.AutoFlyEnabled
+	return State.NoClip
 end
 
-function Module.GetAutoFlyEnabled()
-	return State.AutoFlyEnabled
+function Module.GetNoClip()
+	return State.NoClip
 end
 
 --========================================================
@@ -278,12 +286,7 @@ local function targetPosition(part)
 		return nil
 	end
 
-	return part.Position
-		+ Vector3.new(
-			0,
-			(part.Size.Y * 0.5) + State.FlyHeight,
-			0
-		)
+	return part.Position + Vector3.new(0, State.FlyHeight, 0)
 end
 
 --========================================================
@@ -300,10 +303,6 @@ function Module.IsFlying()
 end
 
 function Module.FlyToPart(part)
-	if not State.AutoFlyEnabled then
-		return false, "Auto-Fly is disabled."
-	end
-
 	if not part or not part:IsA("BasePart") then
 		return false, "Invalid target part."
 	end
@@ -325,7 +324,6 @@ function Module.FlyToPart(part)
 	local timeout = 20
 
 	while State.Flying
-		and State.AutoFlyEnabled
 		and root.Parent
 		and part.Parent
 		and os.clock() - started < timeout
@@ -409,6 +407,24 @@ Connections.CharacterAdded = LocalPlayer.CharacterAdded:Connect(function(charact
 
 	State.Flying = false
 	State.CurrentTarget = nil
+end)
+
+Connections.NoClip = RunService.Stepped:Connect(function()
+	if not State.NoClip then
+		return
+	end
+
+	local character = getCharacter()
+
+	if not character then
+		return
+	end
+
+	for _, object in ipairs(character:GetDescendants()) do
+		if object:IsA("BasePart") then
+			object.CanCollide = false
+		end
+	end
 end)
 
 -- Apply settings immediately if the character already exists.
