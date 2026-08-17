@@ -506,6 +506,20 @@ function Module.RefreshTargets()
 	return targets
 end
 
+print("===== WIN TARGETS =====")
+
+for value, part in pairs(targets) do
+	print(
+		"+"
+			.. tostring(value)
+			.. " Win ->",
+		part:GetFullName(),
+		part.Position
+	)
+end
+
+print("=======================")
+
 -- GET TARGET
 function Module.GetTarget(value)
 	value = tonumber(value)
