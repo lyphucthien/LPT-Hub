@@ -571,8 +571,8 @@ createToggle(settingsPage, "Notifications", 163, true, COLORS.PageSettings)
 --// MOVEMENT PAGE
 createPageTitle(
 	movementPage,
-	"Movement",
-	"Controls for movement, jumping and automatic Win target navigation"
+	"Chức Năng",
+	"CCác điều khiển việc di chuyển, nhảy và điều hướng mục tiêu tự động"
 )
 
 local NUMBER_ROW_HEIGHT = 78
@@ -831,7 +831,7 @@ local winTitle = Instance.new("TextLabel")
 winTitle.Size = UDim2.new(1, -56, 0, 26)
 winTitle.Position = UDim2.new(0, 28, 0, 585)
 winTitle.BackgroundTransparency = 1
-winTitle.Text = "WIN TARGETS"
+winTitle.Text = "AUTO WIN"
 winTitle.TextColor3 = COLORS.Text
 winTitle.TextSize = 15
 winTitle.Font = Enum.Font.GothamBold
@@ -842,15 +842,13 @@ local winHint = Instance.new("TextLabel")
 winHint.Size = UDim2.new(1, -56, 0, 32)
 winHint.Position = UDim2.new(0, 28, 0, 613)
 winHint.BackgroundTransparency = 1
-winHint.Text = "Flip a switch to continuously auto-fly to that target — no need to also enable Auto-Fly Mode."
+winHint.Text = "Gạt Cần Để Bay Đến Nút Win Được Gạt"
 winHint.TextColor3 = COLORS.TextDim
 winHint.TextSize = 12
 winHint.TextXAlignment = Enum.TextXAlignment.Left
 winHint.TextWrapped = true
 winHint.Parent = movementPage
 
--- Công tắc kiểu radio: giống createToggle nhưng thêm forceState() để
--- các mục Win Target khác tự tắt khi 1 mục được bật (chỉ chọn 1 tại 1 thời điểm).
 local function createRadioToggle(parent, text, yPos, accentColor, onToggle)
 	accentColor = accentColor or COLORS.Accent
 
