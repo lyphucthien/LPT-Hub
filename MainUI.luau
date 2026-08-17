@@ -69,8 +69,10 @@ local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ThienHub"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.DisplayOrder = 2147483647 -- số cực lớn: luôn vẽ đè lên ScreenGui khác
+screenGui.DisplayOrder = 2147483647 -- số DisplayOrder cực lớn: luôn vẽ đè lên mọi ScreenGui khác
 
+-- Ưu tiên parent vào layer ẩn của executor (không bị game Destroy/che),
+-- nếu executor không hỗ trợ thì fallback qua CoreGui, cuối cùng mới PlayerGui.
 local hiddenLayer = (gethui and gethui()) or (get_hidden_gui and get_hidden_gui())
 
 if hiddenLayer then
@@ -642,6 +644,7 @@ local function createNumberControl(parent, titleText, yPos, defaultValue, minVal
 	track.Position = UDim2.new(0, 28, 0.5, -3)
 	track.BackgroundColor3 = COLORS.SurfaceLight
 	track.BorderSizePixel = 0
+	track.Active = true -- QUAN TRỌNG: Frame mặc định Active=false nên sẽ không nhận InputBegan
 	track.Parent = sliderZone
 
 	local trackCorner = Instance.new("UICorner")
@@ -663,6 +666,7 @@ local function createNumberControl(parent, titleText, yPos, defaultValue, minVal
 	knob.BackgroundColor3 = Color3.new(1, 1, 1)
 	knob.BorderSizePixel = 0
 	knob.ZIndex = 2
+	knob.Active = true -- cùng lý do: Frame cần Active=true mới bắt InputBegan
 	knob.Parent = track
 
 	local knobCorner = Instance.new("UICorner")
@@ -838,75 +842,147 @@ local winHint = Instance.new("TextLabel")
 winHint.Size = UDim2.new(1, -56, 0, 32)
 winHint.Position = UDim2.new(0, 28, 0, 613)
 winHint.BackgroundTransparency = 1
-winHint.Text = "Choose a target to tell the external movement module where to fly."
+winHint.Text = "Flip a switch to continuously auto-fly to that target — no need to also enable Auto-Fly Mode."
 winHint.TextColor3 = COLORS.TextDim
 winHint.TextSize = 12
 winHint.TextXAlignment = Enum.TextXAlignment.Left
 winHint.TextWrapped = true
 winHint.Parent = movementPage
 
-local targetFrame = Instance.new("Frame")
-targetFrame.Size = UDim2.new(1, -56, 0, 150)
-targetFrame.Position = UDim2.new(0, 28, 0, 648)
-targetFrame.BackgroundTransparency = 1
-targetFrame.Parent = movementPage
+-- Công tắc kiểu radio: giống createToggle nhưng thêm forceState() để
+-- các mục Win Target khác tự tắt khi 1 mục được bật (chỉ chọn 1 tại 1 thời điểm).
+local function createRadioToggle(parent, text, yPos, accentColor, onToggle)
+	accentColor = accentColor or COLORS.Accent
 
-local targetGrid = Instance.new("UIGridLayout")
-targetGrid.CellSize = UDim2.new(0.31, -4, 0, 42)
-targetGrid.CellPadding = UDim2.new(0.02, 0, 0, 8)
-targetGrid.Parent = targetFrame
-
-local function createTargetButton(value)
-	local button = Instance.new("TextButton")
-	button.Name = "Win_" .. tostring(value)
-	button.BackgroundColor3 = COLORS.Card
-	button.BorderSizePixel = 0
-	button.Text = "+" .. tostring(value) .. " WIN"
-	button.TextColor3 = COLORS.Text
-	button.TextSize = 13
-	button.Font = Enum.Font.GothamBold
-	button.AutoButtonColor = false
-	button.Parent = targetFrame
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, -56, 0, 56)
+	row.Position = UDim2.new(0, 28, 0, yPos)
+	row.BackgroundColor3 = COLORS.Card
+	row.BorderSizePixel = 0
+	row.Parent = parent
 
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
-	corner.Parent = button
+	corner.CornerRadius = UDim.new(0, 14)
+	corner.Parent = row
 
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = COLORS.PageServer
-	stroke.Transparency = 0.2
-	stroke.Parent = button
+	stroke.Color = COLORS.Border
+	stroke.Thickness = 1
+	stroke.Transparency = 0.15
+	stroke.Parent = row
 
-	button.MouseEnter:Connect(function()
-		tween(button, {BackgroundColor3 = COLORS.SurfaceLight})
-	end)
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, -90, 1, 0)
+	label.Position = UDim2.new(0, 18, 0, 0)
+	label.BackgroundTransparency = 1
+	label.Text = text
+	label.TextColor3 = COLORS.Text
+	label.TextSize = 14
+	label.Font = Enum.Font.GothamMedium
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = row
 
-	button.MouseLeave:Connect(function()
-		tween(button, {BackgroundColor3 = COLORS.Card})
-	end)
+	local toggle = Instance.new("TextButton")
+	toggle.Size = UDim2.new(0, 50, 0, 26)
+	toggle.Position = UDim2.new(1, -68, 0.5, -13)
+	toggle.BackgroundColor3 = COLORS.SurfaceLight
+	toggle.BorderSizePixel = 0
+	toggle.Text = ""
+	toggle.AutoButtonColor = false
+	toggle.Parent = row
 
-	button.MouseButton1Click:Connect(function()
-		local module = loadMovementModule()
-		if not module then
+	local toggleCorner = Instance.new("UICorner")
+	toggleCorner.CornerRadius = UDim.new(1, 0)
+	toggleCorner.Parent = toggle
+
+	local toggleGradient = applyGradient(toggle, accentColor, COLORS.AccentB, 0)
+	toggleGradient.Enabled = false
+
+	local circle = Instance.new("Frame")
+	circle.Size = UDim2.new(0, 20, 0, 20)
+	circle.Position = UDim2.new(0, 3, 0.5, -10)
+	circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	circle.BorderSizePixel = 0
+	circle.Parent = toggle
+
+	local circleCorner = Instance.new("UICorner")
+	circleCorner.CornerRadius = UDim.new(1, 0)
+	circleCorner.Parent = circle
+
+	local enabled = false
+
+	local function applyVisual()
+		if enabled then
+			toggleGradient.Enabled = true
+			tween(toggle, {BackgroundColor3 = accentColor})
+			tween(circle, {Position = UDim2.new(1, -23, 0.5, -10)})
+		else
+			tween(toggle, {BackgroundColor3 = COLORS.SurfaceLight})
+			tween(circle, {Position = UDim2.new(0, 3, 0.5, -10)})
+			task.delay(0.18, function()
+				if not enabled then toggleGradient.Enabled = false end
+			end)
+		end
+	end
+
+	-- Bật/tắt bằng code (không gọi lại onToggle) — dùng khi mục khác được chọn.
+	local function forceState(newState)
+		if enabled == newState then
 			return
 		end
+		enabled = newState
+		applyVisual()
+	end
 
-		-- Target buttons explicitly perform the requested Auto-Fly action.
-		if module.SetAutoFlyEnabled then
-			module.SetAutoFlyEnabled(true)
-		end
+	toggle.MouseButton1Click:Connect(function()
+		enabled = not enabled
+		applyVisual()
 
-		if module.FlyToWin then
-			module.FlyToWin(value)
+		if onToggle then
+			onToggle(enabled)
 		end
 	end)
 
-	return button
+	return row, function() return enabled end, forceState
 end
 
-for _, value in ipairs({1, 3, 10, 25, 50, 100}) do
-	createTargetButton(value)
+-- Danh sách Win Target: gạt công tắc là tự động bay liên tục tới đó,
+-- không cần bấm nút hay bật riêng "Auto-Fly Mode".
+local WIN_TARGET_VALUES = {1, 3, 10, 25, 50, 100}
+local WIN_TARGET_ROW_HEIGHT = 56
+local WIN_TARGET_ROW_GAP = 10
+
+local winTargetRows = {}
+local selectedWinTarget = nil
+
+for index, value in ipairs(WIN_TARGET_VALUES) do
+	local rowY = 648 + (index - 1) * (WIN_TARGET_ROW_HEIGHT + WIN_TARGET_ROW_GAP)
+
+	local _, _, forceState = createRadioToggle(
+		movementPage,
+		"+" .. tostring(value) .. " Win",
+		rowY,
+		COLORS.PageServer,
+		function(isEnabled)
+			if isEnabled then
+				selectedWinTarget = value
+
+				-- Chỉ cho phép chọn 1 target tại 1 thời điểm: tắt các mục còn lại.
+				for _, entry in ipairs(winTargetRows) do
+					if entry.value ~= value then
+						entry.forceState(false)
+					end
+				end
+			elseif selectedWinTarget == value then
+				selectedWinTarget = nil
+			end
+		end
+	)
+
+	table.insert(winTargetRows, {value = value, forceState = forceState})
 end
+
+local winTargetsBottom = 648 + (#WIN_TARGET_VALUES * (WIN_TARGET_ROW_HEIGHT + WIN_TARGET_ROW_GAP))
 
 local refreshTargets = Instance.new("TextButton")
 refreshTargets.Size = UDim2.new(0, 125, 0, 34)
@@ -946,13 +1022,25 @@ task.spawn(function()
 			module.SetInfiniteJump(infiniteJumpEnabled())
 		end
 
-		if module.SetAutoFlyEnabled then
-			module.SetAutoFlyEnabled(autoFlyEnabled())
+		if selectedWinTarget then
+			-- Có Win Target được chọn: luôn bật Auto-Fly và tự bay lại
+			-- ngay khi chuyến bay trước kết thúc (tới nơi / hết giờ / mục tiêu di chuyển).
+			if module.SetAutoFlyEnabled then
+				module.SetAutoFlyEnabled(true)
+			end
+
+			if module.FlyToWin and module.IsFlying and not module.IsFlying() then
+				module.FlyToWin(selectedWinTarget)
+			end
+		else
+			if module.SetAutoFlyEnabled then
+				module.SetAutoFlyEnabled(autoFlyEnabled())
+			end
 		end
 	end
 end)
 
-movementPage.CanvasSize = UDim2.new(0, 0, 0, 830)
+movementPage.CanvasSize = UDim2.new(0, 0, 0, winTargetsBottom + 30)
 
 
 --// SIDEBAR BUTTONS
