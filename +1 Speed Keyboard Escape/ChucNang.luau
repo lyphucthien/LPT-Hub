@@ -28,11 +28,10 @@ local State = {
 
 local Connections = {}
 
--- Lưu trạng thái collision gốc của character
 local OriginalCollision = {}
 
 --========================================================
--- CONNECTION HELPERS
+-- CONNECTION
 --========================================================
 
 local function disconnect(name)
@@ -45,7 +44,7 @@ local function disconnect(name)
 end
 
 --========================================================
--- CHARACTER HELPERS
+-- CHARACTER
 --========================================================
 
 local function getCharacter()
@@ -103,7 +102,7 @@ local function applyCharacterSettings()
 end
 
 --========================================================
--- WALK SPEED / JUMP POWER
+-- WALK SPEED
 --========================================================
 
 function Module.SetWalkSpeed(value)
@@ -122,6 +121,10 @@ end
 function Module.GetWalkSpeed()
 	return State.WalkSpeed
 end
+
+--========================================================
+-- JUMP POWER
+--========================================================
 
 function Module.SetJumpPower(value)
 	State.JumpPower = getNumber(
@@ -216,8 +219,15 @@ function Module.GetInfiniteJump()
 	return State.InfiniteJump
 end
 
+--========================================================
 -- NO CLIP
+--========================================================
+
 local function rememberCollision(character)
+	if not character then
+		return
+	end
+
 	for _, object in ipairs(character:GetDescendants()) do
 		if object:IsA("BasePart") then
 
@@ -242,8 +252,6 @@ local function restoreCollision(character)
 				object.CanCollide = original
 				OriginalCollision[object] = nil
 			else
-				-- Part mới không có trạng thái cũ
-				-- nên dùng mặc định an toàn.
 				object.CanCollide = true
 			end
 		end
@@ -275,21 +283,44 @@ function Module.GetNoClip()
 	return State.NoClip
 end
 
--- WIN TARGET DETECTION
-local function normalize(text)
-	return tostring(text or "")
-		:lower()
+--========================================================
+-- WIN PARSER
+--========================================================
+
+local function cleanText(text)
+	text = tostring(text or "")
+
+	text = text
 		:gsub(",", "")
+		:gsub("％", "%")
+		:gsub("%s+", " ")
+
+	return text:lower()
 end
 
 local function extractWinValue(text)
-	local normalized = normalize(text)
+	local normalized = cleanText(text)
 
-	normalized = normalized:gsub(",", "")
+	-- Hỗ trợ:
+	-- +1 Win
+	-- +1 Wins
+	-- +1
+	-- +1K Win
+	-- +1M Win
 
-	local number, suffix = normalized:match(
-		"%+%s*([%d%.]+)%s*([km]?)%s*win"
-	)
+	local number, suffix =
+		normalized:match(
+			"%+%s*([%d%.]+)%s*([km]?)%s*[wW][iI][nN][sS]?"
+		)
+
+	-- Nếu không có chữ Win/Wins,
+	-- vẫn nhận +1 / +3
+	if not number then
+		number, suffix =
+			normalized:match(
+				"%+%s*([%d%.]+)%s*([km]?)"
+			)
+	end
 
 	if not number then
 		return nil
@@ -305,7 +336,6 @@ local function extractWinValue(text)
 
 	if suffix == "k" then
 		value = value * 1000
-
 	elseif suffix == "m" then
 		value = value * 1000000
 	end
@@ -313,235 +343,302 @@ local function extractWinValue(text)
 	return math.floor(value + 0.5)
 end
 
+--========================================================
+-- FIND BEST PART IN CONTAINER
+--========================================================
+
+local function findBestPart(container)
+
+	if not container then
+		return nil
+	end
+
+	-- Nếu chính nó là Part
+	if container:IsA("BasePart") then
+		return container
+	end
+
+	-- Model
+	if container:IsA("Model") then
+
+		-- Ưu tiên Hitbox
+		local hitbox = container:FindFirstChild(
+			"Hitbox",
+			true
+		)
+
+		if hitbox and hitbox:IsA("BasePart") then
+			return hitbox
+		end
+
+		-- Ưu tiên Button
+		local button = container:FindFirstChild(
+			"Button",
+			true
+		)
+
+		if button and button:IsA("BasePart") then
+			return button
+		end
+
+		-- PrimaryPart
+		if container.PrimaryPart then
+			return container.PrimaryPart
+		end
+
+		-- Tìm part có tên liên quan
+		for _, object in ipairs(
+			container:GetDescendants()
+		) do
+
+			if object:IsA("BasePart") then
+
+				local name =
+					object.Name:lower()
+
+				if name:find("button")
+					or name:find("hitbox")
+					or name:find("win")
+				then
+					return object
+				end
+			end
+		end
+
+		-- Cuối cùng lấy BasePart đầu tiên
+		return container:FindFirstChildWhichIsA(
+			"BasePart",
+			true
+		)
+	end
+
+	return nil
+end
+
+--========================================================
 -- FIND PART FROM GUI
+--========================================================
+
 local function findPartFromGui(gui)
+
 	if not gui:IsA("TextLabel")
 		and not gui:IsA("TextButton")
 	then
 		return nil
 	end
 
-	local value = extractWinValue(gui.Text)
+	local value =
+		extractWinValue(gui.Text)
 
 	if not value then
 		return nil
 	end
 
+	--====================================================
+	-- 1. GUI trong BillboardGui / SurfaceGui
+	--====================================================
+
 	local current = gui
 
 	while current and current ~= workspace do
 
-		if current:IsA("SurfaceGui")
-			or current:IsA("BillboardGui")
+		if current:IsA("BillboardGui")
+			or current:IsA("SurfaceGui")
 		then
 
-			local adornee = current.Adornee
+			-- Adornee
+			local adornee =
+				current.Adornee
 
 			if adornee then
 
-				if adornee:IsA("BasePart") then
-					return adornee, value
-				end
+				local part =
+					findBestPart(adornee)
 
-				if adornee:IsA("Model") then
-					local part =
-						adornee.PrimaryPart
-						or adornee:FindFirstChild(
-							"Hitbox",
-							true
-						)
-						or adornee:FindFirstChild(
-							"Button",
-							true
-						)
-						or adornee:FindFirstChildWhichIsA(
-							"BasePart",
-							true
-						)
-
-					if part and part:IsA("BasePart") then
-						return part, value
-					end
+				if part then
+					return part, value
 				end
 			end
 
-			local guiParent = current.Parent
-
-			if guiParent then
-
-				if guiParent:IsA("BasePart") then
-					return guiParent, value
-				end
-
-				if guiParent:IsA("Model") then
-					local part =
-						guiParent.PrimaryPart
-						or guiParent:FindFirstChild(
-							"Hitbox",
-							true
-						)
-						or guiParent:FindFirstChild(
-							"Button",
-							true
-						)
-						or guiParent:FindFirstChildWhichIsA(
-							"BasePart",
-							true
-						)
-
-					if part and part:IsA("BasePart") then
-						return part, value
-					end
-				end
-			end
-		end
-
-		current = current.Parent
-	end
-
-	local parent = gui.Parent
-
-	while parent and parent ~= workspace do
-
-		if parent:IsA("BasePart") then
-			return parent, value
-		end
-
-		if parent:IsA("Model") then
-
-			local hitbox =
-				parent:FindFirstChild(
-					"Hitbox",
-					true
-				)
-
-			if hitbox and hitbox:IsA("BasePart") then
-				return hitbox, value
-			end
-
-			local button =
-				parent:FindFirstChild(
-					"Button",
-					true
-				)
-
-			if button and button:IsA("BasePart") then
-				return button, value
-			end
-
-			local primary =
-				parent.PrimaryPart
-
-			if primary then
-				return primary, value
-			end
+			-- Parent của GUI
+			local parent =
+				current.Parent
 
 			local part =
-				parent:FindFirstChildWhichIsA(
-					"BasePart",
-					true
-				)
+				findBestPart(parent)
 
 			if part then
 				return part, value
 			end
 		end
 
-		parent = parent.Parent
+		current = current.Parent
 	end
 
-	local guiParent = gui.Parent
+	--====================================================
+	-- 2. Leo ngược Parent
+	--====================================================
 
-	if guiParent then
+	current = gui.Parent
 
-		local nearestPart = nil
+	while current and current ~= workspace do
 
-		for _, object in ipairs(
-			guiParent:GetDescendants()
-		) do
+		local part =
+			findBestPart(current)
 
-			if object:IsA("BasePart") then
-				nearestPart = object
-				break
-			end
+		if part then
+			return part, value
 		end
 
-		if nearestPart then
-			return nearestPart, value
-		end
+		current = current.Parent
 	end
 
 	return nil
 end
 
+--========================================================
+-- FIND WIN FROM PART / MODEL NAME
+--========================================================
+
+local function findWinFromInstance(object)
+
+	if not object then
+		return nil
+	end
+
+	local value =
+		extractWinValue(object.Name)
+
+	if value then
+		return value
+	end
+
+	return nil
+end
+
+--========================================================
 -- REFRESH TARGETS
+--========================================================
+
 function Module.RefreshTargets()
+
 	local targets = {}
 
-	local function scan(container)
-		for _, object in ipairs(container:GetDescendants()) do
+	--====================================================
+	-- PASS 1:
+	-- Scan Models
+	--====================================================
 
-			-- Part có tên +1 Win, +3 Win...
-			if object:IsA("BasePart") then
+	for _, object in ipairs(
+		workspace:GetDescendants()
+	) do
 
-				local value = extractWinValue(object.Name)
+		if object:IsA("Model") then
 
-				if value then
-					targets[value] = object
-				end
+			local value =
+				findWinFromInstance(object)
 
-			-- GUI có chữ +1 Win, +3 Win...
-			elseif object:IsA("TextLabel")
-				or object:IsA("TextButton")
-			then
+			if value then
 
-				local part, value = findPartFromGui(object)
+				local part =
+					findBestPart(object)
 
-				if part and value then
+				if part then
 					targets[value] = part
 				end
 			end
 		end
 	end
 
-	-- Tìm trong Workspace
-	scan(workspace)
+	--====================================================
+	-- PASS 2:
+	-- Scan Parts
+	--====================================================
 
-	-- Tìm thêm trong PlayerGui
-	local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+	for _, object in ipairs(
+		workspace:GetDescendants()
+	) do
 
-	if playerGui then
-		scan(playerGui)
+		if object:IsA("BasePart") then
+
+			local value =
+				findWinFromInstance(object)
+
+			if value then
+				targets[value] = object
+			end
+		end
+	end
+
+	--====================================================
+	-- PASS 3:
+	-- Scan GUI
+	--====================================================
+
+	for _, object in ipairs(
+		workspace:GetDescendants()
+	) do
+
+		if object:IsA("TextLabel")
+			or object:IsA("TextButton")
+		then
+
+			local part, value =
+				findPartFromGui(object)
+
+			if part and value then
+				targets[value] = part
+			end
+		end
 	end
 
 	State.TargetCache = targets
 
+	--====================================================
 	-- DEBUG
+	--====================================================
+
 	print("===== WIN TARGETS =====")
 
+	local count = 0
+
 	for value, part in pairs(targets) do
-		if part and part.Parent then
-			print(
-				"+" .. tostring(value) .. " Win ->",
-				part:GetFullName(),
-				part.Position
-			)
-		end
+
+		count += 1
+
+		print(
+			("Target +%s Win -> %s | Position: %s")
+				:format(
+					tostring(value),
+					part:GetFullName(),
+					tostring(part.Position)
+				)
+		)
 	end
+
+	print(
+		"Total targets:",
+		count
+	)
 
 	print("=======================")
 
 	return targets
 end
 
+--========================================================
 -- GET TARGET
+--========================================================
+
 function Module.GetTarget(value)
+
 	value = tonumber(value)
 
 	if not value then
 		return nil
 	end
 
+	-- Luôn refresh nếu target chưa có
 	if not State.TargetCache[value] then
 		Module.RefreshTargets()
 	end
@@ -549,17 +646,25 @@ function Module.GetTarget(value)
 	return State.TargetCache[value]
 end
 
+--========================================================
+-- GET ALL TARGETS
+--========================================================
+
 function Module.GetTargets()
 
-	if next(State.TargetCache) == nil then
-		Module.RefreshTargets()
-	end
+	-- Refresh mỗi lần gọi để bắt
+	-- những button mới spawn
+	Module.RefreshTargets()
 
 	return State.TargetCache
 end
 
+--========================================================
 -- TARGET POSITION
+--========================================================
+
 local function targetPosition(part)
+
 	if not part then
 		return nil
 	end
@@ -572,6 +677,7 @@ local function targetPosition(part)
 		return nil
 	end
 
+	-- Bay tới phía trên target
 	local topY =
 		part.Position.Y
 		+ (part.Size.Y / 2)
@@ -584,8 +690,12 @@ local function targetPosition(part)
 	)
 end
 
+--========================================================
 -- STOP FLYING
+--========================================================
+
 function Module.StopFlying()
+
 	State.Flying = false
 	State.CurrentTarget = nil
 end
@@ -594,7 +704,10 @@ function Module.IsFlying()
 	return State.Flying
 end
 
+--========================================================
 -- FLY TO PART
+--========================================================
+
 function Module.FlyToPart(part)
 
 	if not part
@@ -610,7 +723,6 @@ function Module.FlyToPart(part)
 		return false, "Character is not ready."
 	end
 
-	-- Nếu đang bay thì không tạo chuyến bay thứ hai.
 	if State.Flying then
 		return false, "Already flying."
 	end
@@ -618,16 +730,18 @@ function Module.FlyToPart(part)
 	State.Flying = true
 	State.CurrentTarget = part
 
-	local previousAutoRotate = humanoid.AutoRotate
-	local previousPlatformStand = humanoid.PlatformStand
+	local previousAutoRotate =
+		humanoid.AutoRotate
+
+	local previousPlatformStand =
+		humanoid.PlatformStand
 
 	humanoid.AutoRotate = false
-
-	-- Giảm ảnh hưởng physics trong lúc di chuyển.
 	humanoid.PlatformStand = true
 
 	local started = os.clock()
-	local timeout = 20
+
+	local timeout = 30
 
 	local reached = false
 
@@ -644,12 +758,17 @@ function Module.FlyToPart(part)
 			break
 		end
 
-		local current = root.Position
-		local offset = destination - current
-		local distance = offset.Magnitude
+		local current =
+			root.Position
 
-		-- Đã tới gần target.
-		if distance <= 2.5 then
+		local offset =
+			destination - current
+
+		local distance =
+			offset.Magnitude
+
+		-- Đã tới target
+		if distance <= 3 then
 			reached = true
 			break
 		end
@@ -667,7 +786,6 @@ function Module.FlyToPart(part)
 			break
 		end
 
-		-- Tính tốc độ bay.
 		local step =
 			math.min(
 				distance,
@@ -680,7 +798,6 @@ function Module.FlyToPart(part)
 				current
 				+ offset.Unit * step
 
-			-- Xoá vận tốc physics còn sót lại.
 			root.AssemblyLinearVelocity =
 				Vector3.zero
 
@@ -692,7 +809,10 @@ function Module.FlyToPart(part)
 		end
 	end
 
-	-- Chỉ snap nếu thực sự đã tới target.
+	--====================================================
+	-- SNAP
+	--====================================================
+
 	if reached
 		and State.Flying
 		and root.Parent
@@ -715,8 +835,12 @@ function Module.FlyToPart(part)
 		end
 	end
 
-	-- Khôi phục Humanoid.
+	--====================================================
+	-- RESTORE
+	--====================================================
+
 	if humanoid and humanoid.Parent then
+
 		humanoid.AutoRotate =
 			previousAutoRotate
 
@@ -734,7 +858,10 @@ function Module.FlyToPart(part)
 	return reached
 end
 
+--========================================================
 -- FLY TO WIN
+--========================================================
+
 function Module.FlyToWin(winAmount)
 
 	winAmount = tonumber(winAmount)
@@ -743,23 +870,17 @@ function Module.FlyToWin(winAmount)
 		return false, "Invalid Win amount."
 	end
 
+	-- Refresh trước khi tìm
+	Module.RefreshTargets()
+
 	local target =
-		Module.GetTarget(winAmount)
+		State.TargetCache[winAmount]
 
 	if not target then
 
-		-- Refresh lại một lần nữa để đảm bảo
-		-- target mới xuất hiện được tìm thấy.
-		Module.RefreshTargets()
-
-		target =
-			State.TargetCache[winAmount]
-	end
-
-	if not target then
 		return false,
 			("No +%d Win target was detected.")
-			:format(winAmount)
+				:format(winAmount)
 	end
 
 	if State.Flying then
@@ -767,23 +888,35 @@ function Module.FlyToWin(winAmount)
 	end
 
 	task.spawn(function()
-		Module.FlyToPart(target)
+
+		local success, reason =
+			Module.FlyToPart(target)
+
+		print(
+			"FlyToWin:",
+			winAmount,
+			success,
+			reason or ""
+		)
 	end)
 
 	return true
 end
 
+--========================================================
 -- CHARACTER LIFECYCLE
+--========================================================
+
 Connections.CharacterAdded =
 	LocalPlayer.CharacterAdded:Connect(
 		function(character)
 
-			-- Dừng chuyến bay cũ.
 			State.Flying = false
 			State.CurrentTarget = nil
 
-			-- Xoá collision cache của character cũ.
-			table.clear(OriginalCollision)
+			table.clear(
+				OriginalCollision
+			)
 
 			local humanoid =
 				character:WaitForChild(
@@ -797,8 +930,6 @@ Connections.CharacterAdded =
 
 				applyCharacterSettings()
 
-				-- Nếu No Clip đang bật thì áp dụng
-				-- cho character mới.
 				if State.NoClip then
 					rememberCollision(character)
 				end
@@ -806,7 +937,10 @@ Connections.CharacterAdded =
 		end
 	)
 
+--========================================================
 -- NO CLIP LOOP
+--========================================================
+
 Connections.NoClip =
 	RunService.Stepped:Connect(function()
 
@@ -821,12 +955,11 @@ Connections.NoClip =
 			return
 		end
 
-		-- Lưu trạng thái collision trước.
 		rememberCollision(character)
 
-		for _, object in
-			ipairs(character:GetDescendants())
-		do
+		for _, object in ipairs(
+			character:GetDescendants()
+		) do
 
 			if object:IsA("BasePart") then
 				object.CanCollide = false
@@ -834,12 +967,18 @@ Connections.NoClip =
 		end
 	end)
 
--- INITIAL SETTINGS
+--========================================================
+-- INITIAL
+--========================================================
+
 task.defer(function()
+
 	applyCharacterSettings()
 
 	if State.NoClip then
-		local character = getCharacter()
+
+		local character =
+			getCharacter()
 
 		if character then
 			rememberCollision(character)
@@ -847,8 +986,12 @@ task.defer(function()
 	end
 end)
 
+--========================================================
 -- PUBLIC STATE
+--========================================================
+
 function Module.GetState()
+
 	return {
 		WalkSpeed = State.WalkSpeed,
 		JumpPower = State.JumpPower,
@@ -864,4 +1007,5 @@ function Module.GetState()
 		CurrentTarget = State.CurrentTarget,
 	}
 end
+
 return Module
