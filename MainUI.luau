@@ -553,9 +553,13 @@ createPageTitle(
 	"Controls for movement, jumping and automatic Win target navigation"
 )
 
+local NUMBER_ROW_HEIGHT = 78
+
+-- Thanh trượt (slider) kéo thả: bên trái luôn hiện "0" làm mốc,
+-- bên phải hiện đúng số đang được kéo trên thanh, kéo tới đâu áp dụng tới đó.
 local function createNumberControl(parent, titleText, yPos, defaultValue, minValue, maxValue, accentColor, onChanged)
 	local row = Instance.new("Frame")
-	row.Size = UDim2.new(1, -56, 0, 58)
+	row.Size = UDim2.new(1, -56, 0, NUMBER_ROW_HEIGHT)
 	row.Position = UDim2.new(0, 28, 0, yPos)
 	row.BackgroundColor3 = COLORS.Card
 	row.BorderSizePixel = 0
@@ -571,9 +575,10 @@ local function createNumberControl(parent, titleText, yPos, defaultValue, minVal
 	stroke.Transparency = 0.15
 	stroke.Parent = row
 
+	-- Chỉ còn tên tính năng, không hiện khoảng giá trị (vd "1–500") nữa
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, -145, 1, 0)
-	label.Position = UDim2.new(0, 18, 0, 0)
+	label.Size = UDim2.new(1, -36, 0, 18)
+	label.Position = UDim2.new(0, 18, 0, 10)
 	label.BackgroundTransparency = 1
 	label.Text = titleText
 	label.TextColor3 = COLORS.Text
@@ -582,41 +587,131 @@ local function createNumberControl(parent, titleText, yPos, defaultValue, minVal
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Parent = row
 
-	local box = Instance.new("TextBox")
-	box.Size = UDim2.new(0, 105, 0, 34)
-	box.Position = UDim2.new(1, -123, 0.5, -17)
-	box.BackgroundColor3 = COLORS.SurfaceLight
-	box.BorderSizePixel = 0
-	box.Text = tostring(defaultValue)
-	box.PlaceholderText = tostring(defaultValue)
-	box.TextColor3 = COLORS.Text
-	box.PlaceholderColor3 = COLORS.TextDim
-	box.TextSize = 14
-	box.Font = Enum.Font.GothamMedium
-	box.ClearTextOnFocus = false
-	box.Parent = row
+	local sliderZone = Instance.new("Frame")
+	sliderZone.Size = UDim2.new(1, -36, 0, 30)
+	sliderZone.Position = UDim2.new(0, 18, 0, 38)
+	sliderZone.BackgroundTransparency = 1
+	sliderZone.Parent = row
 
-	local boxCorner = Instance.new("UICorner")
-	boxCorner.CornerRadius = UDim.new(0, 9)
-	boxCorner.Parent = box
+	-- Nhãn bên trái: luôn luôn là "0"
+	local minLabel = Instance.new("TextLabel")
+	minLabel.Size = UDim2.new(0, 20, 1, 0)
+	minLabel.Position = UDim2.new(0, 0, 0, 0)
+	minLabel.BackgroundTransparency = 1
+	minLabel.Text = "0"
+	minLabel.TextColor3 = COLORS.TextDim
+	minLabel.TextSize = 12
+	minLabel.Font = Enum.Font.GothamMedium
+	minLabel.TextXAlignment = Enum.TextXAlignment.Left
+	minLabel.Parent = sliderZone
 
-	local function apply()
-		local value = tonumber(box.Text)
-		if not value then
-			value = defaultValue
-		end
+	-- Nhãn bên phải: số hiện tại, cập nhật realtime khi kéo
+	local valueLabel = Instance.new("TextLabel")
+	valueLabel.Size = UDim2.new(0, 46, 1, 0)
+	valueLabel.Position = UDim2.new(1, -46, 0, 0)
+	valueLabel.BackgroundTransparency = 1
+	valueLabel.Text = tostring(defaultValue)
+	valueLabel.TextColor3 = accentColor
+	valueLabel.TextSize = 14
+	valueLabel.Font = Enum.Font.GothamBold
+	valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+	valueLabel.Parent = sliderZone
 
-		value = math.clamp(value, minValue, maxValue)
-		box.Text = tostring(value)
+	local track = Instance.new("Frame")
+	track.Size = UDim2.new(1, -76, 0, 6)
+	track.Position = UDim2.new(0, 28, 0.5, -3)
+	track.BackgroundColor3 = COLORS.SurfaceLight
+	track.BorderSizePixel = 0
+	track.Parent = sliderZone
 
-		if onChanged then
-			onChanged(value)
-		end
+	local trackCorner = Instance.new("UICorner")
+	trackCorner.CornerRadius = UDim.new(1, 0)
+	trackCorner.Parent = track
+
+	local fill = Instance.new("Frame")
+	fill.BackgroundColor3 = accentColor
+	fill.BorderSizePixel = 0
+	fill.Parent = track
+
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(1, 0)
+	fillCorner.Parent = fill
+
+	local knob = Instance.new("Frame")
+	knob.Size = UDim2.new(0, 16, 0, 16)
+	knob.AnchorPoint = Vector2.new(0.5, 0.5)
+	knob.BackgroundColor3 = Color3.new(1, 1, 1)
+	knob.BorderSizePixel = 0
+	knob.ZIndex = 2
+	knob.Parent = track
+
+	local knobCorner = Instance.new("UICorner")
+	knobCorner.CornerRadius = UDim.new(1, 0)
+	knobCorner.Parent = knob
+
+	local knobStroke = Instance.new("UIStroke")
+	knobStroke.Color = accentColor
+	knobStroke.Thickness = 2
+	knobStroke.Parent = knob
+
+	local function updateVisual(value)
+		local fraction = math.clamp((value - minValue) / (maxValue - minValue), 0, 1)
+		fill.Size = UDim2.new(fraction, 0, 1, 0)
+		knob.Position = UDim2.new(fraction, 0, 0.5, 0)
+		valueLabel.Text = tostring(value)
 	end
 
-	box.FocusLost:Connect(apply)
+	local function setValue(value, fireCallback)
+		value = math.clamp(math.floor(value + 0.5), minValue, maxValue)
+		updateVisual(value)
 
-	return row, box, apply
+		if fireCallback ~= false and onChanged then
+			onChanged(value)
+		end
+
+		return value
+	end
+
+	updateVisual(math.clamp(defaultValue, minValue, maxValue))
+
+	local dragging = false
+
+	local function updateFromInputPosition(inputPosition)
+		local relativeX = inputPosition.X - track.AbsolutePosition.X
+		local fraction = math.clamp(relativeX / track.AbsoluteSize.X, 0, 1)
+		setValue(minValue + fraction * (maxValue - minValue))
+	end
+
+	local function beginDrag(input)
+		dragging = true
+		updateFromInputPosition(input.Position)
+	end
+
+	track.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			beginDrag(input)
+		end
+	end)
+
+	knob.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			beginDrag(input)
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			updateFromInputPosition(input.Position)
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+			dragging = false
+		end
+	end)
+
+	return row, valueLabel, setValue
 end
 
 local speedValue = 16
@@ -626,7 +721,7 @@ local flyHeightValue = 5
 
 local _, speedBox, applySpeed = createNumberControl(
 	movementPage,
-	"Walk Speed  •  1–500",
+	"Walk Speed",
 	95,
 	speedValue,
 	1,
@@ -643,8 +738,8 @@ local _, speedBox, applySpeed = createNumberControl(
 
 local _, jumpBox, applyJump = createNumberControl(
 	movementPage,
-	"Jump Power  •  1–500",
-	163,
+	"Jump Power",
+	183,
 	jumpValue,
 	1,
 	500,
@@ -660,8 +755,8 @@ local _, jumpBox, applyJump = createNumberControl(
 
 local _, flySpeedBox, applyFlySpeed = createNumberControl(
 	movementPage,
-	"Auto-Fly Speed  •  10–500",
-	231,
+	"Auto-Fly Speed",
+	271,
 	flySpeedValue,
 	10,
 	500,
@@ -677,8 +772,8 @@ local _, flySpeedBox, applyFlySpeed = createNumberControl(
 
 local _, flyHeightBox, applyFlyHeight = createNumberControl(
 	movementPage,
-	"Fly Height Offset  •  0–100",
-	299,
+	"Fly Height Offset",
+	359,
 	flyHeightValue,
 	0,
 	100,
@@ -695,7 +790,7 @@ local _, flyHeightBox, applyFlyHeight = createNumberControl(
 local _, infiniteJumpEnabled = createToggle(
 	movementPage,
 	"Infinite Jump",
-	367,
+	447,
 	false,
 	COLORS.PageFarm
 )
@@ -703,14 +798,14 @@ local _, infiniteJumpEnabled = createToggle(
 local _, autoFlyEnabled = createToggle(
 	movementPage,
 	"Auto-Fly Mode",
-	435,
+	515,
 	false,
 	COLORS.PageServer
 )
 
 local winTitle = Instance.new("TextLabel")
 winTitle.Size = UDim2.new(1, -56, 0, 26)
-winTitle.Position = UDim2.new(0, 28, 0, 505)
+winTitle.Position = UDim2.new(0, 28, 0, 585)
 winTitle.BackgroundTransparency = 1
 winTitle.Text = "WIN TARGETS"
 winTitle.TextColor3 = COLORS.Text
@@ -721,7 +816,7 @@ winTitle.Parent = movementPage
 
 local winHint = Instance.new("TextLabel")
 winHint.Size = UDim2.new(1, -56, 0, 32)
-winHint.Position = UDim2.new(0, 28, 0, 533)
+winHint.Position = UDim2.new(0, 28, 0, 613)
 winHint.BackgroundTransparency = 1
 winHint.Text = "Choose a target to tell the external movement module where to fly."
 winHint.TextColor3 = COLORS.TextDim
@@ -732,7 +827,7 @@ winHint.Parent = movementPage
 
 local targetFrame = Instance.new("Frame")
 targetFrame.Size = UDim2.new(1, -56, 0, 150)
-targetFrame.Position = UDim2.new(0, 28, 0, 568)
+targetFrame.Position = UDim2.new(0, 28, 0, 648)
 targetFrame.BackgroundTransparency = 1
 targetFrame.Parent = movementPage
 
@@ -795,7 +890,7 @@ end
 
 local refreshTargets = Instance.new("TextButton")
 refreshTargets.Size = UDim2.new(0, 125, 0, 34)
-refreshTargets.Position = UDim2.new(1, -153, 0, 499)
+refreshTargets.Position = UDim2.new(1, -153, 0, 579)
 refreshTargets.BackgroundColor3 = COLORS.PageServer
 refreshTargets.BorderSizePixel = 0
 refreshTargets.Text = "Refresh"
@@ -837,7 +932,7 @@ task.spawn(function()
 	end
 end)
 
-movementPage.CanvasSize = UDim2.new(0, 0, 0, 750)
+movementPage.CanvasSize = UDim2.new(0, 0, 0, 830)
 
 
 --// SIDEBAR BUTTONS
