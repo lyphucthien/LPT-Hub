@@ -5,6 +5,32 @@ local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
+local MOVEMENT_MODULE_URL = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/ChucNang.luau"
+
+local Movement = nil
+local movementLoadError = nil
+
+local function loadMovementModule()
+	if Movement then
+		return Movement
+	end
+
+	local ok, result = pcall(function()
+		return loadstring(game:HttpGet(MOVEMENT_MODULE_URL))()
+	end)
+
+	if ok and type(result) == "table" then
+		Movement = result
+		return Movement
+	end
+
+	movementLoadError = tostring(result)
+	warn("[LPT Hub] Movement module failed to load:", movementLoadError)
+	return nil
+end
+
+loadMovementModule()
+
 --// PALETTE (more vibrant)
 local COLORS = {
 	Background = Color3.fromRGB(10, 11, 16),
@@ -338,6 +364,7 @@ local function createPage(name)
 end
 
 local serverPage = createPage("Server")
+local movementPage = createPage("Movement")
 local settingsPage = createPage("Settings")
 
 --// PAGE TITLE
@@ -518,6 +545,301 @@ createPageTitle(settingsPage, "Settings", "Customize your experience")
 createToggle(settingsPage, "UI Blur", 95, false, COLORS.PageSettings)
 createToggle(settingsPage, "Notifications", 163, true, COLORS.PageSettings)
 
+
+--// MOVEMENT PAGE
+createPageTitle(
+	movementPage,
+	"Movement",
+	"Controls for movement, jumping and automatic Win target navigation"
+)
+
+local function createNumberControl(parent, titleText, yPos, defaultValue, minValue, maxValue, accentColor, onChanged)
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, -56, 0, 58)
+	row.Position = UDim2.new(0, 28, 0, yPos)
+	row.BackgroundColor3 = COLORS.Card
+	row.BorderSizePixel = 0
+	row.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 14)
+	corner.Parent = row
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = COLORS.Border
+	stroke.Thickness = 1
+	stroke.Transparency = 0.15
+	stroke.Parent = row
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, -145, 1, 0)
+	label.Position = UDim2.new(0, 18, 0, 0)
+	label.BackgroundTransparency = 1
+	label.Text = titleText
+	label.TextColor3 = COLORS.Text
+	label.TextSize = 14
+	label.Font = Enum.Font.GothamMedium
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = row
+
+	local box = Instance.new("TextBox")
+	box.Size = UDim2.new(0, 105, 0, 34)
+	box.Position = UDim2.new(1, -123, 0.5, -17)
+	box.BackgroundColor3 = COLORS.SurfaceLight
+	box.BorderSizePixel = 0
+	box.Text = tostring(defaultValue)
+	box.PlaceholderText = tostring(defaultValue)
+	box.TextColor3 = COLORS.Text
+	box.PlaceholderColor3 = COLORS.TextDim
+	box.TextSize = 14
+	box.Font = Enum.Font.GothamMedium
+	box.ClearTextOnFocus = false
+	box.Parent = row
+
+	local boxCorner = Instance.new("UICorner")
+	boxCorner.CornerRadius = UDim.new(0, 9)
+	boxCorner.Parent = box
+
+	local function apply()
+		local value = tonumber(box.Text)
+		if not value then
+			value = defaultValue
+		end
+
+		value = math.clamp(value, minValue, maxValue)
+		box.Text = tostring(value)
+
+		if onChanged then
+			onChanged(value)
+		end
+	end
+
+	box.FocusLost:Connect(apply)
+
+	return row, box, apply
+end
+
+local speedValue = 16
+local jumpValue = 50
+local flySpeedValue = 90
+local flyHeightValue = 5
+
+local _, speedBox, applySpeed = createNumberControl(
+	movementPage,
+	"Walk Speed  •  1–500",
+	95,
+	speedValue,
+	1,
+	500,
+	COLORS.PageFarm,
+	function(value)
+		speedValue = value
+		local module = loadMovementModule()
+		if module and module.SetWalkSpeed then
+			module.SetWalkSpeed(value)
+		end
+	end
+)
+
+local _, jumpBox, applyJump = createNumberControl(
+	movementPage,
+	"Jump Power  •  1–500",
+	163,
+	jumpValue,
+	1,
+	500,
+	COLORS.PageFarm,
+	function(value)
+		jumpValue = value
+		local module = loadMovementModule()
+		if module and module.SetJumpPower then
+			module.SetJumpPower(value)
+		end
+	end
+)
+
+local _, flySpeedBox, applyFlySpeed = createNumberControl(
+	movementPage,
+	"Auto-Fly Speed  •  10–500",
+	231,
+	flySpeedValue,
+	10,
+	500,
+	COLORS.PageServer,
+	function(value)
+		flySpeedValue = value
+		local module = loadMovementModule()
+		if module and module.SetFlySpeed then
+			module.SetFlySpeed(value)
+		end
+	end
+)
+
+local _, flyHeightBox, applyFlyHeight = createNumberControl(
+	movementPage,
+	"Fly Height Offset  •  0–100",
+	299,
+	flyHeightValue,
+	0,
+	100,
+	COLORS.PageServer,
+	function(value)
+		flyHeightValue = value
+		local module = loadMovementModule()
+		if module and module.SetFlyHeight then
+			module.SetFlyHeight(value)
+		end
+	end
+)
+
+local _, infiniteJumpEnabled = createToggle(
+	movementPage,
+	"Infinite Jump",
+	367,
+	false,
+	COLORS.PageFarm
+)
+
+local _, autoFlyEnabled = createToggle(
+	movementPage,
+	"Auto-Fly Mode",
+	435,
+	false,
+	COLORS.PageServer
+)
+
+local winTitle = Instance.new("TextLabel")
+winTitle.Size = UDim2.new(1, -56, 0, 26)
+winTitle.Position = UDim2.new(0, 28, 0, 505)
+winTitle.BackgroundTransparency = 1
+winTitle.Text = "WIN TARGETS"
+winTitle.TextColor3 = COLORS.Text
+winTitle.TextSize = 15
+winTitle.Font = Enum.Font.GothamBold
+winTitle.TextXAlignment = Enum.TextXAlignment.Left
+winTitle.Parent = movementPage
+
+local winHint = Instance.new("TextLabel")
+winHint.Size = UDim2.new(1, -56, 0, 32)
+winHint.Position = UDim2.new(0, 28, 0, 533)
+winHint.BackgroundTransparency = 1
+winHint.Text = "Choose a target to tell the external movement module where to fly."
+winHint.TextColor3 = COLORS.TextDim
+winHint.TextSize = 12
+winHint.TextXAlignment = Enum.TextXAlignment.Left
+winHint.TextWrapped = true
+winHint.Parent = movementPage
+
+local targetFrame = Instance.new("Frame")
+targetFrame.Size = UDim2.new(1, -56, 0, 150)
+targetFrame.Position = UDim2.new(0, 28, 0, 568)
+targetFrame.BackgroundTransparency = 1
+targetFrame.Parent = movementPage
+
+local targetGrid = Instance.new("UIGridLayout")
+targetGrid.CellSize = UDim2.new(0.31, -4, 0, 42)
+targetGrid.CellPadding = UDim2.new(0.02, 0, 0, 8)
+targetGrid.Parent = targetFrame
+
+local function createTargetButton(value)
+	local button = Instance.new("TextButton")
+	button.Name = "Win_" .. tostring(value)
+	button.BackgroundColor3 = COLORS.Card
+	button.BorderSizePixel = 0
+	button.Text = "+" .. tostring(value) .. " WIN"
+	button.TextColor3 = COLORS.Text
+	button.TextSize = 13
+	button.Font = Enum.Font.GothamBold
+	button.AutoButtonColor = false
+	button.Parent = targetFrame
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = button
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = COLORS.PageServer
+	stroke.Transparency = 0.2
+	stroke.Parent = button
+
+	button.MouseEnter:Connect(function()
+		tween(button, {BackgroundColor3 = COLORS.SurfaceLight})
+	end)
+
+	button.MouseLeave:Connect(function()
+		tween(button, {BackgroundColor3 = COLORS.Card})
+	end)
+
+	button.MouseButton1Click:Connect(function()
+		local module = loadMovementModule()
+		if not module then
+			return
+		end
+
+		-- Target buttons explicitly perform the requested Auto-Fly action.
+		if module.SetAutoFlyEnabled then
+			module.SetAutoFlyEnabled(true)
+		end
+
+		if module.FlyToWin then
+			module.FlyToWin(value)
+		end
+	end)
+
+	return button
+end
+
+for _, value in ipairs({1, 3, 10, 25, 50, 100}) do
+	createTargetButton(value)
+end
+
+local refreshTargets = Instance.new("TextButton")
+refreshTargets.Size = UDim2.new(0, 125, 0, 34)
+refreshTargets.Position = UDim2.new(1, -153, 0, 499)
+refreshTargets.BackgroundColor3 = COLORS.PageServer
+refreshTargets.BorderSizePixel = 0
+refreshTargets.Text = "Refresh"
+refreshTargets.TextColor3 = Color3.new(1, 1, 1)
+refreshTargets.TextSize = 12
+refreshTargets.Font = Enum.Font.GothamBold
+refreshTargets.AutoButtonColor = false
+refreshTargets.Parent = movementPage
+
+local refreshCorner = Instance.new("UICorner")
+refreshCorner.CornerRadius = UDim.new(0, 9)
+refreshCorner.Parent = refreshTargets
+
+refreshTargets.MouseButton1Click:Connect(function()
+	local module = loadMovementModule()
+	if module and module.RefreshTargets then
+		module.RefreshTargets()
+	end
+end)
+
+-- Toggle state is read by the UI and passed to the external module.
+-- The existing createToggle intentionally exposes a getter.
+task.spawn(function()
+	while movementPage.Parent do
+		task.wait(0.1)
+
+		local module = Movement
+		if not module then
+			continue
+		end
+
+		if module.SetInfiniteJump then
+			module.SetInfiniteJump(infiniteJumpEnabled())
+		end
+
+		if module.SetAutoFlyEnabled then
+			module.SetAutoFlyEnabled(autoFlyEnabled())
+		end
+	end
+end)
+
+movementPage.CanvasSize = UDim2.new(0, 0, 0, 750)
+
+
 --// SIDEBAR BUTTONS
 local currentPage = nil
 local buttons = {}
@@ -619,7 +941,8 @@ local function createSidebarButton(text, icon, order, pageName, accentColor)
 end
 
 createSidebarButton("Server", "▣", 1, "Server", COLORS.PageServer)
-createSidebarButton("Settings", "⚙", 2, "Settings", COLORS.PageSettings)
+createSidebarButton("Movement", "✦", 2, "Movement", COLORS.PageFarm)
+createSidebarButton("Settings", "⚙", 3, "Settings", COLORS.PageSettings)
 
 --// DEFAULT PAGE = SERVER
 currentPage = "Server"
@@ -724,5 +1047,3 @@ UserInputService.InputChanged:Connect(function(input)
 		)
 	end
 end)
-
---// MainUI is intentionally visible immediately when this file is loaded.
