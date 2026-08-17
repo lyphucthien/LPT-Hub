@@ -322,6 +322,7 @@ function Module.FlyToPart(part)
 
 	local started = os.clock()
 	local timeout = 20
+	local reached = false
 
 	while State.Flying
 		and root.Parent
@@ -339,10 +340,15 @@ function Module.FlyToPart(part)
 		local distance = offset.Magnitude
 
 		if distance <= 3 then
+			reached = true
 			break
 		end
 
 		local deltaTime = RunService.Heartbeat:Wait()
+
+		if not State.Flying then
+			break
+		end
 
 		local step = math.min(
 			distance,
@@ -351,16 +357,14 @@ function Module.FlyToPart(part)
 
 		local nextPosition = current + offset.Unit * step
 
-		root.CFrame = CFrame.lookAt(
-			nextPosition,
-			destination
-		)
+		root.CFrame = CFrame.new(nextPosition)
 	end
 
-	if root.Parent and part.Parent then
+	-- Chỉ snap tới target nếu chuyến bay thực sự vẫn đang hoạt động.
+	if reached and State.Flying and root.Parent and part.Parent then
 		local destination = targetPosition(part)
 
-		if destination and (root.Position - destination).Magnitude <= 15 then
+		if destination then
 			root.CFrame = CFrame.new(destination)
 		end
 	end
@@ -370,7 +374,7 @@ function Module.FlyToPart(part)
 	State.Flying = false
 	State.CurrentTarget = nil
 
-	return true
+	return reached
 end
 
 function Module.FlyToWin(winAmount)
@@ -384,6 +388,10 @@ function Module.FlyToWin(winAmount)
 
 	if not target then
 		return false, ("No +%d Win target was detected."):format(winAmount)
+	end
+
+	if State.Flying then
+		return false, "Already flying."
 	end
 
 	task.spawn(function()
@@ -436,7 +444,7 @@ function Module.GetState()
 		WalkSpeed = State.WalkSpeed,
 		JumpPower = State.JumpPower,
 		InfiniteJump = State.InfiniteJump,
-		AutoFlyEnabled = State.AutoFlyEnabled,
+		NoClip = State.NoClip,
 		Flying = State.Flying,
 		FlySpeed = State.FlySpeed,
 		FlyHeight = State.FlyHeight,

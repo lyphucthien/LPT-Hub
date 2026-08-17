@@ -5,7 +5,7 @@ local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
-local MOVEMENT_MODULE_URL = "https://raw.githubusercontent.com/USERNAME/REPOSITORY/main/LPT_Movement.lua"
+local MOVEMENT_MODULE_URL = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/ChucNang.luau"
 
 local Movement = nil
 local movementLoadError = nil
@@ -49,6 +49,7 @@ local COLORS = {
 	PageServer = Color3.fromRGB(96, 165, 250),   -- blue
 	PageHop = Color3.fromRGB(168, 105, 245),     -- purple
 	PageFarm = Color3.fromRGB(74, 222, 128),     -- green
+	PageSettings = Color3.fromRGB(251, 146, 60), -- orange
 }
 
 local function tween(obj, props, time, style)
@@ -68,7 +69,29 @@ local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ThienHub"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.Parent = playerGui
+screenGui.DisplayOrder = 2147483647 -- số DisplayOrder cực lớn: luôn vẽ đè lên mọi ScreenGui khác
+
+-- Ưu tiên parent vào layer ẩn của executor (không bị game Destroy/che),
+-- nếu executor không hỗ trợ thì fallback qua CoreGui, cuối cùng mới PlayerGui.
+local hiddenLayer = (gethui and gethui()) or (get_hidden_gui and get_hidden_gui())
+
+if hiddenLayer then
+	screenGui.Parent = hiddenLayer
+else
+	local placedInCoreGui = pcall(function()
+		screenGui.Parent = game:GetService("CoreGui")
+	end)
+
+	if not placedInCoreGui then
+		screenGui.Parent = playerGui
+	end
+end
+
+if protect_gui then
+	protect_gui(screenGui)
+elseif syn and syn.protect_gui then
+	syn.protect_gui(screenGui)
+end
 
 --// Main Window
 local main = Instance.new("Frame")
@@ -541,13 +564,17 @@ createCard(serverPage, 95, "Server", "Manage server information here.", 90, COLO
 --// MOVEMENT PAGE
 createPageTitle(
 	movementPage,
-	"Movement",
-	"Controls for movement, jumping and automatic Win target navigation"
+	"Chức Năng",
+	"CCác điều khiển việc di chuyển, nhảy và điều hướng mục tiêu tự động"
 )
 
+local NUMBER_ROW_HEIGHT = 78
+
+-- Thanh trượt (slider) kéo thả: bên trái luôn hiện "0" làm mốc,
+-- bên phải hiện đúng số đang được kéo trên thanh, kéo tới đâu áp dụng tới đó.
 local function createNumberControl(parent, titleText, yPos, defaultValue, minValue, maxValue, accentColor, onChanged)
 	local row = Instance.new("Frame")
-	row.Size = UDim2.new(1, -56, 0, 58)
+	row.Size = UDim2.new(1, -56, 0, NUMBER_ROW_HEIGHT)
 	row.Position = UDim2.new(0, 28, 0, yPos)
 	row.BackgroundColor3 = COLORS.Card
 	row.BorderSizePixel = 0
@@ -563,9 +590,10 @@ local function createNumberControl(parent, titleText, yPos, defaultValue, minVal
 	stroke.Transparency = 0.15
 	stroke.Parent = row
 
+	-- Chỉ còn tên tính năng, không hiện khoảng giá trị (vd "1–500") nữa
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, -145, 1, 0)
-	label.Position = UDim2.new(0, 18, 0, 0)
+	label.Size = UDim2.new(1, -36, 0, 18)
+	label.Position = UDim2.new(0, 18, 0, 10)
 	label.BackgroundTransparency = 1
 	label.Text = titleText
 	label.TextColor3 = COLORS.Text
@@ -574,41 +602,133 @@ local function createNumberControl(parent, titleText, yPos, defaultValue, minVal
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Parent = row
 
-	local box = Instance.new("TextBox")
-	box.Size = UDim2.new(0, 105, 0, 34)
-	box.Position = UDim2.new(1, -123, 0.5, -17)
-	box.BackgroundColor3 = COLORS.SurfaceLight
-	box.BorderSizePixel = 0
-	box.Text = tostring(defaultValue)
-	box.PlaceholderText = tostring(defaultValue)
-	box.TextColor3 = COLORS.Text
-	box.PlaceholderColor3 = COLORS.TextDim
-	box.TextSize = 14
-	box.Font = Enum.Font.GothamMedium
-	box.ClearTextOnFocus = false
-	box.Parent = row
+	local sliderZone = Instance.new("Frame")
+	sliderZone.Size = UDim2.new(1, -36, 0, 30)
+	sliderZone.Position = UDim2.new(0, 18, 0, 38)
+	sliderZone.BackgroundTransparency = 1
+	sliderZone.Parent = row
 
-	local boxCorner = Instance.new("UICorner")
-	boxCorner.CornerRadius = UDim.new(0, 9)
-	boxCorner.Parent = box
+	-- Nhãn bên trái: luôn luôn là "0"
+	local minLabel = Instance.new("TextLabel")
+	minLabel.Size = UDim2.new(0, 20, 1, 0)
+	minLabel.Position = UDim2.new(0, 0, 0, 0)
+	minLabel.BackgroundTransparency = 1
+	minLabel.Text = "0"
+	minLabel.TextColor3 = COLORS.TextDim
+	minLabel.TextSize = 12
+	minLabel.Font = Enum.Font.GothamMedium
+	minLabel.TextXAlignment = Enum.TextXAlignment.Left
+	minLabel.Parent = sliderZone
 
-	local function apply()
-		local value = tonumber(box.Text)
-		if not value then
-			value = defaultValue
-		end
+	-- Nhãn bên phải: số hiện tại, cập nhật realtime khi kéo
+	local valueLabel = Instance.new("TextLabel")
+	valueLabel.Size = UDim2.new(0, 46, 1, 0)
+	valueLabel.Position = UDim2.new(1, -46, 0, 0)
+	valueLabel.BackgroundTransparency = 1
+	valueLabel.Text = tostring(defaultValue)
+	valueLabel.TextColor3 = accentColor
+	valueLabel.TextSize = 14
+	valueLabel.Font = Enum.Font.GothamBold
+	valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+	valueLabel.Parent = sliderZone
 
-		value = math.clamp(value, minValue, maxValue)
-		box.Text = tostring(value)
+	local track = Instance.new("Frame")
+	track.Size = UDim2.new(1, -76, 0, 6)
+	track.Position = UDim2.new(0, 28, 0.5, -3)
+	track.BackgroundColor3 = COLORS.SurfaceLight
+	track.BorderSizePixel = 0
+	track.Active = true -- QUAN TRỌNG: Frame mặc định Active=false nên sẽ không nhận InputBegan
+	track.Parent = sliderZone
 
-		if onChanged then
-			onChanged(value)
-		end
+	local trackCorner = Instance.new("UICorner")
+	trackCorner.CornerRadius = UDim.new(1, 0)
+	trackCorner.Parent = track
+
+	local fill = Instance.new("Frame")
+	fill.BackgroundColor3 = accentColor
+	fill.BorderSizePixel = 0
+	fill.Parent = track
+
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(1, 0)
+	fillCorner.Parent = fill
+
+	local knob = Instance.new("Frame")
+	knob.Size = UDim2.new(0, 16, 0, 16)
+	knob.AnchorPoint = Vector2.new(0.5, 0.5)
+	knob.BackgroundColor3 = Color3.new(1, 1, 1)
+	knob.BorderSizePixel = 0
+	knob.ZIndex = 2
+	knob.Active = true -- cùng lý do: Frame cần Active=true mới bắt InputBegan
+	knob.Parent = track
+
+	local knobCorner = Instance.new("UICorner")
+	knobCorner.CornerRadius = UDim.new(1, 0)
+	knobCorner.Parent = knob
+
+	local knobStroke = Instance.new("UIStroke")
+	knobStroke.Color = accentColor
+	knobStroke.Thickness = 2
+	knobStroke.Parent = knob
+
+	local function updateVisual(value)
+		local fraction = math.clamp((value - minValue) / (maxValue - minValue), 0, 1)
+		fill.Size = UDim2.new(fraction, 0, 1, 0)
+		knob.Position = UDim2.new(fraction, 0, 0.5, 0)
+		valueLabel.Text = tostring(value)
 	end
 
-	box.FocusLost:Connect(apply)
+	local function setValue(value, fireCallback)
+		value = math.clamp(math.floor(value + 0.5), minValue, maxValue)
+		updateVisual(value)
 
-	return row, box, apply
+		if fireCallback ~= false and onChanged then
+			onChanged(value)
+		end
+
+		return value
+	end
+
+	updateVisual(math.clamp(defaultValue, minValue, maxValue))
+
+	local dragging = false
+
+	local function updateFromInputPosition(inputPosition)
+		local relativeX = inputPosition.X - track.AbsolutePosition.X
+		local fraction = math.clamp(relativeX / track.AbsoluteSize.X, 0, 1)
+		setValue(minValue + fraction * (maxValue - minValue))
+	end
+
+	local function beginDrag(input)
+		dragging = true
+		updateFromInputPosition(input.Position)
+	end
+
+	track.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			beginDrag(input)
+		end
+	end)
+
+	knob.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			beginDrag(input)
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			updateFromInputPosition(input.Position)
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+			dragging = false
+		end
+	end)
+
+	return row, valueLabel, setValue
 end
 
 local speedValue = 16
@@ -618,7 +738,7 @@ local flyHeightValue = 5
 
 local _, speedBox, applySpeed = createNumberControl(
 	movementPage,
-	"Walk Speed  •  1–500",
+	"Walk Speed",
 	95,
 	speedValue,
 	1,
@@ -635,8 +755,8 @@ local _, speedBox, applySpeed = createNumberControl(
 
 local _, jumpBox, applyJump = createNumberControl(
 	movementPage,
-	"Jump Power  •  1–500",
-	163,
+	"Jump Power",
+	183,
 	jumpValue,
 	1,
 	500,
@@ -652,8 +772,8 @@ local _, jumpBox, applyJump = createNumberControl(
 
 local _, flySpeedBox, applyFlySpeed = createNumberControl(
 	movementPage,
-	"Auto-Fly Speed  •  10–500",
-	231,
+	"Auto-Fly Speed",
+	271,
 	flySpeedValue,
 	10,
 	500,
@@ -669,8 +789,8 @@ local _, flySpeedBox, applyFlySpeed = createNumberControl(
 
 local _, flyHeightBox, applyFlyHeight = createNumberControl(
 	movementPage,
-	"Fly Height Offset  •  0–100",
-	299,
+	"Fly Height Offset",
+	359,
 	flyHeightValue,
 	0,
 	100,
@@ -687,7 +807,7 @@ local _, flyHeightBox, applyFlyHeight = createNumberControl(
 local _, infiniteJumpEnabled = createToggle(
 	movementPage,
 	"Infinite Jump",
-	367,
+	447,
 	false,
 	COLORS.PageFarm
 )
@@ -695,16 +815,16 @@ local _, infiniteJumpEnabled = createToggle(
 local _, noClipEnabled = createToggle(
 	movementPage,
 	"No Clip",
-	435,
+	515,
 	false,
-	COLORS.PageFarm
+	COLORS.PageServer
 )
 
 local winTitle = Instance.new("TextLabel")
 winTitle.Size = UDim2.new(1, -56, 0, 26)
-winTitle.Position = UDim2.new(0, 28, 0, 505)
+winTitle.Position = UDim2.new(0, 28, 0, 653)
 winTitle.BackgroundTransparency = 1
-winTitle.Text = "WIN TARGETS"
+winTitle.Text = "AUTO WIN"
 winTitle.TextColor3 = COLORS.Text
 winTitle.TextSize = 15
 winTitle.Font = Enum.Font.GothamBold
@@ -713,76 +833,151 @@ winTitle.Parent = movementPage
 
 local winHint = Instance.new("TextLabel")
 winHint.Size = UDim2.new(1, -56, 0, 32)
-winHint.Position = UDim2.new(0, 28, 0, 533)
+winHint.Position = UDim2.new(0, 28, 0, 681)
 winHint.BackgroundTransparency = 1
-winHint.Text = "Choose a target to tell the external movement module where to fly."
+winHint.Text = "Gạt Cần Để Bay Đến Nút Win Được Gạt"
 winHint.TextColor3 = COLORS.TextDim
 winHint.TextSize = 12
 winHint.TextXAlignment = Enum.TextXAlignment.Left
 winHint.TextWrapped = true
 winHint.Parent = movementPage
 
-local targetFrame = Instance.new("Frame")
-targetFrame.Size = UDim2.new(1, -56, 0, 150)
-targetFrame.Position = UDim2.new(0, 28, 0, 568)
-targetFrame.BackgroundTransparency = 1
-targetFrame.Parent = movementPage
+local function createRadioToggle(parent, text, yPos, accentColor, onToggle)
+	accentColor = accentColor or COLORS.Accent
 
-local targetGrid = Instance.new("UIGridLayout")
-targetGrid.CellSize = UDim2.new(0.31, -4, 0, 42)
-targetGrid.CellPadding = UDim2.new(0.02, 0, 0, 8)
-targetGrid.Parent = targetFrame
-
-local function createTargetButton(value)
-	local button = Instance.new("TextButton")
-	button.Name = "Win_" .. tostring(value)
-	button.BackgroundColor3 = COLORS.Card
-	button.BorderSizePixel = 0
-	button.Text = "+" .. tostring(value) .. " WIN"
-	button.TextColor3 = COLORS.Text
-	button.TextSize = 13
-	button.Font = Enum.Font.GothamBold
-	button.AutoButtonColor = false
-	button.Parent = targetFrame
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, -56, 0, 56)
+	row.Position = UDim2.new(0, 28, 0, yPos)
+	row.BackgroundColor3 = COLORS.Card
+	row.BorderSizePixel = 0
+	row.Parent = parent
 
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
-	corner.Parent = button
+	corner.CornerRadius = UDim.new(0, 14)
+	corner.Parent = row
 
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = COLORS.PageServer
-	stroke.Transparency = 0.2
-	stroke.Parent = button
+	stroke.Color = COLORS.Border
+	stroke.Thickness = 1
+	stroke.Transparency = 0.15
+	stroke.Parent = row
 
-	button.MouseEnter:Connect(function()
-		tween(button, {BackgroundColor3 = COLORS.SurfaceLight})
-	end)
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, -90, 1, 0)
+	label.Position = UDim2.new(0, 18, 0, 0)
+	label.BackgroundTransparency = 1
+	label.Text = text
+	label.TextColor3 = COLORS.Text
+	label.TextSize = 14
+	label.Font = Enum.Font.GothamMedium
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = row
 
-	button.MouseLeave:Connect(function()
-		tween(button, {BackgroundColor3 = COLORS.Card})
-	end)
+	local toggle = Instance.new("TextButton")
+	toggle.Size = UDim2.new(0, 50, 0, 26)
+	toggle.Position = UDim2.new(1, -68, 0.5, -13)
+	toggle.BackgroundColor3 = COLORS.SurfaceLight
+	toggle.BorderSizePixel = 0
+	toggle.Text = ""
+	toggle.AutoButtonColor = false
+	toggle.Parent = row
 
-	button.MouseButton1Click:Connect(function()
-		local module = loadMovementModule()
-		if not module then
+	local toggleCorner = Instance.new("UICorner")
+	toggleCorner.CornerRadius = UDim.new(1, 0)
+	toggleCorner.Parent = toggle
+
+	local toggleGradient = applyGradient(toggle, accentColor, COLORS.AccentB, 0)
+	toggleGradient.Enabled = false
+
+	local circle = Instance.new("Frame")
+	circle.Size = UDim2.new(0, 20, 0, 20)
+	circle.Position = UDim2.new(0, 3, 0.5, -10)
+	circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	circle.BorderSizePixel = 0
+	circle.Parent = toggle
+
+	local circleCorner = Instance.new("UICorner")
+	circleCorner.CornerRadius = UDim.new(1, 0)
+	circleCorner.Parent = circle
+
+	local enabled = false
+
+	local function applyVisual()
+		if enabled then
+			toggleGradient.Enabled = true
+			tween(toggle, {BackgroundColor3 = accentColor})
+			tween(circle, {Position = UDim2.new(1, -23, 0.5, -10)})
+		else
+			tween(toggle, {BackgroundColor3 = COLORS.SurfaceLight})
+			tween(circle, {Position = UDim2.new(0, 3, 0.5, -10)})
+			task.delay(0.18, function()
+				if not enabled then toggleGradient.Enabled = false end
+			end)
+		end
+	end
+
+	-- Bật/tắt bằng code (không gọi lại onToggle) — dùng khi mục khác được chọn.
+	local function forceState(newState)
+		if enabled == newState then
 			return
 		end
+		enabled = newState
+		applyVisual()
+	end
 
-		if module.FlyToWin then
-			module.FlyToWin(value)
+	toggle.MouseButton1Click:Connect(function()
+		enabled = not enabled
+		applyVisual()
+
+		if onToggle then
+			onToggle(enabled)
 		end
 	end)
 
-	return button
+	return row, function() return enabled end, forceState
 end
 
-for _, value in ipairs({1, 3, 10, 25, 50, 100}) do
-	createTargetButton(value)
+-- Danh sách Win Target: gạt công tắc là tự động bay liên tục tới đó,
+-- không cần bấm nút hay bật riêng "Auto-Fly Mode".
+local WIN_TARGET_VALUES = {1, 3, 10, 25, 50, 100}
+local WIN_TARGET_ROW_HEIGHT = 56
+local WIN_TARGET_ROW_GAP = 10
+
+local winTargetRows = {}
+local selectedWinTarget = nil
+
+for index, value in ipairs(WIN_TARGET_VALUES) do
+	local rowY = 648 + (index - 1) * (WIN_TARGET_ROW_HEIGHT + WIN_TARGET_ROW_GAP)
+
+	local _, _, forceState = createRadioToggle(
+		movementPage,
+		"+" .. tostring(value) .. " Win",
+		rowY,
+		COLORS.PageServer,
+		function(isEnabled)
+			if isEnabled then
+				selectedWinTarget = value
+
+				-- Chỉ cho phép chọn 1 target tại 1 thời điểm: tắt các mục còn lại.
+				for _, entry in ipairs(winTargetRows) do
+					if entry.value ~= value then
+						entry.forceState(false)
+					end
+				end
+			elseif selectedWinTarget == value then
+				selectedWinTarget = nil
+			end
+		end
+	)
+
+	table.insert(winTargetRows, {value = value, forceState = forceState})
 end
+
+local winTargetsBottom = 653 + (#WIN_TARGET_VALUES * (WIN_TARGET_ROW_HEIGHT + WIN_TARGET_ROW_GAP))
 
 local refreshTargets = Instance.new("TextButton")
 refreshTargets.Size = UDim2.new(0, 125, 0, 34)
-refreshTargets.Position = UDim2.new(1, -153, 0, 499)
+refreshTargets.Position = UDim2.new(1, -153, 0, 647)
 refreshTargets.BackgroundColor3 = COLORS.PageServer
 refreshTargets.BorderSizePixel = 0
 refreshTargets.Text = "Refresh"
@@ -814,17 +1009,35 @@ task.spawn(function()
 			continue
 		end
 
+		-- Infinite Jump
 		if module.SetInfiniteJump then
 			module.SetInfiniteJump(infiniteJumpEnabled())
 		end
 
+		-- No Clip
 		if module.SetNoClip then
 			module.SetNoClip(noClipEnabled())
+		end
+
+		-- Auto Win
+		if selectedWinTarget then
+			if module.IsFlying
+				and module.FlyToWin
+				and not module.IsFlying()
+			then
+				module.FlyToWin(selectedWinTarget)
+			end
+		else
+			if module.IsFlying and module.IsFlying() then
+				if module.StopFlying then
+					module.StopFlying()
+				end
+			end
 		end
 	end
 end)
 
-movementPage.CanvasSize = UDim2.new(0, 0, 0, 750)
+movementPage.CanvasSize = UDim2.new(0, 0, 0, winTargetsBottom + 30)
 
 
 --// SIDEBAR BUTTONS
