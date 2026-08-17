@@ -69,7 +69,27 @@ local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ThienHub"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.Parent = playerGui
+screenGui.DisplayOrder = 2147483647 -- số cực lớn: luôn vẽ đè lên ScreenGui khác
+
+local hiddenLayer = (gethui and gethui()) or (get_hidden_gui and get_hidden_gui())
+
+if hiddenLayer then
+	screenGui.Parent = hiddenLayer
+else
+	local placedInCoreGui = pcall(function()
+		screenGui.Parent = game:GetService("CoreGui")
+	end)
+
+	if not placedInCoreGui then
+		screenGui.Parent = playerGui
+	end
+end
+
+if protect_gui then
+	protect_gui(screenGui)
+elseif syn and syn.protect_gui then
+	syn.protect_gui(screenGui)
+end
 
 --// Main Window
 local main = Instance.new("Frame")
