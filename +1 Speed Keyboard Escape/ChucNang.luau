@@ -317,47 +317,47 @@ local function extractWinValue(text)
 	local normalized =
 		cleanText(text)
 
+	-- Common formats:
 	-- +1 Win
 	-- +3 Wins
 	-- +10 Win
 	-- +1K Win
 	-- +1M Win
+	-- 1 Win
+	-- Win 1
+	-- 1.5k wins
+	-- win +1
 
-	local number, suffix =
-		normalized:match(
-			"%+%s*([%d%.]+)%s*([km]?)%s*wins?"
-		)
+	local patterns = {
+		"%+%s*([%d%.]+)%s*([km]?)%s*wins?",
+		"([%d%.]+)%s*([km]?)%s*wins?",
+		"wins?%s*[%+%-]*%s*([%d%.]+)%s*([km]?)",
+		"[%+%-]?%s*([%d%.]+)%s*([km]?)%s*win",
+	}
 
-	-- Chỉ +1
-	if not number then
+	for _, pattern in ipairs(patterns) do
+		local number, suffix =
+			normalized:match(pattern)
 
-		number, suffix =
-			normalized:match(
-				"%+%s*([%d%.]+)%s*([km]?)"
-			)
+		if number then
+			local value =
+				tonumber(number)
+
+			if value then
+				suffix = suffix or ""
+
+				if suffix == "k" then
+					value *= 1000
+				elseif suffix == "m" then
+					value *= 1000000
+				end
+
+				return math.floor(value + 0.5)
+			end
+		end
 	end
 
-	if not number then
-		return nil
-	end
-
-	local value =
-		tonumber(number)
-
-	if not value then
-		return nil
-	end
-
-	suffix = suffix or ""
-
-	if suffix == "k" then
-		value *= 1000
-
-	elseif suffix == "m" then
-		value *= 1000000
-	end
-
-	return math.floor(value + 0.5)
+	return nil
 end
 
 --========================================================
