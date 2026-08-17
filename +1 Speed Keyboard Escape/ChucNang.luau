@@ -503,9 +503,6 @@ function Module.RefreshTargets()
 
 	State.TargetCache = targets
 
-	return targets
-end
-
 print("===== WIN TARGETS =====")
 
 for value, part in pairs(targets) do
@@ -519,6 +516,9 @@ for value, part in pairs(targets) do
 end
 
 print("=======================")
+
+	return targets
+end
 
 -- GET TARGET
 function Module.GetTarget(value)
