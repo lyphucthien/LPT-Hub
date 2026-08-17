@@ -478,44 +478,58 @@ end
 function Module.RefreshTargets()
 	local targets = {}
 
-	for _, object in ipairs(workspace:GetDescendants()) do
-		if object:IsA("BasePart") then
+	local function scan(container)
+		for _, object in ipairs(container:GetDescendants()) do
 
-			local value =
-				extractWinValue(object.Name)
+			-- Part có tên +1 Win, +3 Win...
+			if object:IsA("BasePart") then
 
-			if value then
-				targets[value] = object
-			end
+				local value = extractWinValue(object.Name)
 
-		elseif object:IsA("TextLabel")
-			or object:IsA("TextButton")
-		then
+				if value then
+					targets[value] = object
+				end
 
-			local part, value =
-				findPartFromGui(object)
+			-- GUI có chữ +1 Win, +3 Win...
+			elseif object:IsA("TextLabel")
+				or object:IsA("TextButton")
+			then
 
-			if part and value then
-				targets[value] = part
+				local part, value = findPartFromGui(object)
+
+				if part and value then
+					targets[value] = part
+				end
 			end
 		end
 	end
 
+	-- Tìm trong Workspace
+	scan(workspace)
+
+	-- Tìm thêm trong PlayerGui
+	local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+
+	if playerGui then
+		scan(playerGui)
+	end
+
 	State.TargetCache = targets
 
-print("===== WIN TARGETS =====")
+	-- DEBUG
+	print("===== WIN TARGETS =====")
 
-for value, part in pairs(targets) do
-	print(
-		"+"
-			.. tostring(value)
-			.. " Win ->",
-		part:GetFullName(),
-		part.Position
-	)
-end
+	for value, part in pairs(targets) do
+		if part and part.Parent then
+			print(
+				"+" .. tostring(value) .. " Win ->",
+				part:GetFullName(),
+				part.Position
+			)
+		end
+	end
 
-print("=======================")
+	print("=======================")
 
 	return targets
 end
