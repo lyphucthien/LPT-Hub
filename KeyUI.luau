@@ -4,7 +4,7 @@ local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
-local MAIN_UI = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/MainUI.luau"
+local MAIN_UI = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/%2B1%20Speed%20Keyboard%20Escape/MainUI.luau"
 
 local VALID_KEYS = {
 	["LPT-HUB"] = true,
