@@ -315,7 +315,6 @@ end
 
 -- FIND PART FROM GUI
 local function findPartFromGui(gui)
-
 	if not gui:IsA("TextLabel")
 		and not gui:IsA("TextButton")
 	then
@@ -328,15 +327,15 @@ local function findPartFromGui(gui)
 		return nil
 	end
 
-	local currentGui = gui
+	local current = gui
 
-	while currentGui do
+	while current and current ~= workspace do
 
-		if currentGui:IsA("SurfaceGui")
-			or currentGui:IsA("BillboardGui")
+		if current:IsA("SurfaceGui")
+			or current:IsA("BillboardGui")
 		then
 
-			local adornee = currentGui.Adornee
+			local adornee = current.Adornee
 
 			if adornee then
 
@@ -345,60 +344,96 @@ local function findPartFromGui(gui)
 				end
 
 				if adornee:IsA("Model") then
-
-					if adornee.PrimaryPart then
-						return adornee.PrimaryPart, value
-					end
-
 					local part =
-						adornee:FindFirstChildWhichIsA(
+						adornee.PrimaryPart
+						or adornee:FindFirstChild(
+							"Hitbox",
+							true
+						)
+						or adornee:FindFirstChild(
+							"Button",
+							true
+						)
+						or adornee:FindFirstChildWhichIsA(
 							"BasePart",
 							true
 						)
 
-					if part then
+					if part and part:IsA("BasePart") then
+						return part, value
+					end
+				end
+			end
+
+			local guiParent = current.Parent
+
+			if guiParent then
+
+				if guiParent:IsA("BasePart") then
+					return guiParent, value
+				end
+
+				if guiParent:IsA("Model") then
+					local part =
+						guiParent.PrimaryPart
+						or guiParent:FindFirstChild(
+							"Hitbox",
+							true
+						)
+						or guiParent:FindFirstChild(
+							"Button",
+							true
+						)
+						or guiParent:FindFirstChildWhichIsA(
+							"BasePart",
+							true
+						)
+
+					if part and part:IsA("BasePart") then
 						return part, value
 					end
 				end
 			end
 		end
 
-		currentGui = currentGui.Parent
+		current = current.Parent
 	end
 
 	local parent = gui.Parent
 
 	while parent and parent ~= workspace do
 
-		-- BasePart
 		if parent:IsA("BasePart") then
 			return parent, value
 		end
 
-		-- Model
 		if parent:IsA("Model") then
 
-			if parent.PrimaryPart then
-				return parent.PrimaryPart, value
-			end
-
 			local hitbox =
-				parent:FindFirstChild("Hitbox")
+				parent:FindFirstChild(
+					"Hitbox",
+					true
+				)
 
 			if hitbox and hitbox:IsA("BasePart") then
 				return hitbox, value
 			end
 
-			local buttonPart =
+			local button =
 				parent:FindFirstChild(
 					"Button",
 					true
 				)
 
-			if buttonPart
-				and buttonPart:IsA("BasePart")
-			then
-				return buttonPart, value
+			if button and button:IsA("BasePart") then
+				return button, value
+			end
+
+			local primary =
+				parent.PrimaryPart
+
+			if primary then
+				return primary, value
 			end
 
 			local part =
@@ -419,13 +454,20 @@ local function findPartFromGui(gui)
 
 	if guiParent then
 
+		local nearestPart = nil
+
 		for _, object in ipairs(
 			guiParent:GetDescendants()
 		) do
 
 			if object:IsA("BasePart") then
-				return object, value
+				nearestPart = object
+				break
 			end
+		end
+
+		if nearestPart then
+			return nearestPart, value
 		end
 	end
 
