@@ -1094,7 +1094,7 @@ function Module.FlyToWin(winAmount)
 		("[FlyToWin] +%d -> %s")
 			:format(
 				winAmount,
-				target:GetFullName()
+			tostring((type(target) == "userdata" and target.GetFullName and target:GetFullName()) or tostring(target))
 			)
 	)
 
@@ -1102,24 +1102,40 @@ function Module.FlyToWin(winAmount)
 	-- FLY
 	--====================================================
 
-	task.spawn(
-		function()
+	-- Defensive checks + pcall to capture errors
+	if type(target) ~= "userdata" or not target.Parent then
 
-			local success, reason =
-				Module.FlyToPart(
-					target
-				)
+		print(("[FlyToWin] Invalid target object: %s | type=%s | parent=%s")
+			:format(tostring(target), type(target), tostring(target and target.Parent)))
 
-			print(
-				("[FlyToWin] Finished +%d | success=%s | reason=%s")
-					:format(
-						winAmount,
-						tostring(success),
-						tostring(reason or "")
-					)
-			)
+		return false, "Invalid target object"
+	end
+
+	task.spawn(function()
+
+		local ok, res = pcall(function()
+			return Module.FlyToPart(target)
+		end)
+
+		if not ok then
+			warn(("[FlyToWin] ERROR while flying +%d -> %s")
+				:format(winAmount, tostring(res)))
+
+			-- Extra debug: print target class and properties
+			if type(target) == "userdata" then
+				pcall(function()
+					print("[FlyToWin] target.ClassName=", target.ClassName)
+					print("[FlyToWin] target.Name=", target.Name)
+					print("[FlyToWin] target:IsA('BasePart')=", target:IsA("BasePart"))
+				end)
+			return
 		end
-	)
+
+		local success, reason = res
+
+		print(("[FlyToWin] Finished +%d | success=%s | reason=%s")
+			:format(winAmount, tostring(success), tostring(reason or "")))
+	end)
 
 	return true
 end
