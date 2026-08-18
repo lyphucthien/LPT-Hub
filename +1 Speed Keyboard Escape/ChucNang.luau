@@ -718,12 +718,7 @@ function Module.RefreshTargets()
 	-- CACHE
 	--====================================================
 
-	State.TargetCache =
-		targets
-
-	--====================================================
-	-- RESULT
-	--====================================================
+	State.TargetCache = targets
 
 	local count = 0
 
