@@ -1110,110 +1110,83 @@ end
 -- FLY TO PART
 --========================================================
 
-function Module.FlyToPart(
-	part
-)
+function Module.FlyToPart(part)
 
 	if not isBasePart(part) then
-		return false,
-			"Invalid target part."
+		warn("[FLY] Invalid target")
+		return false, "Invalid target"
 	end
 
 	if State.Flying then
-		return false,
-			"Already flying."
+		warn("[FLY] Already flying")
+		return false, "Already flying"
 	end
 
 	local character = getCharacter()
 	local root = getRoot()
 	local humanoid = getHumanoid()
 
-	if not character
-		or not root
-		or not root.Parent
-		or not humanoid
-		or not humanoid.Parent
-	then
-
-		return false,
-			"Character is not ready."
+	if not character then
+		warn("[FLY] Character nil")
+		return false, "Character nil"
 	end
 
-	--====================================================
-	-- LOCK
-	--====================================================
+	if not root then
+		warn("[FLY] HumanoidRootPart nil")
+		return false, "Root nil"
+	end
+
+	if not humanoid then
+		warn("[FLY] Humanoid nil")
+		return false, "Humanoid nil"
+	end
+
+	if not part.Parent then
+		warn("[FLY] Target disappeared")
+		return false, "Target disappeared"
+	end
 
 	State.Flying = true
 	State.CurrentTarget = part
 
-	local previousAutoRotate =
-		humanoid.AutoRotate
+	print("========================================")
+	print("[FLY] START")
+	print("[FLY] Target:", part:GetFullName())
+	print("[FLY] Player:", root.Position)
+	print("[FLY] TargetPos:", part.Position)
+	print("[FLY] Distance:", (root.Position - part.Position).Magnitude)
+	print("========================================")
 
-	local previousPlatformStand =
-		humanoid.PlatformStand
+	local oldAutoRotate = humanoid.AutoRotate
+	local oldPlatformStand = humanoid.PlatformStand
 
-	humanoid.AutoRotate =
-		false
+	humanoid.AutoRotate = false
+	humanoid.PlatformStand = true
 
-	humanoid.PlatformStand =
-		true
-
-	print(
-		"[FLY] Started ->",
-		part:GetFullName()
-	)
-
-	print(
-		"[FLY] Target ->",
-		part.Position
-	)
-
-	--====================================================
-	-- MOVE
-	--====================================================
-
-	local started =
-		os.clock()
-
-	local reached =
-		false
+	local started = os.clock()
+	local lastPosition = root.Position
+	local stuckTime = 0
+	local reached = false
 
 	while
 		State.Flying
 		and character.Parent
 		and root.Parent
 		and part.Parent
-		and os.clock() - started
-			< FLY_TIMEOUT
+		and os.clock() - started < FLY_TIMEOUT
 	do
 
-		local destination =
-			getTargetPosition(
-				part
-			)
-
-		if not destination then
-			break
-		end
-
+		local destination = part.Position
 		local current = root.Position
-		local offset = destination
-			- current
-
+		local offset = destination - current
 		local distance = offset.Magnitude
 
-		-- Arrived
-		if distance
-			<= ARRIVAL_DISTANCE
-		then
-
+		if distance <= ARRIVAL_DISTANCE then
 			reached = true
-
 			break
 		end
 
-		local dt =
-			RunService.Heartbeat:Wait()
+		local dt = RunService.Heartbeat:Wait()
 
 		if not State.Flying then
 			break
@@ -1226,226 +1199,129 @@ function Module.FlyToPart(
 			break
 		end
 
-		local speed =
-			math.max(
-				10,
-				State.FlySpeed
-			)
+		local speed = math.max(10, State.FlySpeed)
+		local step = math.min(distance, speed * dt)
 
-		local moveDistance =
-			math.min(
-				distance,
-				speed * dt
-			)
+		local nextPosition = current + offset.Unit * step
 
-		local direction =
-			offset.Unit
+		root.CFrame =
+			CFrame.new(nextPosition)
+			* (root.CFrame - root.CFrame.Position)
 
-		local newPosition =
-			current
-			+ direction
-				* moveDistance
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.AssemblyAngularVelocity = Vector3.zero
 
-		-- Giữ rotation hiện tại
-		local rotationOnly =
-			root.CFrame
-			- root.CFrame.Position
+		local actualPosition = root.Position
+		local movement = (actualPosition - lastPosition).Magnitude
 
-		local newCFrame =
-			CFrame.new(
-				newPosition
-			)
-			* rotationOnly
+		if movement < 0.01 then
+			stuckTime += dt
+		else
+			stuckTime = 0
+		end
 
-		-- Di chuyển character
-		character:PivotTo(
-			newCFrame
-		)
+		lastPosition = actualPosition
 
-		root.AssemblyLinearVelocity =
-			Vector3.zero
-
-		root.AssemblyAngularVelocity =
-			Vector3.zero
+		if stuckTime >= 2 then
+			warn("[FLY] Character position is being blocked/reset.")
+			break
+		end
 	end
-
-	--====================================================
-	-- FINAL SNAP
-	--====================================================
 
 	if reached
 		and State.Flying
-		and character.Parent
 		and root.Parent
 		and part.Parent
 	then
 
-		local finalPosition =
-			getTargetPosition(
-				part
-			)
+		local finalPosition = part.Position
 
-		if finalPosition then
+		for _ = 1, 10 do
 
-			local rotationOnly =
-				root.CFrame
-				- root.CFrame.Position
-
-			local finalCFrame =
-				CFrame.new(
-					finalPosition
-				)
-				* rotationOnly
-
-			for _ = 1, 8 do
-
-				if not State.Flying then
-					break
-				end
-
-				if not character.Parent
-					or not root.Parent
-					or not part.Parent
-				then
-					break
-				end
-
-				character:PivotTo(
-					finalCFrame
-				)
-
-				root.AssemblyLinearVelocity =
-					Vector3.zero
-
-				root.AssemblyAngularVelocity =
-					Vector3.zero
-
-				RunService.Heartbeat:Wait()
+			if not State.Flying then
+				break
 			end
 
-		end
+			if not root.Parent
+				or not part.Parent
+			then
+				break
+			end
 
+			root.CFrame =
+				CFrame.new(finalPosition)
+				* (root.CFrame - root.CFrame.Position)
+
+			root.AssemblyLinearVelocity = Vector3.zero
+			root.AssemblyAngularVelocity = Vector3.zero
+
+			RunService.Heartbeat:Wait()
+		end
 	end
 
-	--====================================================
-	-- RESTORE
-	--====================================================
-
-	if humanoid
-		and humanoid.Parent
-	then
-
+	if humanoid.Parent then
 		pcall(function()
-
-			humanoid.AutoRotate =
-				previousAutoRotate
-
-			humanoid.PlatformStand =
-				previousPlatformStand
-
-			humanoid:ChangeState(
-				Enum.HumanoidStateType.GettingUp
-			)
-
+			humanoid.AutoRotate = oldAutoRotate
+			humanoid.PlatformStand = oldPlatformStand
+			humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
 		end)
-
 	end
 
 	State.Flying = false
 	State.CurrentTarget = nil
 
 	if reached then
-
-		print(
-			"[FLY] Reached target"
-		)
-
+		print("[FLY] SUCCESS")
 		return true
-
 	end
 
-	warn(
-		"[FLY] Failed / timeout"
-	)
-
-	return false,
-		"Could not reach target."
+	warn("[FLY] FAILED")
+	return false, "Could not reach target"
 end
 
 --========================================================
 -- FLY TO WIN
 --========================================================
 
-function Module.FlyToWin(
-	winAmount
-)
+function Module.FlyToWin(winAmount)
 
 	if not ENABLE_FLY_TO_WIN then
-
-		warn(
-			"[FlyToWin] Disabled by configuration."
-		)
-
-		return false,
-			"FlyToWin is disabled."
+		warn("[FlyToWin] Disabled by configuration.")
+		return false, "FlyToWin is disabled."
 	end
 
-	winAmount =
-		tonumber(winAmount)
+	winAmount = tonumber(winAmount)
 
 	if not winAmount then
-
-		return false,
-			"Invalid Win amount."
+		return false, "Invalid Win amount."
 	end
 
 	if State.Flying then
-
-		return false,
-			"Already flying."
+		return false, "Already flying."
 	end
 
-	local target =
-		State.TargetCache[
-			winAmount
-		]
+	local target = State.TargetCache[winAmount]
 
 	if not isBasePart(target) then
-
 		Module.RefreshTargets()
-
-		target =
-			State.TargetCache[
-				winAmount
-			]
+		target = State.TargetCache[winAmount]
 	end
 
 	if not isBasePart(target) then
-
 		return false,
-			(
-				"No +%s Win target."
-			):format(
-				tostring(
-					winAmount
-				)
-			)
+			("No +%s Win target.")
+				:format(tostring(winAmount))
 	end
 
 	print(
-		(
-			"[FlyToWin] +%s -> %s"
-		):format(
-			tostring(
-				winAmount
-			),
-			target:GetFullName()
-		)
+		("[FlyToWin] +%s -> %s")
+			:format(
+				tostring(winAmount),
+				target:GetFullName()
+			)
 	)
 
-	return Module.FlyToPart(
-		target
-	)
+	return Module.FlyToPart(target)
 end
 
 --========================================================
