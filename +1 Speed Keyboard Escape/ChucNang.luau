@@ -592,43 +592,48 @@ local function findByWinValue(winValue)
 		workspace:GetDescendants()
 	) do
 
-		-- First: try to parse numeric values from the object's name (supports 1K, 25K, 1M)
-		local numericMatch = parseNumberFromName(object.Name)
-
-		if numericMatch and numericMatch == winValue then
-
-			local part = findTargetPart(object)
-
-			if part then
-				return part
-			end
-		end
-
-		local name = object.Name:lower()
-
-		for _, pattern in ipairs(possiblePatterns) do
-
-			if name:find(pattern:lower(), 1, true) then
-
+			-- 1) Try numeric in the object's own name (1K/25K/etc)
+			local numericMatch = parseNumberFromName(object.Name)
+			if numericMatch and numericMatch == winValue then
 				local part = findTargetPart(object)
+				if part then return part end
+			end
 
-				if part then
-					return part
+			-- 2) Try ancestor names (some devs put the value on parent models)
+			local anc = object.Parent
+			while anc do
+				local ancNum = parseNumberFromName(anc.Name)
+				if ancNum and ancNum == winValue then
+					local part = findTargetPart(anc)
+					if part then return part end
+				end
+				anc = anc.Parent
+			end
+
+			-- 3) Try to read text from any GUI/Text descendants (SurfaceGui, BillboardGui)
+			for _, desc in ipairs(object:GetDescendants()) do
+				if desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox") then
+					local txt = tostring(desc.Text)
+					local txtNum = parseNumberFromName(txt)
+					if txtNum and txtNum == winValue then
+						local part = findTargetPart(object)
+						if part then return part end
+					end
 				end
 			end
-		end
+
+			-- 4) Fallback: simple name pattern matching (existing)
+			local name = object.Name:lower()
+			for _, pattern in ipairs(possiblePatterns) do
+				if name:find(pattern:lower(), 1, true) then
+					local part = findTargetPart(object)
+					if part then return part end
+				end
+			end
 	end
 
 	return nil
 end
-
---========================================================
--- PARSE NUMBER FROM NAME (supports K/M abbreviations)
---========================================================
--- (moved earlier to avoid forward-reference nil call)
---========================================================
--- REFRESH TARGETS
---========================================================
 
 function Module.RefreshTargets()
 
@@ -639,10 +644,6 @@ function Module.RefreshTargets()
 	print("        LPT HUB - WIN TARGET SCAN")
 	print("========================================")
 
-	--====================================================
-	-- 15 STAGES
-	--====================================================
-
 	for _, stageInfo in ipairs(WIN_STAGES) do
 
 		local stageNumber =
@@ -652,10 +653,6 @@ function Module.RefreshTargets()
 			stageInfo.value
 
 		local target = nil
-
-		--================================================
-		-- 1. Tìm theo Stage
-		--================================================
 
 		local stageContainer =
 			findStageContainer(
@@ -672,10 +669,6 @@ function Module.RefreshTargets()
 
 		end
 
-		--================================================
-		-- 2. Nếu không thấy -> tìm theo Win value
-		--================================================
-
 		if not target then
 
 			target =
@@ -684,10 +677,6 @@ function Module.RefreshTargets()
 				)
 
 		end
-
-		--================================================
-		-- SAVE
-		--================================================
 
 		if target then
 
