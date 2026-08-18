@@ -20,7 +20,7 @@ local State = {
 	Flying = false,
 
 	FlySpeed = 90,
-	FlyHeight = 5,
+	FlyHeight = 0,
 
 	CurrentTarget = nil,
 	TargetCache = {},
@@ -52,12 +52,6 @@ local WIN_STAGES = {
 	{stage = 14, value = 50000, text = "Stage 14 (+50K Wins)"},
 	{stage = 15, value = 150000, text = "Stage 15 (+150K Wins)"},
 }
-
-local WIN_VALUES = {}
-
-for _, info in ipairs(WIN_STAGES) do
-	WIN_VALUES[info.stage] = info.value
-end
 
 --========================================================
 -- UTILITY
@@ -106,38 +100,56 @@ local function getNumber(value, minimum, maximum, fallback)
 	return math.clamp(value, minimum, maximum)
 end
 
+local function containsText(text, phrase)
+	if not text then
+		return false
+	end
+
+	return string.find(
+		string.lower(tostring(text)),
+		string.lower(phrase),
+		1,
+		true
+	) ~= nil
+end
+
+local function isBasePart(object)
+	return object
+		and object:IsA("BasePart")
+		and object.Parent
+end
+
 --========================================================
--- PARSE NUMBER
+-- PARSE WIN VALUE
 --========================================================
 
-local function parseNumberFromName(name)
-	if not name then
+local function parseWinValue(text)
+	if not text then
 		return nil
 	end
 
-	local s = tostring(name)
+	local s = tostring(text)
 		:gsub(",", "")
 		:gsub("%s+", "")
 
-	-- Ưu tiên số có K/M
-	local number, suffix = s:match("(%d+%.?%d*)([kKmM])")
+	-- 2.5K / 10K / 1M
+	local number, suffix =
+		s:match("(%d+%.?%d*)([kKmM])")
 
 	if number then
 		local n = tonumber(number)
 
-		if not n then
-			return nil
-		end
-
-		if suffix == "k" or suffix == "K" then
-			return n * 1000
-		elseif suffix == "m" or suffix == "M" then
-			return n * 1000000
+		if n then
+			if suffix == "k" or suffix == "K" then
+				return n * 1000
+			elseif suffix == "m" or suffix == "M" then
+				return n * 1000000
+			end
 		end
 	end
 
 	-- Số thường
-	local plain = s:match("%d+")
+	local plain = s:match("(%d+)")
 
 	if plain then
 		return tonumber(plain)
@@ -256,6 +268,7 @@ function Module.SetInfiniteJump(enabled)
 	if State.InfiniteJump then
 		Connections.InfiniteJump =
 			UserInputService.JumpRequest:Connect(function()
+
 				if not State.InfiniteJump then
 					return
 				end
@@ -335,7 +348,187 @@ function Module.GetNoClip()
 end
 
 --========================================================
--- FIND TARGET PART
+-- TARGET SCORING
+--========================================================
+
+local function collectObjectText(object)
+	local texts = {}
+
+	if not object then
+		return ""
+	end
+
+	table.insert(texts, tostring(object.Name))
+
+	local current = object.Parent
+
+	for _ = 1, 5 do
+		if not current then
+			break
+		end
+
+		table.insert(texts, tostring(current.Name))
+
+		current = current.Parent
+	end
+
+	for _, descendant in ipairs(object:GetDescendants()) do
+		if descendant:IsA("TextLabel")
+			or descendant:IsA("TextButton")
+			or descendant:IsA("TextBox")
+		then
+			table.insert(
+				texts,
+				tostring(descendant.Text)
+			)
+		end
+	end
+
+	return table.concat(texts, " ")
+end
+
+local function hasInteractiveObject(part)
+	if not part then
+		return false
+	end
+
+	if part:FindFirstChildOfClass("ClickDetector") then
+		return true
+	end
+
+	if part:FindFirstChildOfClass("ProximityPrompt") then
+		return true
+	end
+
+	if part:FindFirstChild("TouchInterest") then
+		return true
+	end
+
+	return false
+end
+
+--========================================================
+-- FIND PART FROM GUI
+--========================================================
+
+local function findPartFromGui(gui)
+	if not gui then
+		return nil
+	end
+
+	-- BillboardGui / SurfaceGui can have Adornee
+	if gui:IsA("BillboardGui")
+		or gui:IsA("SurfaceGui")
+	then
+		if gui.Adornee
+			and gui.Adornee:IsA("BasePart")
+		then
+			return gui.Adornee
+		end
+	end
+
+	-- Walk parents
+	local current = gui.Parent
+
+	while current do
+		if current:IsA("BasePart") then
+			return current
+		end
+
+		if current:IsA("Model") then
+			local primary =
+				current.PrimaryPart
+
+			if primary
+				and primary:IsA("BasePart")
+			then
+				return primary
+			end
+
+			local button =
+				current:FindFirstChild(
+					"Button",
+					true
+				)
+
+			if button
+				and button:IsA("BasePart")
+			then
+				return button
+			end
+
+			return current:FindFirstChildWhichIsA(
+				"BasePart",
+				true
+			)
+		end
+
+		current = current.Parent
+	end
+
+	return nil
+end
+
+--========================================================
+-- FIND "LAY WIN" TARGET
+--========================================================
+
+local function findGetWinTarget()
+	local bestPart = nil
+	local bestScore = -math.huge
+
+	for _, object in ipairs(
+		workspace:GetDescendants()
+	) do
+
+		-- Text GUI
+		if object:IsA("TextLabel")
+			or object:IsA("TextButton")
+			or object:IsA("TextBox")
+		then
+
+			local text =
+				tostring(object.Text)
+
+			local isWinButton =
+				containsText(text, "Lấy Win")
+				or containsText(text, "Lay Win")
+				or containsText(text, "Get Win")
+				or containsText(text, "Claim Win")
+				or containsText(text, "Claim")
+
+			if isWinButton then
+				local part =
+					findPartFromGui(object)
+
+				if isBasePart(part) then
+					local score = 1000
+
+					if hasInteractiveObject(part) then
+						score += 500
+					end
+
+					if containsText(
+						part.Name,
+						"button"
+					) then
+						score += 100
+					end
+
+					if score > bestScore then
+						bestScore = score
+						bestPart = part
+					end
+				end
+			end
+		end
+	end
+
+	return bestPart
+end
+
+--========================================================
+-- FIND TARGET PART INSIDE CONTAINER
 --========================================================
 
 local function findTargetPart(container)
@@ -343,61 +536,133 @@ local function findTargetPart(container)
 		return nil
 	end
 
-	if container:IsA("BasePart") then
+	-- Nếu chính nó là part
+	if isBasePart(container) then
 		return container
 	end
 
-	if container:IsA("Model") then
-		if container.PrimaryPart then
-			return container.PrimaryPart
-		end
-	end
+	local candidates = {}
 
-	local preferredNames = {
-		"Button",
-		"Hitbox",
-		"Win",
-		"Finish",
-		"Award",
-		"Trophy",
-	}
+	--====================================================
+	-- COLLECT PARTS
+	--====================================================
 
-	for _, name in ipairs(preferredNames) do
-		local object = container:FindFirstChild(name, true)
+	for _, object in ipairs(
+		container:GetDescendants()
+	) do
 
-		if object and object:IsA("BasePart") then
-			return object
-		end
-	end
-
-	for _, object in ipairs(container:GetDescendants()) do
 		if object:IsA("BasePart") then
-			local name = object.Name:lower()
 
-			if name:find("win", 1, true)
-				or name:find("award", 1, true)
-				or name:find("button", 1, true)
-				or name:find("hitbox", 1, true)
-				or name:find("finish", 1, true)
-				or name:find("trophy", 1, true)
-			then
-				return object
+			local score = 0
+			local name = string.lower(
+				object.Name
+			)
+
+			-- Interactive
+			if hasInteractiveObject(object) then
+				score += 300
 			end
+
+			-- Exact button naming
+			if name == "button" then
+				score += 250
+			end
+
+			if name == "winbutton" then
+				score += 350
+			end
+
+			if name == "getwinbutton" then
+				score += 400
+			end
+
+			if name == "claimwinbutton" then
+				score += 400
+			end
+
+			-- Name keywords
+			if name:find("button", 1, true) then
+				score += 150
+			end
+
+			if name:find("win", 1, true) then
+				score += 150
+			end
+
+			if name:find("claim", 1, true) then
+				score += 180
+			end
+
+			if name:find("get", 1, true) then
+				score += 100
+			end
+
+			if name:find("finish", 1, true) then
+				score += 80
+			end
+
+			if name:find("award", 1, true) then
+				score += 80
+			end
+
+			-- Text inside this part/model
+			local allText =
+				collectObjectText(object)
+
+			if containsText(
+				allText,
+				"Lấy Win"
+			)
+			or containsText(
+				allText,
+				"Lay Win"
+			)
+			or containsText(
+				allText,
+				"Get Win"
+			)
+			or containsText(
+				allText,
+				"Claim Win"
+			)
+			then
+				score += 1000
+			end
+
+			table.insert(
+				candidates,
+				{
+					part = object,
+					score = score,
+				}
+			)
 		end
 	end
 
-	return container:FindFirstChildWhichIsA(
-		"BasePart",
-		true
+	table.sort(
+		candidates,
+		function(a, b)
+			return a.score > b.score
+		end
 	)
+
+	if candidates[1] then
+		return candidates[1].part
+	end
+
+	return nil
 end
 
 --========================================================
 -- FIND STAGE CONTAINER
 --========================================================
 
-local function findStageContainer(stageNumber, winValue)
-	local possibleNames = {
+local function findStageContainer(
+	stageNumber,
+	winValue
+)
+
+	local names = {
 		"Stage" .. stageNumber,
 		"Stage-" .. stageNumber,
 		"Stage_" .. stageNumber,
@@ -410,15 +675,20 @@ local function findStageContainer(stageNumber, winValue)
 		"Win-" .. winValue,
 		"Win_" .. winValue,
 
-		"+" .. winValue .. " Win",
-		"+" .. winValue .. " Wins",
-
 		"Win " .. winValue,
 		"Wins " .. winValue,
+
+		"+" .. winValue .. " Win",
+		"+" .. winValue .. " Wins",
 	}
 
-	for _, name in ipairs(possibleNames) do
-		local object = workspace:FindFirstChild(name, true)
+	for _, name in ipairs(names) do
+
+		local object =
+			workspace:FindFirstChild(
+				name,
+				true
+			)
 
 		if object then
 			return object
@@ -433,67 +703,123 @@ end
 --========================================================
 
 local function findByWinValue(winValue)
-	local possiblePatterns = {
-		"+" .. tostring(winValue),
-		tostring(winValue) .. " Win",
-		tostring(winValue) .. " Wins",
-		"Win" .. tostring(winValue),
-		"Win-" .. tostring(winValue),
-		"Win_" .. tostring(winValue),
-	}
+	local bestPart = nil
+	local bestScore = -math.huge
 
-	for _, object in ipairs(workspace:GetDescendants()) do
-		local name = object.Name
+	for _, object in ipairs(
+		workspace:GetDescendants()
+	) do
 
-		-- Name
-		local numericMatch = parseNumberFromName(name)
+		if object:IsA("BasePart") then
 
-		if numericMatch == winValue then
-			local part = findTargetPart(object)
+			local text =
+				collectObjectText(object)
 
-			if part then
-				return part
+			local score = 0
+
+			-- Exact win value
+			local ownNumber =
+				parseWinValue(object.Name)
+
+			if ownNumber == winValue then
+				score += 500
 			end
-		end
 
-		-- Pattern
-		local lowerName = name:lower()
+			-- Win number in ancestor names
+			local parent =
+				object.Parent
 
-		for _, pattern in ipairs(possiblePatterns) do
+			for _ = 1, 5 do
+				if not parent then
+					break
+				end
+
+				local parentNumber =
+					parseWinValue(
+						parent.Name
+					)
+
+				if parentNumber == winValue then
+					score += 400
+				end
+
+				parent = parent.Parent
+			end
+
+			-- GUI text
+			for _, descendant in ipairs(
+				object:GetDescendants()
+			) do
+
+				if descendant:IsA("TextLabel")
+					or descendant:IsA("TextButton")
+					or descendant:IsA("TextBox")
+				then
+
+					local textNumber =
+						parseWinValue(
+							descendant.Text
+						)
+
+					if textNumber == winValue then
+						score += 700
+					end
+				end
+			end
+
+			-- Strong preference to actual button
+			local lowerName =
+				string.lower(object.Name)
+
 			if lowerName:find(
-				pattern:lower(),
+				"button",
 				1,
 				true
 			) then
-				local part = findTargetPart(object)
-
-				if part then
-					return part
-				end
+				score += 200
 			end
-		end
 
-		-- GUI text
-		for _, desc in ipairs(object:GetDescendants()) do
-			if desc:IsA("TextLabel")
-				or desc:IsA("TextButton")
-				or desc:IsA("TextBox")
+			if lowerName:find(
+				"win",
+				1,
+				true
+			) then
+				score += 200
+			end
+
+			if hasInteractiveObject(object) then
+				score += 300
+			end
+
+			-- "Lấy Win" has highest priority
+			if containsText(
+				text,
+				"Lấy Win"
+			)
+			or containsText(
+				text,
+				"Lay Win"
+			)
+			or containsText(
+				text,
+				"Get Win"
+			)
+			or containsText(
+				text,
+				"Claim Win"
+			)
 			then
-				local text = tostring(desc.Text)
-				local textNumber = parseNumberFromName(text)
+				score += 1000
+			end
 
-				if textNumber == winValue then
-					local part = findTargetPart(object)
-
-					if part then
-						return part
-					end
-				end
+			if score > bestScore then
+				bestScore = score
+				bestPart = object
 			end
 		end
 	end
 
-	return nil
+	return bestPart
 end
 
 --========================================================
@@ -511,16 +837,42 @@ function Module.RefreshTargets()
 
 	print("")
 	print("========================================")
-	print("        LPT HUB - WIN TARGET SCAN")
+	print("      LPT HUB - WIN TARGET SCAN")
 	print("========================================")
 
+	--====================================================
+	-- FIRST: LOOK FOR GLOBAL "LAY WIN" BUTTON
+	--====================================================
+
+	local globalGetWin =
+		findGetWinTarget()
+
+	if globalGetWin then
+
+		print(
+			"[FOUND] Global Lấy Win button -> "
+				.. globalGetWin:GetFullName()
+		)
+	end
+
+	--====================================================
+	-- SCAN EACH STAGE
+	--====================================================
+
 	for _, stageInfo in ipairs(WIN_STAGES) do
-		local stageNumber = stageInfo.stage
-		local winValue = stageInfo.value
 
-		local target
+		local stageNumber =
+			stageInfo.stage
 
-		-- Method 1
+		local winValue =
+			stageInfo.value
+
+		local target = nil
+
+		--================================================
+		-- METHOD 1
+		--================================================
+
 		local stageContainer =
 			findStageContainer(
 				stageNumber,
@@ -528,19 +880,59 @@ function Module.RefreshTargets()
 			)
 
 		if stageContainer then
-			target = findTargetPart(stageContainer)
+
+			target =
+				findTargetPart(
+					stageContainer
+				)
+
 		end
 
-		-- Method 2
+		--================================================
+		-- METHOD 2
+		--================================================
+
 		if not target then
-			target = findByWinValue(winValue)
+
+			target =
+				findByWinValue(
+					winValue
+				)
+
 		end
 
-		if target
-			and target:IsA("BasePart")
-			and target.Parent
+		--================================================
+		-- METHOD 3
+		--================================================
+
+		if not target
+			and globalGetWin
 		then
-			targets[winValue] = target
+
+			-- Chỉ dùng global target nếu
+			-- thực sự có cấu trúc stage/win phù hợp.
+			local text =
+				collectObjectText(
+					globalGetWin
+				)
+
+			local parsed =
+				parseWinValue(text)
+
+			if parsed == winValue then
+				target =
+					globalGetWin
+			end
+		end
+
+		--================================================
+		-- SAVE
+		--================================================
+
+		if isBasePart(target) then
+
+			targets[winValue] =
+				target
 
 			print(
 				("[FOUND] Stage %d | +%s Win | %s")
@@ -550,7 +942,18 @@ function Module.RefreshTargets()
 						target:GetFullName()
 					)
 			)
+
+			print(
+				("        Position: %s")
+					:format(
+						tostring(
+							target.Position
+						)
+					)
+			)
+
 		else
+
 			warn(
 				("[MISSING] Stage %d | +%s Win")
 					:format(
@@ -558,10 +961,13 @@ function Module.RefreshTargets()
 						tostring(winValue)
 					)
 			)
+
 		end
 	end
 
-	State.TargetCache = targets
+	State.TargetCache =
+		targets
+
 	State.Scanning = false
 
 	local count = 0
@@ -571,6 +977,7 @@ function Module.RefreshTargets()
 	end
 
 	print("----------------------------------------")
+
 	print(
 		("Found %d / %d Win targets")
 			:format(
@@ -578,6 +985,7 @@ function Module.RefreshTargets()
 				#WIN_STAGES
 			)
 	)
+
 	print("========================================")
 	print("")
 
@@ -595,12 +1003,10 @@ function Module.GetTarget(value)
 		return nil
 	end
 
-	local target = State.TargetCache[value]
+	local target =
+		State.TargetCache[value]
 
-	if target
-		and target.Parent
-		and target:IsA("BasePart")
-	then
+	if isBasePart(target) then
 		return target
 	end
 
@@ -610,7 +1016,7 @@ function Module.GetTarget(value)
 end
 
 --========================================================
--- GET ALL TARGETS
+-- GET TARGETS
 --========================================================
 
 function Module.GetTargets()
@@ -626,16 +1032,19 @@ end
 --========================================================
 
 function Module.GetStage(stageNumber)
-	stageNumber = tonumber(stageNumber)
+	stageNumber =
+		tonumber(stageNumber)
 
 	if not stageNumber then
 		return nil
 	end
 
 	for _, stageInfo in ipairs(WIN_STAGES) do
+
 		if stageInfo.stage == stageNumber then
 			return stageInfo
 		end
+
 	end
 
 	return nil
@@ -649,20 +1058,16 @@ end
 -- TARGET POSITION
 --========================================================
 
-local function targetPosition(part)
-	if not part
-		or not part.Parent
-		or not part:IsA("BasePart")
-	then
+local function getTargetPosition(part)
+	if not isBasePart(part) then
 		return nil
 	end
 
-	-- Đứng phía trên target một khoảng nhỏ.
-	return part.Position + Vector3.new(
-		0,
-		State.FlyHeight,
-		0
-	)
+	-- QUAN TRỌNG:
+	-- không cộng FlyHeight ở đây.
+	-- dừng đúng tâm của target.
+
+	return part.Position
 end
 
 --========================================================
@@ -683,10 +1088,8 @@ end
 --========================================================
 
 function Module.FlyToPart(part)
-	if not part
-		or not part:IsA("BasePart")
-		or not part.Parent
-	then
+
+	if not isBasePart(part) then
 		return false, "Invalid target part."
 	end
 
@@ -705,40 +1108,70 @@ function Module.FlyToPart(part)
 		return false, "Character is not ready."
 	end
 
+	--====================================================
+	-- STATE
+	--====================================================
+
 	State.Flying = true
 	State.CurrentTarget = part
 
-	local previousAutoRotate = humanoid.AutoRotate
-	local previousPlatformStand = humanoid.PlatformStand
+	local previousAutoRotate =
+		humanoid.AutoRotate
+
+	local previousPlatformStand =
+		humanoid.PlatformStand
 
 	humanoid.AutoRotate = false
 	humanoid.PlatformStand = true
 
-	local started = os.clock()
-	local timeout = 30
-	local reached = false
+	--====================================================
+	-- FLY
+	--====================================================
 
-	while State.Flying
+	local started =
+		os.clock()
+
+	local timeout =
+		30
+
+	local reached =
+		false
+
+	while
+		State.Flying
 		and root.Parent
 		and part.Parent
 		and os.clock() - started < timeout
 	do
-		local destination = targetPosition(part)
+
+		local destination =
+			getTargetPosition(part)
 
 		if not destination then
 			break
 		end
 
-		local current = root.Position
-		local offset = destination - current
-		local distance = offset.Magnitude
+		local current =
+			root.Position
 
-		if distance <= 2.5 then
+		local offset =
+			destination - current
+
+		local distance =
+			offset.Magnitude
+
+		--================================================
+		-- ARRIVED
+		--================================================
+
+		if distance <= 1 then
+
 			reached = true
 			break
 		end
 
-		local deltaTime = RunService.Heartbeat:Wait()
+		local deltaTime =
+			RunService.Heartbeat:Wait()
 
 		if not State.Flying then
 			break
@@ -750,19 +1183,23 @@ function Module.FlyToPart(part)
 			break
 		end
 
-		local speed = math.max(
-			10,
-			State.FlySpeed
-		)
+		local speed =
+			math.max(
+				10,
+				State.FlySpeed
+			)
 
-		local step = math.min(
-			distance,
-			speed * deltaTime
-		)
+		local step =
+			math.min(
+				distance,
+				speed * deltaTime
+			)
 
 		if offset.Magnitude > 0 then
+
 			local nextPosition =
-				current + offset.Unit * step
+				current
+				+ offset.Unit * step
 
 			root.AssemblyLinearVelocity =
 				Vector3.zero
@@ -770,13 +1207,17 @@ function Module.FlyToPart(part)
 			root.AssemblyAngularVelocity =
 				Vector3.zero
 
+			-- Không set rotation của target.
+			-- Chỉ thay đổi vị trí.
 			root.CFrame =
-				CFrame.new(nextPosition)
+				CFrame.new(
+					nextPosition
+				)
 		end
 	end
 
 	--====================================================
-	-- FINAL POSITION
+	-- FINAL SNAP
 	--====================================================
 
 	if reached
@@ -784,29 +1225,67 @@ function Module.FlyToPart(part)
 		and root.Parent
 		and part.Parent
 	then
-		local destination =
-			targetPosition(part)
 
-		if destination then
+		local finalPosition =
+			getTargetPosition(part)
+
+		if finalPosition then
+
 			root.AssemblyLinearVelocity =
 				Vector3.zero
 
 			root.AssemblyAngularVelocity =
 				Vector3.zero
 
+			-- SNAP ĐÚNG TARGET
 			root.CFrame =
-				CFrame.new(destination)
+				CFrame.new(
+					finalPosition
+				)
+
+			-- Giữ tại target một chút.
+			-- Giúp TouchInterest / ClickDetector / trigger
+			-- có thời gian xử lý.
+			for _ = 1, 4 do
+
+				RunService.Heartbeat:Wait()
+
+				if not State.Flying then
+					break
+				end
+
+				if root.Parent
+					and part.Parent
+				then
+
+					root.AssemblyLinearVelocity =
+						Vector3.zero
+
+					root.AssemblyAngularVelocity =
+						Vector3.zero
+
+					root.CFrame =
+						CFrame.new(
+							finalPosition
+						)
+
+				else
+					break
+				end
+			end
 		end
 	end
 
 	--====================================================
-	-- RESTORE
+	-- RESTORE HUMANOID
 	--====================================================
 
 	if humanoid
 		and humanoid.Parent
 	then
+
 		pcall(function()
+
 			humanoid.AutoRotate =
 				previousAutoRotate
 
@@ -816,7 +1295,9 @@ function Module.FlyToPart(part)
 			humanoid:ChangeState(
 				Enum.HumanoidStateType.GettingUp
 			)
+
 		end)
+
 	end
 
 	State.Flying = false
@@ -830,35 +1311,47 @@ end
 --========================================================
 
 function Module.FlyToWin(winAmount)
-	winAmount = tonumber(winAmount)
+
+	winAmount =
+		tonumber(winAmount)
 
 	if not winAmount then
-		return false, "Invalid Win amount."
+		return false,
+			"Invalid Win amount."
 	end
 
 	if State.Flying then
-		return false, "Already flying."
+		return false,
+			"Already flying."
 	end
 
-	-- Cache trước
-	local target = State.TargetCache[winAmount]
+	--====================================================
+	-- CACHE
+	--====================================================
 
-	-- Chỉ scan nếu target chưa có
-	if not target
-		or not target.Parent
-		or not target:IsA("BasePart")
-	then
+	local target =
+		State.TargetCache[winAmount]
+
+	--====================================================
+	-- VALIDATE
+	--====================================================
+
+	if not isBasePart(target) then
+
 		Module.RefreshTargets()
-		target = State.TargetCache[winAmount]
+
+		target =
+			State.TargetCache[winAmount]
 	end
 
-	if not target
-		or not target.Parent
-		or not target:IsA("BasePart")
-	then
+	if not isBasePart(target) then
+
 		return false,
 			("No +%s Win target was detected.")
-				:format(tostring(winAmount))
+				:format(
+					tostring(winAmount)
+				)
+
 	end
 
 	print(
@@ -869,14 +1362,26 @@ function Module.FlyToWin(winAmount)
 			)
 	)
 
+	print(
+		("[FlyToWin] Target Position -> %s")
+			:format(
+				tostring(
+					target.Position
+				)
+			)
+	)
+
 	--====================================================
-	-- FLY DIRECTLY
+	-- FLY
 	--====================================================
 
 	local success, reason =
-		Module.FlyToPart(target)
+		Module.FlyToPart(
+			target
+		)
 
 	if not success then
+
 		warn(
 			("[FlyToWin] Failed +%s | %s")
 				:format(
@@ -889,7 +1394,7 @@ function Module.FlyToWin(winAmount)
 	end
 
 	print(
-		("[FlyToWin] Finished +%s")
+		("[FlyToWin] Reached +%s exactly")
 			:format(
 				tostring(winAmount)
 			)
@@ -903,19 +1408,26 @@ end
 --========================================================
 
 function Module.FlyToStage(stageNumber)
-	stageNumber = tonumber(stageNumber)
+
+	stageNumber =
+		tonumber(stageNumber)
 
 	if not stageNumber then
-		return false, "Invalid stage."
+		return false,
+			"Invalid stage."
 	end
 
 	local stageInfo =
-		Module.GetStage(stageNumber)
+		Module.GetStage(
+			stageNumber
+		)
 
 	if not stageInfo then
 		return false,
 			("Stage %d does not exist.")
-				:format(stageNumber)
+				:format(
+					stageNumber
+				)
 	end
 
 	print(
@@ -939,16 +1451,16 @@ Connections.CharacterAdded =
 	LocalPlayer.CharacterAdded:Connect(
 		function(character)
 
-			-- Dừng fly cũ
+			-- Stop fly
 			State.Flying = false
 			State.CurrentTarget = nil
 
-			-- Xóa collision cũ
+			-- Clear collision
 			table.clear(
 				OriginalCollision
 			)
 
-			-- Target cũ không còn đáng tin
+			-- Old targets invalid
 			table.clear(
 				State.TargetCache
 			)
@@ -960,13 +1472,17 @@ Connections.CharacterAdded =
 				)
 
 			if humanoid then
+
 				task.wait(0.1)
 
 				applyCharacterSettings()
 
 				if State.NoClip then
-					rememberCollision(character)
+					rememberCollision(
+						character
+					)
 				end
+
 			end
 		end
 	)
@@ -990,25 +1506,32 @@ Connections.NoClip =
 				return
 			end
 
-			rememberCollision(character)
+			rememberCollision(
+				character
+			)
 
 			for _, object in ipairs(
 				character:GetDescendants()
 			) do
+
 				if object:IsA("BasePart") then
-					object.CanCollide = false
+
+					object.CanCollide =
+						false
+
 				end
 			end
 		end
 	)
 
 --========================================================
--- CHARACTER RESPAWN SETTINGS
+-- CHARACTER APPEARANCE
 --========================================================
 
 Connections.CharacterAppearance =
 	LocalPlayer.CharacterAppearanceLoaded:Connect(
 		function()
+
 			task.wait(0.1)
 
 			applyCharacterSettings()
@@ -1019,7 +1542,11 @@ Connections.CharacterAppearance =
 			if State.NoClip
 				and character
 			then
-				rememberCollision(character)
+
+				rememberCollision(
+					character
+				)
+
 			end
 		end
 	)
@@ -1029,6 +1556,7 @@ Connections.CharacterAppearance =
 --========================================================
 
 task.defer(function()
+
 	task.wait(0.1)
 
 	applyCharacterSettings()
@@ -1039,8 +1567,13 @@ task.defer(function()
 	if State.NoClip
 		and character
 	then
-		rememberCollision(character)
+
+		rememberCollision(
+			character
+		)
+
 	end
+
 end)
 
 --========================================================
@@ -1048,25 +1581,38 @@ end)
 --========================================================
 
 function Module.GetState()
+
 	return {
 		WalkSpeed = State.WalkSpeed,
 		JumpPower = State.JumpPower,
+
 		InfiniteJump = State.InfiniteJump,
 		NoClip = State.NoClip,
+
 		Flying = State.Flying,
 		FlySpeed = State.FlySpeed,
 		FlyHeight = State.FlyHeight,
+
 		CurrentTarget = State.CurrentTarget,
 		TargetCount = #WIN_STAGES,
 		FoundTargets = State.TargetCache,
 	}
+
 end
 
+--========================================================
+-- DESTROY
+--========================================================
+
 function Module.Destroy()
+
 	State.Flying = false
 	State.CurrentTarget = nil
 
-	for name, connection in pairs(Connections) do
+	for name, connection in pairs(
+		Connections
+	) do
+
 		if connection then
 			connection:Disconnect()
 		end
@@ -1074,13 +1620,19 @@ function Module.Destroy()
 		Connections[name] = nil
 	end
 
-	local character = getCharacter()
+	local character =
+		getCharacter()
 
 	if character then
-		restoreCollision(character)
+		restoreCollision(
+			character
+		)
 	end
 
-	table.clear(State.TargetCache)
+	table.clear(
+		State.TargetCache
+	)
+
 end
 
 return Module
