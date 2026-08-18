@@ -558,25 +558,65 @@ local function findByWinValue(winValue)
 		workspace:GetDescendants()
 	) do
 
-		local name =
-			object.Name:lower()
+		-- First: try to parse numeric values from the object's name (supports 1K, 25K, 1M)
+		local numericMatch = parseNumberFromName(object.Name)
 
-		for _, pattern in ipairs(
-			possiblePatterns
-		) do
+		if numericMatch and numericMatch == winValue then
 
-			if name:find(
-				pattern:lower(),
-				1,
-				true
-			) then
+			local part = findTargetPart(object)
 
-				local part =
-					findTargetPart(object)
+			if part then
+				return part
+			end
+		end
+
+		local name = object.Name:lower()
+
+		for _, pattern in ipairs(possiblePatterns) do
+
+			if name:find(pattern:lower(), 1, true) then
+
+				local part = findTargetPart(object)
 
 				if part then
 					return part
 				end
+			end
+		end
+	end
+
+	return nil
+end
+
+--========================================================
+-- PARSE NUMBER FROM NAME (supports K/M abbreviations)
+--========================================================
+
+local function parseNumberFromName(name)
+
+	if not name then
+		return nil
+	end
+
+	-- Normalize: remove commas and trim spaces
+	local s = tostring(name):gsub(",", ""):gsub("%s+", "")
+
+	-- Try to find number tokens like 1, 1000, 1K, 2.5K, 1M
+	for num, suffix in s:gmatch("(%d+%.?%d*)([kKmM]?)") do
+
+		local n = tonumber(num)
+
+		if n then
+
+			if suffix == "k" or suffix == "K" then
+				n = n * 1000
+			elseif suffix == "m" or suffix == "M" then
+				n = n * 1000000
+			end
+
+			-- Return the numeric value (as integer when possible)
+			if n then
+				return n
 			end
 		end
 	end
