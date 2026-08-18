@@ -136,6 +136,40 @@ for _, stageInfo in ipairs(WIN_STAGES) do
 end
 
 --========================================================
+-- PARSE NUMBER FROM NAME (supports K/M abbreviations)
+-- Defined early so other functions can call it safely
+--========================================================
+
+local function parseNumberFromName(name)
+
+	if not name then
+		return nil
+	end
+
+	-- Normalize: remove commas and trim spaces
+	local s = tostring(name):gsub(",", ""):gsub("%s+", "")
+
+	-- Try to find number tokens like 1, 1000, 1K, 2.5K, 1M
+	for num, suffix in s:gmatch("(%d+%.?%d*)([kKmM]?)") do
+
+		local n = tonumber(num)
+
+		if n then
+
+			if suffix == "k" or suffix == "K" then
+				n = n * 1000
+			elseif suffix == "m" or suffix == "M" then
+				n = n * 1000000
+			end
+
+			return n
+		end
+	end
+
+	return nil
+end
+
+--========================================================
 -- CONNECTION
 --========================================================
 
@@ -591,39 +625,7 @@ end
 --========================================================
 -- PARSE NUMBER FROM NAME (supports K/M abbreviations)
 --========================================================
-
-local function parseNumberFromName(name)
-
-	if not name then
-		return nil
-	end
-
-	-- Normalize: remove commas and trim spaces
-	local s = tostring(name):gsub(",", ""):gsub("%s+", "")
-
-	-- Try to find number tokens like 1, 1000, 1K, 2.5K, 1M
-	for num, suffix in s:gmatch("(%d+%.?%d*)([kKmM]?)") do
-
-		local n = tonumber(num)
-
-		if n then
-
-			if suffix == "k" or suffix == "K" then
-				n = n * 1000
-			elseif suffix == "m" or suffix == "M" then
-				n = n * 1000000
-			end
-
-			-- Return the numeric value (as integer when possible)
-			if n then
-				return n
-			end
-		end
-	end
-
-	return nil
-end
-
+-- (moved earlier to avoid forward-reference nil call)
 --========================================================
 -- REFRESH TARGETS
 --========================================================
