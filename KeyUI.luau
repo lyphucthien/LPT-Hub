@@ -1,87 +1,116 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
-local MAIN_UI = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/%2B1%20Speed%20Keyboard%20Escape/MainUI.luau"
+--============================================================
+-- CONFIG
+--============================================================
+
+local GET_KEY_LINK = "https://link4sub.com/owycAYxKdu"
+local KEY_FILE = "LPT_Hub_Key.txt"
 
 local VALID_KEYS = {
 	["LPT-HUB"] = true,
 }
 
-local GET_KEY_LINK = "https://link4sub.com/owycAYxKdu"
+local GAME_CONFIG = {
+	["+1 Speed Keyboard Escape"] = {
+		Name = "+1 Speed Keyboard Escape",
+		PlaceId = {95082159892680},
+		UniverseId = {9584852943},
+		WaitForDataLoaded = false,
+		MainUI = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/%2B1%20Speed%20Keyboard%20Escape/MainUI.luau",
+	},
+}
 
---// ============================================================
---// KEY SAVE / LOAD
---// ============================================================
+--============================================================
+-- STATE
+--============================================================
 
-local KEY_FILE = "lpt_hub_key.txt"
+local State = {
+	KeyValid = false,
+	PlaceId = nil,
+	UniverseId = nil,
+	GameName = "Unknown Game",
+	GameSupported = false,
+	GameConfig = nil,
+	MainUI = nil,
+	Loading = false,
+	Submitting = false,
+}
+
+--============================================================
+-- COLORS
+--============================================================
+
+local COLORS = {
+	Background = Color3.fromRGB(8,18,32),
+	SurfaceLight = Color3.fromRGB(40,44,58),
+	Card = Color3.fromRGB(34,38,50),
+	Accent = Color3.fromRGB(168,105,245),
+	AccentB = Color3.fromRGB(236,72,153),
+	Text = Color3.fromRGB(240,241,245),
+	TextDim = Color3.fromRGB(145,153,168),
+	Border = Color3.fromRGB(52,56,70),
+	Danger = Color3.fromRGB(255,92,108),
+	Success = Color3.fromRGB(74,222,128),
+	Info = Color3.fromRGB(96,165,250),
+	Warning = Color3.fromRGB(250,204,21),
+}
+
+--============================================================
+-- HELPERS
+--============================================================
+
+local function tween(obj, props, time, style)
+	if not obj or not obj.Parent then return end
+	local t = TweenService:Create(obj, TweenInfo.new(time or .18, style or Enum.EasingStyle.Quad), props)
+	t:Play()
+	return t
+end
+
+local function applyGradient(obj, a, b, rotation)
+	local gradient = Instance.new("UIGradient")
+	gradient.Color = ColorSequence.new(a, b)
+	gradient.Rotation = rotation or 0
+	gradient.Parent = obj
+	return gradient
+end
+
+--============================================================
+-- KEY STORAGE
+--============================================================
 
 local function getSavedKey()
-	if isfile and isfile(KEY_FILE) then
+	if type(isfile) ~= "function" then return nil end
+
+	local ok, result = pcall(function()
+		if not isfile(KEY_FILE) then return nil end
 		local data = readfile(KEY_FILE)
-		if data and data ~= "" then
-			return data
-		end
-	end
-	return nil
+		return data and data ~= "" and tostring(data) or nil
+	end)
+
+	return ok and result or nil
 end
 
 local function saveKey(key)
-	if writefile then
-		writefile(KEY_FILE, key)
-	end
-end
-
---// ============================================================
---// PALETTE
---// ============================================================
-
-local COLORS = {
-	Background = Color3.fromRGB(8, 18, 32),
-	SurfaceLight = Color3.fromRGB(40, 44, 58),
-	Card = Color3.fromRGB(34, 38, 50),
-
-	Accent = Color3.fromRGB(168, 105, 245),
-	AccentB = Color3.fromRGB(236, 72, 153),
-
-	Text = Color3.fromRGB(240, 241, 245),
-	TextDim = Color3.fromRGB(145, 153, 168),
-	Border = Color3.fromRGB(52, 56, 70),
-
-	Danger = Color3.fromRGB(255, 92, 108),
-	Success = Color3.fromRGB(74, 222, 128),
-}
-
---// ============================================================
---// HELPERS
---// ============================================================
-
-local function tween(obj, props, time, style)
-	local tweenInfo = TweenInfo.new(
-		time or 0.18,
-		style or Enum.EasingStyle.Quad
-	)
-
-	TweenService:Create(obj, tweenInfo, props):Play()
-end
-
-local function applyGradient(guiObject, colorA, colorB, rotation)
-	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new(colorA, colorB)
-	gradient.Rotation = rotation or 0
-	gradient.Parent = guiObject
-	return gradient
+	if type(writefile) ~= "function" then return end
+	pcall(function() writefile(KEY_FILE, tostring(key)) end)
 end
 
 local function checkKey(key)
 	return VALID_KEYS[key] == true
 end
 
---// ============================================================
---// SCREEN GUI
---// ============================================================
+--============================================================
+-- SCREEN GUI
+--============================================================
+
+local oldGui = playerGui:FindFirstChild("LPTKeyUI")
+if oldGui then oldGui:Destroy() end
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "LPTKeyUI"
@@ -90,228 +119,147 @@ screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = playerGui
 
---// ============================================================
---// NOTIFICATION SYSTEM
---// ============================================================
+--============================================================
+-- NOTIFICATION SYSTEM
+--============================================================
 
 local notificationHolder = Instance.new("Frame")
 notificationHolder.Name = "NotificationHolder"
-notificationHolder.Size = UDim2.new(1, 0, 1, 0)
-notificationHolder.Position = UDim2.new(0, 0, 0, 0)
+notificationHolder.Size = UDim2.fromScale(1,1)
 notificationHolder.BackgroundTransparency = 1
 notificationHolder.BorderSizePixel = 0
 notificationHolder.ZIndex = 100
 notificationHolder.Parent = screenGui
 
 local activeNotifications = {}
+local NOTIFICATION_WIDTH, NOTIFICATION_HEIGHT, NOTIFICATION_GAP = 310, 74, 10
+local RIGHT_MARGIN, BOTTOM_MARGIN = 20, 20
 
-local NOTIFICATION_WIDTH = 310
-local NOTIFICATION_HEIGHT = 74
-local NOTIFICATION_GAP = 10
-
-local RIGHT_MARGIN = 20
-local BOTTOM_MARGIN = 20
-
-local function getNotificationPosition(index)
-	return UDim2.new(
-		1,
-		-RIGHT_MARGIN,
-		1,
-		-BOTTOM_MARGIN - ((index - 1) * (NOTIFICATION_HEIGHT + NOTIFICATION_GAP))
-	)
+local function notificationPosition(index)
+	return UDim2.new(1, -RIGHT_MARGIN, 1, -BOTTOM_MARGIN - ((index - 1) * (NOTIFICATION_HEIGHT + NOTIFICATION_GAP)))
 end
 
-local function updateNotificationPositions()
-	for index, notification in ipairs(activeNotifications) do
+local function updateNotifications()
+	for i, notification in ipairs(activeNotifications) do
 		if notification and notification.Parent then
-			tween(
-				notification,
-				{
-					Position = getNotificationPosition(index)
-				},
-				0.25,
-				Enum.EasingStyle.Quart
-			)
+			tween(notification, {Position = notificationPosition(i)}, .25, Enum.EasingStyle.Quart)
 		end
 	end
 end
 
 local function showNotification(titleText, messageText, notificationType)
-
-	local accentColor = COLORS.Success
-	local iconText = "✓"
+	local accent, iconText = COLORS.Success, "✓"
 
 	if notificationType == "error" then
-		accentColor = COLORS.Danger
-		iconText = "!"
+		accent, iconText = COLORS.Danger, "!"
 	elseif notificationType == "info" then
-		accentColor = COLORS.Accent
-		iconText = "i"
+		accent, iconText = COLORS.Info, "i"
+	elseif notificationType == "warning" then
+		accent, iconText = COLORS.Warning, "!"
 	end
 
 	local notification = Instance.new("Frame")
 	notification.Name = "Notification"
-
-	-- QUAN TRỌNG
-	-- Neo theo góc phải dưới
-	notification.AnchorPoint = Vector2.new(1, 1)
-
-	notification.Size = UDim2.new(
-		0,
-		NOTIFICATION_WIDTH,
-		0,
-		NOTIFICATION_HEIGHT
-	)
-
-	-- Bắt đầu ngoài màn hình bên phải
-	notification.Position = UDim2.new(
-		1,
-		NOTIFICATION_WIDTH + 50,
-		1,
-		-BOTTOM_MARGIN
-	)
-
-	notification.BackgroundColor3 = Color3.fromRGB(10, 18, 30)
-	notification.BackgroundTransparency = 0.04
+	notification.AnchorPoint = Vector2.new(1,1)
+	notification.Size = UDim2.fromOffset(NOTIFICATION_WIDTH, NOTIFICATION_HEIGHT)
+	notification.Position = UDim2.new(1, NOTIFICATION_WIDTH + 50, 1, -BOTTOM_MARGIN)
+	notification.BackgroundColor3 = Color3.fromRGB(10,18,30)
+	notification.BackgroundTransparency = .04
 	notification.BorderSizePixel = 0
 	notification.ZIndex = 101
 	notification.Parent = notificationHolder
 
-	-- Corner
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 12)
+	corner.CornerRadius = UDim.new(0,12)
 	corner.Parent = notification
 
-	-- Border
 	local stroke = Instance.new("UIStroke")
 	stroke.Color = COLORS.Border
 	stroke.Thickness = 1
-	stroke.Transparency = 0.15
+	stroke.Transparency = .15
 	stroke.Parent = notification
 
-	-- Accent bar
-	local accentBar = Instance.new("Frame")
-	accentBar.Size = UDim2.new(0, 4, 1, -18)
-	accentBar.Position = UDim2.new(0, 0, 0.5, 0)
-	accentBar.AnchorPoint = Vector2.new(0, 0.5)
-	accentBar.BackgroundColor3 = accentColor
-	accentBar.BorderSizePixel = 0
-	accentBar.ZIndex = 102
-	accentBar.Parent = notification
+	local bar = Instance.new("Frame")
+	bar.Size = UDim2.new(0,4,1,-18)
+	bar.Position = UDim2.new(0,0,.5,0)
+	bar.AnchorPoint = Vector2.new(0,.5)
+	bar.BackgroundColor3 = accent
+	bar.BorderSizePixel = 0
+	bar.ZIndex = 102
+	bar.Parent = notification
 
-	local accentCorner = Instance.new("UICorner")
-	accentCorner.CornerRadius = UDim.new(1, 0)
-	accentCorner.Parent = accentBar
+	local barCorner = Instance.new("UICorner")
+	barCorner.CornerRadius = UDim.new(1,0)
+	barCorner.Parent = bar
 
-	-- Icon
 	local icon = Instance.new("TextLabel")
-	icon.Size = UDim2.new(0, 30, 0, 30)
-	icon.Position = UDim2.new(0, 13, 0, 12)
-	icon.BackgroundColor3 = accentColor
-	icon.BackgroundTransparency = 0.82
+	icon.Size = UDim2.fromOffset(30,30)
+	icon.Position = UDim2.fromOffset(13,12)
+	icon.BackgroundColor3 = accent
+	icon.BackgroundTransparency = .82
 	icon.BorderSizePixel = 0
 	icon.Text = iconText
-	icon.TextColor3 = accentColor
+	icon.TextColor3 = accent
 	icon.TextSize = 15
 	icon.Font = Enum.Font.GothamBold
 	icon.ZIndex = 102
 	icon.Parent = notification
 
 	local iconCorner = Instance.new("UICorner")
-	iconCorner.CornerRadius = UDim.new(1, 0)
+	iconCorner.CornerRadius = UDim.new(1,0)
 	iconCorner.Parent = icon
 
-	-- Title
-	local notificationTitle = Instance.new("TextLabel")
-	notificationTitle.Size = UDim2.new(1, -62, 0, 21)
-	notificationTitle.Position = UDim2.new(0, 55, 0, 10)
-	notificationTitle.BackgroundTransparency = 1
-	notificationTitle.Text = titleText
-	notificationTitle.TextColor3 = COLORS.Text
-	notificationTitle.TextSize = 13
-	notificationTitle.Font = Enum.Font.GothamBold
-	notificationTitle.TextXAlignment = Enum.TextXAlignment.Left
-	notificationTitle.ZIndex = 102
-	notificationTitle.Parent = notification
+	local title = Instance.new("TextLabel")
+	title.Size = UDim2.new(1,-62,0,21)
+	title.Position = UDim2.fromOffset(55,10)
+	title.BackgroundTransparency = 1
+	title.Text = titleText
+	title.TextColor3 = COLORS.Text
+	title.TextSize = 13
+	title.Font = Enum.Font.GothamBold
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.ZIndex = 102
+	title.Parent = notification
 
-	-- Message
-	local notificationMessage = Instance.new("TextLabel")
-	notificationMessage.Size = UDim2.new(1, -62, 0, 30)
-	notificationMessage.Position = UDim2.new(0, 55, 0, 32)
-	notificationMessage.BackgroundTransparency = 1
-	notificationMessage.Text = messageText
-	notificationMessage.TextColor3 = COLORS.TextDim
-	notificationMessage.TextSize = 11
-	notificationMessage.Font = Enum.Font.Gotham
-	notificationMessage.TextWrapped = true
-	notificationMessage.TextXAlignment = Enum.TextXAlignment.Left
-	notificationMessage.TextYAlignment = Enum.TextYAlignment.Top
-	notificationMessage.ZIndex = 102
-	notificationMessage.Parent = notification
+	local message = Instance.new("TextLabel")
+	message.Size = UDim2.new(1,-62,0,30)
+	message.Position = UDim2.fromOffset(55,32)
+	message.BackgroundTransparency = 1
+	message.Text = messageText
+	message.TextColor3 = COLORS.TextDim
+	message.TextSize = 11
+	message.Font = Enum.Font.Gotham
+	message.TextWrapped = true
+	message.TextXAlignment = Enum.TextXAlignment.Left
+	message.TextYAlignment = Enum.TextYAlignment.Top
+	message.ZIndex = 102
+	message.Parent = notification
 
-	-- Progress bar
 	local progress = Instance.new("Frame")
-	progress.Size = UDim2.new(1, 0, 0, 2)
-	progress.Position = UDim2.new(0, 0, 1, -2)
-	progress.BackgroundColor3 = accentColor
+	progress.Size = UDim2.new(1,0,0,2)
+	progress.Position = UDim2.new(0,0,1,-2)
+	progress.BackgroundColor3 = accent
 	progress.BorderSizePixel = 0
 	progress.ZIndex = 103
 	progress.Parent = notification
 
-	-- Thêm notification mới
 	table.insert(activeNotifications, 1, notification)
+	updateNotifications()
 
-	-- Cập nhật notification cũ
-	updateNotificationPositions()
+	tween(notification, {Position = notificationPosition(1)}, .3, Enum.EasingStyle.Quart)
+	tween(progress, {Size = UDim2.new(0,0,0,2)}, 3, Enum.EasingStyle.Linear)
 
-	-- Trượt từ bên phải vào
-	tween(
-		notification,
-		{
-			Position = getNotificationPosition(1)
-		},
-		0.3,
-		Enum.EasingStyle.Quart
-	)
-
-	-- Progress 3 giây
-	tween(
-		progress,
-		{
-			Size = UDim2.new(0, 0, 0, 2)
-		},
-		3,
-		Enum.EasingStyle.Linear
-	)
-
-	-- Sau 3 giây: trượt xuống dưới
 	task.delay(3, function()
+		if not notification.Parent then return end
 
-		if not notification.Parent then
-			return
-		end
+		tween(notification, {
+			Position = UDim2.new(1,-RIGHT_MARGIN,1,NOTIFICATION_HEIGHT + 30)
+		}, .35, Enum.EasingStyle.Quart)
 
-		tween(
-			notification,
-			{
-				Position = UDim2.new(
-					1,
-					-RIGHT_MARGIN,
-					1,
-					NOTIFICATION_HEIGHT + 30
-				)
-			},
-			0.35,
-			Enum.EasingStyle.Quart
-		)
+		task.wait(.4)
 
-		task.wait(0.4)
+		if notification.Parent then notification:Destroy() end
 
-		if notification.Parent then
-			notification:Destroy()
-		end
-
-		-- Xóa khỏi danh sách
 		for i, item in ipairs(activeNotifications) do
 			if item == notification then
 				table.remove(activeNotifications, i)
@@ -319,130 +267,110 @@ local function showNotification(titleText, messageText, notificationType)
 			end
 		end
 
-		updateNotificationPositions()
+		updateNotifications()
 	end)
 end
 
---// ============================================================
---// KEY UI
---// ============================================================
+--============================================================
+-- KEY UI
+--============================================================
 
 local keyFrame = Instance.new("Frame")
 keyFrame.Name = "KeyUI"
-keyFrame.Size = UDim2.new(0, 340, 0, 330)
-keyFrame.Position = UDim2.new(0.5, -170, 0.5, -165)
+keyFrame.Size = UDim2.fromOffset(340,330)
+keyFrame.Position = UDim2.new(.5,-170,.5,-165)
 keyFrame.BackgroundColor3 = COLORS.Background
-keyFrame.BackgroundTransparency = 0.15
+keyFrame.BackgroundTransparency = .15
 keyFrame.BorderSizePixel = 0
 keyFrame.ClipsDescendants = true
 keyFrame.ZIndex = 10
 keyFrame.Parent = screenGui
 
-local keyFrameCorner = Instance.new("UICorner")
-keyFrameCorner.CornerRadius = UDim.new(0, 18)
-keyFrameCorner.Parent = keyFrame
+local frameCorner = Instance.new("UICorner")
+frameCorner.CornerRadius = UDim.new(0,18)
+frameCorner.Parent = keyFrame
 
-local keyFrameStroke = Instance.new("UIStroke")
-keyFrameStroke.Color = COLORS.Border
-keyFrameStroke.Thickness = 1.5
-keyFrameStroke.Transparency = 0.2
-keyFrameStroke.Parent = keyFrame
+local frameStroke = Instance.new("UIStroke")
+frameStroke.Color = COLORS.Border
+frameStroke.Thickness = 1.5
+frameStroke.Transparency = .2
+frameStroke.Parent = keyFrame
+applyGradient(frameStroke, COLORS.Accent, COLORS.AccentB, 45)
 
-applyGradient(
-	keyFrameStroke,
-	COLORS.Accent,
-	COLORS.AccentB,
-	45
-)
+--============================================================
+-- LOGO / HEADER
+--============================================================
 
---// ============================================================
---// LPT LOGO
---// ============================================================
+local logo = Instance.new("ImageLabel")
+logo.Name = "KeyLogo"
+logo.Size = UDim2.fromOffset(54,54)
+logo.Position = UDim2.fromOffset(24,24)
+logo.BackgroundColor3 = Color3.fromRGB(8,8,10)
+logo.BorderSizePixel = 0
+logo.Image = "rbxassetid://86498268964550"
+logo.ScaleType = Enum.ScaleType.Crop
+logo.ZIndex = 11
+logo.Parent = keyFrame
 
-local keyLogo = Instance.new("ImageLabel")
-keyLogo.Name = "KeyLogo"
-keyLogo.Size = UDim2.new(0, 54, 0, 54)
-keyLogo.Position = UDim2.new(0, 24, 0, 24)
-keyLogo.BackgroundColor3 = Color3.fromRGB(8, 8, 10)
-keyLogo.BackgroundTransparency = 0
-keyLogo.BorderSizePixel = 0
-keyLogo.Image = "rbxassetid://86498268964550"
-keyLogo.ImageTransparency = 0
-keyLogo.ScaleType = Enum.ScaleType.Crop
-keyLogo.ZIndex = 11
-keyLogo.Parent = keyFrame
+local logoCorner = Instance.new("UICorner")
+logoCorner.CornerRadius = UDim.new(1,0)
+logoCorner.Parent = logo
 
--- Bo tròn logo
-local keyLogoCorner = Instance.new("UICorner")
-keyLogoCorner.CornerRadius = UDim.new(1, 0)
-keyLogoCorner.Parent = keyLogo
+local logoStroke = Instance.new("UIStroke")
+logoStroke.Color = COLORS.Border
+logoStroke.Thickness = 1
+logoStroke.Transparency = .15
+logoStroke.Parent = logo
 
--- Viền logo
-local keyLogoStroke = Instance.new("UIStroke")
-keyLogoStroke.Color = COLORS.Border
-keyLogoStroke.Thickness = 1
-keyLogoStroke.Transparency = 0.15
-keyLogoStroke.Parent = keyLogo
+local title = Instance.new("TextLabel")
+title.Size = UDim2.fromOffset(250,28)
+title.Position = UDim2.fromOffset(92,20)
+title.BackgroundTransparency = 1
+title.Text = "LPT HUB KEY SYSTEM"
+title.TextColor3 = COLORS.Text
+title.TextSize = 22
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.ZIndex = 11
+title.Parent = keyFrame
 
---// ============================================================
---// HEADER
---// ============================================================
+local subtitle = Instance.new("TextLabel")
+subtitle.Size = UDim2.fromOffset(250,14)
+subtitle.Position = UDim2.fromOffset(92,47)
+subtitle.BackgroundTransparency = 1
+subtitle.Text = "THE AUTHENTICATE SYSTEM"
+subtitle.TextColor3 = COLORS.TextDim
+subtitle.TextSize = 11
+subtitle.Font = Enum.Font.Gotham
+subtitle.TextXAlignment = Enum.TextXAlignment.Left
+subtitle.ZIndex = 11
+subtitle.Parent = keyFrame
 
-local keyTitle = Instance.new("TextLabel")
-keyTitle.Name = "KeyTitle"
-keyTitle.Size = UDim2.new(0, 250, 0, 28)
-keyTitle.Position = UDim2.new(0, 92, 0, 20)
-keyTitle.BackgroundTransparency = 1
-keyTitle.Text = "LPT HUB KEY SYSTEM"
-keyTitle.TextColor3 = Color3.fromRGB(245, 245, 248)
-keyTitle.TextSize = 22
-keyTitle.Font = Enum.Font.GothamBold
-keyTitle.TextXAlignment = Enum.TextXAlignment.Left
-keyTitle.TextYAlignment = Enum.TextYAlignment.Center
-keyTitle.ZIndex = 11
-keyTitle.Parent = keyFrame
+--============================================================
+-- INPUT
+--============================================================
 
-local keySubtitle = Instance.new("TextLabel")
-keySubtitle.Name = "KeySubtitle"
-keySubtitle.Size = UDim2.new(0, 250, 0, 14)
-keySubtitle.Position = UDim2.new(0, 92, 0, 47)
-keySubtitle.BackgroundTransparency = 1
-keySubtitle.Text = "THE AUTHENTICATE SYSTEM"
-keySubtitle.TextColor3 = COLORS.TextDim
-keySubtitle.TextSize = 11
-keySubtitle.Font = Enum.Font.Gotham
-keySubtitle.TextXAlignment = Enum.TextXAlignment.Left
-keySubtitle.TextYAlignment = Enum.TextYAlignment.Center
-keySubtitle.ZIndex = 11
-keySubtitle.Parent = keyFrame
+local inputBox = Instance.new("Frame")
+inputBox.Size = UDim2.new(1,-40,0,44)
+inputBox.Position = UDim2.fromOffset(20,100)
+inputBox.BackgroundColor3 = COLORS.Card
+inputBox.BorderSizePixel = 0
+inputBox.ZIndex = 11
+inputBox.Parent = keyFrame
 
---// ============================================================
---// INPUT
---// ============================================================
+local inputCorner = Instance.new("UICorner")
+inputCorner.CornerRadius = UDim.new(0,12)
+inputCorner.Parent = inputBox
 
-local keyInputBox = Instance.new("Frame")
-keyInputBox.Name = "KeyInputBox"
-keyInputBox.Size = UDim2.new(1, -40, 0, 44)
-keyInputBox.Position = UDim2.new(0, 20, 0, 100)
-keyInputBox.BackgroundColor3 = COLORS.Card
-keyInputBox.BorderSizePixel = 0
-keyInputBox.ZIndex = 11
-keyInputBox.Parent = keyFrame
-
-local keyInputCorner = Instance.new("UICorner")
-keyInputCorner.CornerRadius = UDim.new(0, 12)
-keyInputCorner.Parent = keyInputBox
-
-local keyInputStroke = Instance.new("UIStroke")
-keyInputStroke.Color = COLORS.Border
-keyInputStroke.Thickness = 1
-keyInputStroke.Transparency = 0.15
-keyInputStroke.Parent = keyInputBox
+local inputStroke = Instance.new("UIStroke")
+inputStroke.Color = COLORS.Border
+inputStroke.Thickness = 1
+inputStroke.Transparency = .15
+inputStroke.Parent = inputBox
 
 local keyInput = Instance.new("TextBox")
-keyInput.Name = "KeyInput"
-keyInput.Size = UDim2.new(1, -32, 1, 0)
-keyInput.Position = UDim2.new(0, 16, 0, 0)
+keyInput.Size = UDim2.new(1,-32,1,0)
+keyInput.Position = UDim2.fromOffset(16,0)
 keyInput.BackgroundTransparency = 1
 keyInput.PlaceholderText = "Enter Key..."
 keyInput.PlaceholderColor3 = COLORS.TextDim
@@ -451,33 +379,25 @@ keyInput.TextColor3 = COLORS.Text
 keyInput.TextSize = 14
 keyInput.Font = Enum.Font.Gotham
 keyInput.TextXAlignment = Enum.TextXAlignment.Left
-keyInput.TextYAlignment = Enum.TextYAlignment.Center
 keyInput.ClearTextOnFocus = false
 keyInput.ZIndex = 12
-keyInput.Parent = keyInputBox
+keyInput.Parent = inputBox
 
 keyInput.Focused:Connect(function()
-	tween(keyInputStroke, {
-		Color = COLORS.Accent,
-		Transparency = 0,
-	})
+	tween(inputStroke, {Color = COLORS.Accent, Transparency = 0})
 end)
 
 keyInput.FocusLost:Connect(function()
-	tween(keyInputStroke, {
-		Color = COLORS.Border,
-		Transparency = 0.15,
-	})
+	tween(inputStroke, {Color = COLORS.Border, Transparency = .15})
 end)
 
---// ============================================================
---// GET KEY
---// ============================================================
+--============================================================
+-- GET KEY
+--============================================================
 
 local getKeyButton = Instance.new("TextButton")
-getKeyButton.Name = "GetKeyButton"
-getKeyButton.Size = UDim2.new(1, -40, 0, 40)
-getKeyButton.Position = UDim2.new(0, 20, 0, 154)
+getKeyButton.Size = UDim2.new(1,-40,0,40)
+getKeyButton.Position = UDim2.fromOffset(20,154)
 getKeyButton.BackgroundColor3 = COLORS.SurfaceLight
 getKeyButton.BorderSizePixel = 0
 getKeyButton.Text = "GET KEY"
@@ -488,67 +408,49 @@ getKeyButton.AutoButtonColor = false
 getKeyButton.ZIndex = 11
 getKeyButton.Parent = keyFrame
 
-local getKeyCorner = Instance.new("UICorner")
-getKeyCorner.CornerRadius = UDim.new(0, 12)
-getKeyCorner.Parent = getKeyButton
+local getCorner = Instance.new("UICorner")
+getCorner.CornerRadius = UDim.new(0,12)
+getCorner.Parent = getKeyButton
 
-local getKeyStroke = Instance.new("UIStroke")
-getKeyStroke.Color = COLORS.Border
-getKeyStroke.Thickness = 1
-getKeyStroke.Transparency = 0.2
-getKeyStroke.Parent = getKeyButton
+local getStroke = Instance.new("UIStroke")
+getStroke.Color = COLORS.Border
+getStroke.Thickness = 1
+getStroke.Transparency = .2
+getStroke.Parent = getKeyButton
 
 getKeyButton.MouseEnter:Connect(function()
-	tween(getKeyButton, {
-		BackgroundColor3 = COLORS.Card,
-	})
+	tween(getKeyButton, {BackgroundColor3 = COLORS.Card})
 end)
 
 getKeyButton.MouseLeave:Connect(function()
-	tween(getKeyButton, {
-		BackgroundColor3 = COLORS.SurfaceLight,
-	})
+	tween(getKeyButton, {BackgroundColor3 = COLORS.SurfaceLight})
 end)
 
 getKeyButton.MouseButton1Click:Connect(function()
-	if setclipboard then
+	if type(setclipboard) == "function" then
 		setclipboard(GET_KEY_LINK)
-
-		-- Hiện notification NGAY LẬP TỨC
-		showNotification(
-			"Link Copied!",
-			"link đã được copy",
-			"success"
-		)
-
+		showNotification("Link Copied!", "Link lấy KEY đã được copy.", "success")
 		getKeyButton.Text = "LINK COPIED!"
 
 		task.delay(1.2, function()
-			if getKeyButton.Parent then
-				getKeyButton.Text = "GET KEY"
-			end
+			if getKeyButton.Parent then getKeyButton.Text = "GET KEY" end
 		end)
 	else
-		showNotification(
-			"Copy Failed",
-			"Không thể copy link.",
-			"error"
-		)
+		showNotification("Copy Failed", "Không thể copy link.", "error")
 	end
 end)
 
---// ============================================================
---// SUBMIT
---// ============================================================
+--============================================================
+-- SUBMIT
+--============================================================
 
 local submitButton = Instance.new("TextButton")
-submitButton.Name = "SubmitButton"
-submitButton.Size = UDim2.new(1, -40, 0, 44)
-submitButton.Position = UDim2.new(0, 20, 0, 208)
+submitButton.Size = UDim2.new(1,-40,0,44)
+submitButton.Position = UDim2.fromOffset(20,208)
 submitButton.BackgroundColor3 = COLORS.Accent
 submitButton.BorderSizePixel = 0
 submitButton.Text = "Submit Key"
-submitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+submitButton.TextColor3 = Color3.fromRGB(255,255,255)
 submitButton.TextSize = 14
 submitButton.Font = Enum.Font.GothamBold
 submitButton.AutoButtonColor = false
@@ -556,40 +458,25 @@ submitButton.ZIndex = 11
 submitButton.Parent = keyFrame
 
 local submitCorner = Instance.new("UICorner")
-submitCorner.CornerRadius = UDim.new(0, 12)
+submitCorner.CornerRadius = UDim.new(0,12)
 submitCorner.Parent = submitButton
-
-applyGradient(
-	submitButton,
-	COLORS.Accent,
-	COLORS.AccentB,
-	0
-)
+applyGradient(submitButton, COLORS.Accent, COLORS.AccentB, 0)
 
 submitButton.MouseEnter:Connect(function()
-	tween(
-		submitButton,
-		{Size = UDim2.new(1, -36, 0, 44)},
-		0.12
-	)
+	tween(submitButton, {Size = UDim2.new(1,-36,0,44)}, .12)
 end)
 
 submitButton.MouseLeave:Connect(function()
-	tween(
-		submitButton,
-		{Size = UDim2.new(1, -40, 0, 44)},
-		0.12
-	)
+	tween(submitButton, {Size = UDim2.new(1,-40,0,44)}, .12)
 end)
 
---// ============================================================
---// STATUS
---// ============================================================
+--============================================================
+-- STATUS
+--============================================================
 
 local keyStatus = Instance.new("TextLabel")
-keyStatus.Name = "KeyStatus"
-keyStatus.Size = UDim2.new(1, -40, 0, 18)
-keyStatus.Position = UDim2.new(0, 20, 0, 260)
+keyStatus.Size = UDim2.new(1,-40,0,18)
+keyStatus.Position = UDim2.fromOffset(20,260)
 keyStatus.BackgroundTransparency = 1
 keyStatus.Text = ""
 keyStatus.TextColor3 = COLORS.Danger
@@ -599,128 +486,316 @@ keyStatus.TextXAlignment = Enum.TextXAlignment.Left
 keyStatus.ZIndex = 11
 keyStatus.Parent = keyFrame
 
---// ============================================================
---// LOAD MAIN UI
---// ============================================================
+local function setStatus(text, color)
+	keyStatus.Text = tostring(text or "")
+	keyStatus.TextColor3 = color or COLORS.Text
+end
 
-local loadingMain = false
+--============================================================
+-- GAME DETECTION
+--============================================================
 
-local function openMainUI()
-	if loadingMain then
+local function getUniverseId(placeId)
+	if not placeId then return nil end
+
+	local ok, result = pcall(function()
+		local url = "https://apis.roblox.com/universes/v1/places/" .. tostring(placeId) .. "/universe"
+		local response = game:HttpGet(url)
+		if not response or response == "" then error("Empty response") end
+
+		local data = HttpService:JSONDecode(response)
+		if not data then error("Invalid JSON") end
+
+		return tonumber(data.universeId)
+	end)
+
+	if ok and result then return result end
+
+	warn("[LPT HUB] UniverseId Error:", tostring(result))
+	return nil
+end
+
+local function containsId(list, id)
+	if not id or type(list) ~= "table" then return false end
+
+	local target = tonumber(id)
+
+	for _, value in ipairs(list) do
+		if tonumber(value) == target then return true end
+	end
+
+	return false
+end
+
+local function findGameConfig(placeId, universeId)
+	for configKey, config in pairs(GAME_CONFIG) do
+		if type(config) ~= "table" then continue end
+
+		if containsId(config.PlaceId, placeId) then
+			return config, "PlaceId", configKey
+		end
+
+		if containsId(config.UniverseId, universeId) then
+			return config, "UniverseId", configKey
+		end
+	end
+
+	return nil, nil, nil
+end
+
+local function resolveGame()
+	State.PlaceId = tonumber(game.PlaceId)
+
+	if not State.PlaceId or State.PlaceId <= 0 then
+		return false, "Không lấy được PlaceId."
+	end
+
+	setStatus("PlaceId: " .. tostring(State.PlaceId) .. " • Đang nhận diện...", COLORS.Info)
+	showNotification("Detecting Game", "Đang lấy PlaceId và UniverseId...", "info")
+
+	task.wait(.25)
+
+	State.UniverseId = getUniverseId(State.PlaceId)
+
+	if State.UniverseId then
+		setStatus("UniverseId: " .. tostring(State.UniverseId) .. " • Đang tìm game...", COLORS.Info)
+	else
+		setStatus("Không lấy được UniverseId • Kiểm tra PlaceId...", COLORS.Warning)
+	end
+
+	task.wait(.2)
+
+	local gameConfig, matchType, configKey = findGameConfig(State.PlaceId, State.UniverseId)
+
+	if not gameConfig then
+		State.GameSupported = false
+		State.GameConfig = nil
+		State.MainUI = nil
+		return false, "Game không được hỗ trợ."
+	end
+
+	if type(gameConfig) ~= "table" then
+		return false, "Config game không hợp lệ."
+	end
+
+	local gameName = gameConfig.Name or gameConfig.name or configKey or "Unknown Game"
+	local mainUI = gameConfig.MainUI or gameConfig.mainUI or gameConfig.URL or gameConfig.url
+
+	if type(mainUI) ~= "string" or mainUI == "" then
+		return false, "Game đã nhận diện nhưng chưa có MainUI."
+	end
+
+	State.GameName = tostring(gameName)
+	State.GameConfig = gameConfig
+	State.MainUI = mainUI
+	State.GameSupported = true
+
+	setStatus("Đã nhận diện: " .. State.GameName, COLORS.Success)
+	showNotification("Game Detected", State.GameName .. " • " .. tostring(matchType), "success")
+
+	print("[LPT HUB] Game:", State.GameName)
+	print("[LPT HUB] Match:", matchType)
+	print("[LPT HUB] PlaceId:", State.PlaceId)
+	print("[LPT HUB] UniverseId:", State.UniverseId)
+
+	return true
+end
+
+--============================================================
+-- DATA LOADED
+--============================================================
+
+local function waitForGameData(config)
+	if type(config) ~= "table" or config.WaitForDataLoaded ~= true then
+		print("[LPT HUB] DataLoaded: Not Required")
+		return true
+	end
+
+	print("[LPT HUB] DataLoaded: Waiting...")
+	setStatus("Đang chờ dữ liệu game...", COLORS.Info)
+
+	local dataLoaded = player:FindFirstChild("DataLoaded")
+
+	if not dataLoaded then
+		local ok, result = pcall(function()
+			return player:WaitForChild("DataLoaded", 30)
+		end)
+
+		if not ok or not result then
+			warn("[LPT HUB] DataLoaded không tồn tại.")
+			return false
+		end
+
+		dataLoaded = result
+	end
+
+	if dataLoaded:IsA("BoolValue") then
+		local timeout = os.clock() + 30
+
+		while not dataLoaded.Value and os.clock() < timeout do
+			task.wait(.2)
+		end
+
+		if dataLoaded.Value then
+			print("[LPT HUB] DataLoaded = true")
+			return true
+		end
+
+		warn("[LPT HUB] DataLoaded timeout.")
+		return false
+	end
+
+	warn("[LPT HUB] DataLoaded không phải BoolValue:", dataLoaded.ClassName)
+	return true
+end
+
+--============================================================
+-- LOAD MAIN UI
+--============================================================
+
+local function loadMainUI()
+	if State.Loading then return end
+
+	State.Loading = true
+	keyFrame.Visible = true
+
+	setStatus("KEY hợp lệ • Đang nhận diện game...", COLORS.Success)
+	task.wait(.25)
+
+	local resolved, resolveError = resolveGame()
+
+	if not resolved then
+		keyFrame.Visible = true
+		setStatus(resolveError, COLORS.Danger)
+		showNotification("Game Not Supported", resolveError, "error")
+		State.Loading = false
 		return
 	end
 
-	loadingMain = true
+	task.wait(.4)
 
-	keyStatus.TextColor3 = COLORS.Success
-	keyStatus.Text = "Key hợp lệ! Đang mở..."
+	if not waitForGameData(State.GameConfig) then
+		keyFrame.Visible = true
+		setStatus("Game chưa sẵn sàng.", COLORS.Danger)
+		showNotification("Game Loading", "DataLoaded chưa hoàn tất.", "error")
+		State.Loading = false
+		return
+	end
 
-	-- Lưu key lại để lần sau tự động điền
-	saveKey(keyInput.Text)
+	setStatus("Đang tải MainUI...", COLORS.Info)
+	showNotification("Loading UI", "Đang tải " .. State.GameName .. "...", "info")
+	task.wait(.25)
 
-	task.wait(0.4)
+	local ok, result = pcall(function()
+		local response = game:HttpGet(State.MainUI)
 
-	keyFrame.Visible = false
+		if not response or response == "" then
+			error("MainUI trả về dữ liệu rỗng.")
+		end
 
-	local success, result = pcall(function()
-		local response = game:HttpGet(MAIN_UI)
 		local mainFunction = loadstring(response)
 
 		if type(mainFunction) ~= "function" then
-			error("MainUI.lua không trả về một function hợp lệ.")
+			error("MainUI không trả về function.")
 		end
 
 		return mainFunction()
 	end)
 
-	if not success then
+	if not ok then
 		keyFrame.Visible = true
-		keyStatus.TextColor3 = COLORS.Danger
-		keyStatus.Text = "Không thể tải Main UI."
-
-		warn("[LPT KeyUI] MainUI error:", result)
-		loadingMain = false
+		setStatus("Không thể tải MainUI.", COLORS.Danger)
+		showNotification("MainUI Error", tostring(result), "error")
+		warn("[LPT HUB] MainUI Error:", result)
+		State.Loading = false
+		return
 	end
+
+	setStatus("Đã tải " .. State.GameName, COLORS.Success)
+	showNotification("LPT HUB", "Đã tải UI: " .. State.GameName, "success")
+
+	task.wait(.25)
+
+	keyFrame.Visible = false
+	State.Loading = false
+
+	print("[LPT HUB] MainUI loaded:", State.GameName)
 end
 
---// ============================================================
---// SUBMIT FUNCTION
---// ============================================================
-
-local submitting = false
+--============================================================
+-- SUBMIT KEY
+--============================================================
 
 local function attemptSubmit()
-	if submitting then
-		return
-	end
+	if State.Submitting or State.Loading then return end
 
-	submitting = true
+	State.Submitting = true
 
-	local key = keyInput.Text
+	local key = tostring(keyInput.Text or "")
+	key = key:gsub("^%s+", ""):gsub("%s+$", "")
 
 	if key == "" then
-		keyStatus.TextColor3 = COLORS.Danger
-		keyStatus.Text = "Vui lòng nhập key."
-		submitting = false
+		setStatus("Vui lòng nhập KEY.", COLORS.Danger)
+		State.Submitting = false
 		return
 	end
 
-	if checkKey(key) then
-		showNotification(
-			"Key Valid!",
-			"Key hợp lệ, đang mở...",
-			"success"
-		)
+	setStatus("Đang xác thực KEY...", COLORS.Info)
+	task.wait(.2)
 
-		submitting = false
-		openMainUI()
-	else
-		keyStatus.TextColor3 = COLORS.Danger
-		keyStatus.Text = "Key không đúng, thử lại."
+	if not checkKey(key) then
+		setStatus("KEY không đúng, thử lại.", COLORS.Danger)
+		showNotification("Invalid Key", "KEY không hợp lệ.", "error")
 
-		tween(
-			keyInputStroke,
-			{
-				Color = COLORS.Danger,
-				Transparency = 0,
-			},
-			0.1
-		)
+		tween(inputStroke, {Color = COLORS.Danger, Transparency = 0}, .1)
+		task.wait(.15)
+		tween(inputStroke, {Color = COLORS.Border, Transparency = .15}, .2)
 
-		task.wait(0.15)
-
-		tween(
-			keyInputStroke,
-			{
-				Color = COLORS.Border,
-				Transparency = 0.15,
-			},
-			0.2
-		)
-
-		submitting = false
+		State.Submitting = false
+		return
 	end
+
+	State.KeyValid = true
+	saveKey(key)
+
+	showNotification("Key Valid!", "KEY hợp lệ. Đang nhận diện game...", "success")
+	setStatus("KEY hợp lệ! Đang nhận diện game...", COLORS.Success)
+
+	State.Submitting = false
+	loadMainUI()
 end
+
+--============================================================
+-- EVENTS
+--============================================================
 
 submitButton.MouseButton1Click:Connect(attemptSubmit)
 
 keyInput.FocusLost:Connect(function(enterPressed)
-	if enterPressed then
-		attemptSubmit()
-	end
+	if enterPressed then attemptSubmit() end
 end)
+
+--============================================================
+-- LOAD SAVED KEY
+--============================================================
 
 task.spawn(function()
 	local savedKey = getSavedKey()
 
-	if savedKey and savedKey ~= "" then
-		task.wait(0.3)
-
-		keyInput.Text = savedKey
-		keyStatus.TextColor3 = COLORS.TextDim
-		keyStatus.Text = "Đang xác thực key..."
-
-		task.wait(0.4)
-		attemptSubmit()
+	if not savedKey or savedKey == "" then
+		print("[LPT HUB] No saved key.")
+		return
 	end
+
+	task.wait(.4)
+
+	keyInput.Text = savedKey
+	setStatus("Đang xác thực KEY đã lưu...", COLORS.Info)
+
+	task.wait(.4)
+	attemptSubmit()
 end)
+
+print("[LPT HUB] KeyUI started.")
+print("[LPT HUB] PlaceId:", game.PlaceId)
+print("[LPT HUB] Waiting for valid key...")
