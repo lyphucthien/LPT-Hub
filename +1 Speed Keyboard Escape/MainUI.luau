@@ -2233,7 +2233,6 @@ local buttons = {}
 
 local function createSidebarButton(
 	text,
-	icon,
 	order,
 	pageName,
 	accentColor
@@ -2260,19 +2259,9 @@ local function createSidebarButton(
 	corner.CornerRadius = UDim.new(0, 12)
 	corner.Parent = button
 
-	local iconLabel = Instance.new("TextLabel")
-	iconLabel.Size = UDim2.new(0, 32, 1, 0)
-	iconLabel.Position = UDim2.new(0, 14, 0, 0)
-	iconLabel.BackgroundTransparency = 1
-	iconLabel.Text = icon
-	iconLabel.TextColor3 = COLORS.TextDim
-	iconLabel.TextSize = 17
-	iconLabel.Font = Enum.Font.Gotham
-	iconLabel.Parent = button
-
 	local textLabel = Instance.new("TextLabel")
-	textLabel.Size = UDim2.new(1, -55, 1, 0)
-	textLabel.Position = UDim2.new(0, 48, 0, 0)
+	textLabel.Size = UDim2.new(1, -32, 1, 0)
+	textLabel.Position = UDim2.new(0, 18, 0, 0)
 	textLabel.BackgroundTransparency = 1
 	textLabel.Text = text
 	textLabel.TextColor3 = COLORS.TextDim
@@ -2327,13 +2316,6 @@ local function createSidebarButton(
 			data.indicator.Visible = false
 
 			tween(
-				data.icon,
-				{
-					TextColor3 = COLORS.TextDim,
-				}
-			)
-
-			tween(
 				data.label,
 				{
 					TextColor3 = COLORS.TextDim,
@@ -2357,13 +2339,6 @@ local function createSidebarButton(
 		indicator.Visible = true
 
 		tween(
-			iconLabel,
-			{
-				TextColor3 = accentColor,
-			}
-		)
-
-		tween(
 			textLabel,
 			{
 				TextColor3 = COLORS.Text,
@@ -2376,7 +2351,6 @@ local function createSidebarButton(
 	buttons[pageName] = {
 		button = button,
 		indicator = indicator,
-		icon = iconLabel,
 		label = textLabel,
 		accent = accentColor,
 	}
@@ -2384,20 +2358,9 @@ local function createSidebarButton(
 	return button
 end
 
-createSidebarButton("Server",
-	1,
-	"Server",COLORS.PageServer
-)
-
-createSidebarButton("Auto Win",
-	2,
-	"AutoWin",COLORS.PageServer
-)
-
-createSidebarButton("Movement",
-	3,
-	"Movement",COLORS.PageFarm
-)
+createSidebarButton("Server", 1, "Server", COLORS.PageServer)
+createSidebarButton("Auto Win", 2, "AutoWin", COLORS.PageServer)
+createSidebarButton("Movement", 3, "Movement", COLORS.PageFarm)
 
 currentPage = "Server"
 
@@ -2407,7 +2370,6 @@ movementPage.Visible = false
 
 buttons["Server"].button.BackgroundTransparency = 0.1
 buttons["Server"].indicator.Visible = true
-buttons["Server"].icon.TextColor3 = COLORS.PageServer
 buttons["Server"].label.TextColor3 = COLORS.Text
 
 close.MouseButton1Click:Connect(function()
