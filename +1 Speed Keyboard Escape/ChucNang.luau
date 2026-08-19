@@ -874,10 +874,6 @@ local function findByWinValue(
 				winValue
 			)
 
-		--================================================
-		-- Object name
-		--================================================
-
 		if parseWinValue(
 			object.Name
 		) == winValue then
@@ -927,21 +923,13 @@ local function findByWinValue(
 			object:GetDescendants()
 		) do
 
-			if descendant:IsA(
-				"TextLabel"
-			)
-			or descendant:IsA(
-				"TextButton"
-			)
-			or descendant:IsA(
-				"TextBox"
-			)
+			if descendant:IsA("TextLabel")
+			or descendant:IsA("TextButton")
+			or descendant:IsA("TextBox")
+
 			then
 
-				local text =
-					tostring(
-						descendant.Text
-					)
+				local text = tostring(descendant.Text)
 
 				if parseWinValue(text)
 					== winValue
@@ -971,20 +959,12 @@ local function findByWinValue(
 			end
 		end
 
-		--================================================
-		-- Must belong to correct stage if possible
-		--================================================
-
 		if belongsToStage(
 			object,
 			stageNumber
 		) then
 			score += 7000
 		end
-
-		--================================================
-		-- Reject NPC target
-		--================================================
 
 		if isBadNPCName(
 			object.Name
@@ -997,10 +977,6 @@ local function findByWinValue(
 		then
 			score -= 5000
 		end
-
-		--================================================
-		-- Best
-		--================================================
 
 		if score > bestScore then
 			bestScore = score
@@ -1142,9 +1118,7 @@ function Module.RefreshTargets()
 		end
 	end
 
-	State.TargetCache =
-		targets
-
+	State.TargetCache = targets
 	State.Scanning = false
 
 	local count = 0
@@ -1155,12 +1129,8 @@ function Module.RefreshTargets()
 
 	print("----------------------------------------")
 
-	print(
-		("Found %d / %d Win targets")
-		:format(
-			count,
-			#WIN_STAGES
-		)
+	print(("Found %d / %d Win targets")
+		:format(count,#WIN_STAGES)
 	)
 
 	print("========================================")
@@ -1291,42 +1261,24 @@ function Module.IsFlying()
 end
 
 --========================================================
--- FLY TO PART
+-- FLY TO PART - STABLE
 --========================================================
 
-function Module.FlyToPart(
-	part,
-	stageNumber
-)
+function Module.FlyToPart(part)
 
 	if not isBasePart(part) then
-
-		warn(
-			"[FLY] Invalid target"
-		)
-
-		return false,
-			"Invalid target"
+		warn("[FLY] Invalid target")
+		return false, "Invalid target"
 	end
 
 	if State.Flying then
-
-		warn(
-			"[FLY] Already flying"
-		)
-
-		return false,
-			"Already flying"
+		warn("[FLY] Already flying")
+		return false, "Already flying"
 	end
 
-	local character =
-		getCharacter()
-
-	local root =
-		getRoot()
-
-	local humanoid =
-		getHumanoid()
+	local character = getCharacter()
+	local root = getRoot()
+	local humanoid = getHumanoid()
 
 	if not character then
 		return false, "Character nil"
@@ -1341,41 +1293,31 @@ function Module.FlyToPart(
 	end
 
 	if not part.Parent then
-		return false,
-			"Target disappeared"
+		return false, "Target disappeared"
 	end
 
 	State.Flying = true
 	State.CurrentTarget = part
-	State.CurrentStage = stageNumber
 
 	print("========================================")
 	print("[FLY] START")
-	print("[FLY] Stage:", stageNumber or "?")
 	print("[FLY] Target:", part:GetFullName())
 	print("[FLY] Player:", root.Position)
 	print("[FLY] Target:", part.Position)
-	print(
-		"[FLY] Distance:",
-		(root.Position - part.Position).Magnitude
-	)
-	print("[FLY] Speed:", State.FlySpeed)
+	print("[FLY] Distance:",(root.Position - part.Position).Magnitude)
 	print("========================================")
 
-	local oldAutoRotate =
-		humanoid.AutoRotate
-
-	local oldPlatformStand =
-		humanoid.PlatformStand
+	local oldAutoRotate = humanoid.AutoRotate
+	local oldPlatformStand = humanoid.PlatformStand
+	local oldWalkSpeed = humanoid.WalkSpeed
 
 	humanoid.AutoRotate = false
 	humanoid.PlatformStand = true
 
-	local started =
-		os.clock()
-
-	local reached =
-		false
+	local started = os.clock()
+	local reached = false
+	local lastDistance = math.huge
+	local stuckTime = 0
 
 	while
 		State.Flying
@@ -1385,6 +1327,10 @@ function Module.FlyToPart(
 		and os.clock() - started < FLY_TIMEOUT
 	do
 
+		--================================================
+		-- TARGET POSITION
+		--================================================
+
 		local destination =
 			getTargetPosition(part)
 
@@ -1392,14 +1338,9 @@ function Module.FlyToPart(
 			break
 		end
 
-		local current =
-			root.Position
-
-		local offset =
-			destination - current
-
-		local distance =
-			offset.Magnitude
+		local current = root.Position
+		local offset = destination - current
+		local distance = offset.Magnitude
 
 		--================================================
 		-- ARRIVED
@@ -1408,8 +1349,18 @@ function Module.FlyToPart(
 		if distance <= ARRIVAL_DISTANCE then
 
 			reached = true
+
+			print(
+				("[FLY] Arrived. Distance: %.2f")
+				:format(distance)
+			)
+
 			break
 		end
+
+		--================================================
+		-- WAIT
+		--================================================
 
 		local dt =
 			RunService.Heartbeat:Wait()
@@ -1426,7 +1377,7 @@ function Module.FlyToPart(
 		end
 
 		--================================================
-		-- MOVE
+		-- FLY SPEED
 		--================================================
 
 		local speed =
@@ -1441,31 +1392,79 @@ function Module.FlyToPart(
 				speed * dt
 			)
 
-		if offset.Magnitude > 0 then
+		--================================================
+		-- MOVE
+		--================================================
+
+		if offset.Magnitude > 0.001 then
 
 			local nextPosition =
 				current
-				+ offset.Unit
-				* step
+				+ offset.Unit * step
 
-			local lookCFrame =
-				CFrame.lookAt(
-					nextPosition,
-					destination
+			root.CFrame =
+				CFrame.new(
+					nextPosition
 				)
 
-			pcall(function()
+			root.AssemblyLinearVelocity = Vector3.zero
+			root.AssemblyAngularVelocity = Vector3.zero
+		end
+
+		--================================================
+		-- MAINTAIN HUMANOID
+		--================================================
+
+		pcall(function()
+			humanoid.PlatformStand = true
+			humanoid.AutoRotate = false
+			humanoid.WalkSpeed = State.WalkSpeed
+
+			root.AssemblyLinearVelocity = Vector3.zero
+			root.AssemblyAngularVelocity = Vector3.zero
+
+		end)
+
+		--================================================
+		-- DETECT SERVER RESET
+		--================================================
+
+		local newDistance =
+			(root.Position - destination).Magnitude
+
+		if newDistance >= lastDistance - 0.01 then
+
+			stuckTime += dt
+		else
+			stuckTime = 0
+		end
+
+		lastDistance = newDistance
+
+		if stuckTime > 3 then
+
+			warn(
+				"[FLY] Server may be resetting character position."
+			)
+
+			-- thử teleport lại gần target
+			local direction =
+				(destination - root.Position)
+
+			if direction.Magnitude > 0 then
+
+				local emergencyPosition =
+					destination
+					- direction.Unit * 5
 
 				root.CFrame =
-					lookCFrame
+					CFrame.new(
+						emergencyPosition
+					)
 
-				root.AssemblyLinearVelocity =
-					Vector3.zero
+			end
 
-				root.AssemblyAngularVelocity =
-					Vector3.zero
-
-			end)
+			stuckTime = 0
 		end
 	end
 
@@ -1484,12 +1483,7 @@ function Module.FlyToPart(
 
 		if finalPosition then
 
-			print(
-				"[FLY] Locking final position:",
-				finalPosition
-			)
-
-			for _ = 1, 12 do
+			for _ = 1, 10 do
 
 				if not State.Flying then
 					break
@@ -1501,20 +1495,11 @@ function Module.FlyToPart(
 					break
 				end
 
-				pcall(function()
+				root.CFrame = CFrame.new(finalPosition)
 
-					root.CFrame =
-						CFrame.new(
-							finalPosition
-						)
+				root.AssemblyLinearVelocity = Vector3.zero
 
-					root.AssemblyLinearVelocity =
-						Vector3.zero
-
-					root.AssemblyAngularVelocity =
-						Vector3.zero
-
-				end)
+				root.AssemblyAngularVelocity = Vector3.zero
 
 				RunService.Heartbeat:Wait()
 			end
@@ -1522,42 +1507,36 @@ function Module.FlyToPart(
 	end
 
 	--====================================================
-	-- RESTORE HUMANOID
+	-- RESTORE
 	--====================================================
 
 	if humanoid.Parent then
 
 		pcall(function()
 
-			humanoid.AutoRotate =
-				oldAutoRotate
+			humanoid.AutoRotate = oldAutoRotate
+			humanoid.PlatformStand = oldPlatformStand
+			humanoid.WalkSpeed = State.WalkSpeed
 
-			humanoid.PlatformStand =
-				oldPlatformStand
-
-			humanoid:ChangeState(
-				Enum.HumanoidStateType.GettingUp
-			)
+			humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
 
 		end)
 	end
 
-	State.Flying = false
-	State.CurrentTarget = nil
-	State.CurrentStage = nil
+	State.Flying =
+		false
+
+	State.CurrentTarget =
+		nil
 
 	if reached then
 
-		print(
-			"[FLY] SUCCESS"
-		)
+		print("[FLY] SUCCESS")
 
 		return true
 	end
 
-	warn(
-		"[FLY] FAILED"
-	)
+	warn("[FLY] FAILED")
 
 	return false,
 		"Could not reach target"
@@ -1898,14 +1877,10 @@ Connections.CharacterAdded =
 				)
 
 			if humanoid then
-
 				task.wait(0.15)
 
 				applyCharacterSettings()
-
-				connectHumanoidSettings(
-					humanoid
-				)
+				connectHumanoidSettings(humanoid)
 
 				if State.NoClip then
 
@@ -1941,7 +1916,6 @@ Connections.CharacterAppearance =
 			if State.NoClip
 				and character
 			then
-
 				rememberCollision(character)
 			end
 		end)
@@ -1959,7 +1933,6 @@ task.defer(function()
 	local humanoid = getHumanoid()
 
 	if humanoid then
-
 		connectHumanoidSettings(humanoid)
 	end
 
@@ -1968,7 +1941,6 @@ task.defer(function()
 	if State.NoClip
 		and character
 	then
-
 		rememberCollision(character)
 	end
 end)
@@ -1999,16 +1971,10 @@ function Module.GetState()
 	}
 end
 
---========================================================
--- DESTROY
---========================================================
-
 function Module.Destroy()
 
 	State.Flying = false
-
 	State.CurrentTarget = nil
-
 	State.CurrentStage = nil
 
 	for name, connection in pairs(
