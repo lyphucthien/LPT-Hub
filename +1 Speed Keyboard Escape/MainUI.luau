@@ -1039,7 +1039,7 @@ local function createPage(name)
 	return page
 end
 
-local serverPage=createPage("Server")
+local informationPage=createPage("Information")
 local autoWinPage=createPage("AutoWin")
 local movementPage=createPage("Movement")
 
@@ -1474,13 +1474,48 @@ local function createNumberControl(parent,titleText,yPos,defaultValue,minValue,m
 end
 
 --========================================================
--- SERVER
+-- INFORMATION
 --========================================================
 
-createPageTitle(serverPage,"Server","Server info & tools")
-createCard(serverPage,95,"Server","Manage server information here.",90,COLORS.PageServer)
-serverPage.CanvasSize=UDim2.new(0,0,0,220)
+createPageTitle(informationPage,"Information","Thông tin về LPT Hub và các chức năng hiện tại.")
 
+createCard(
+	informationPage,
+	95,
+	"LPT Hub",
+	"Hub hỗ trợ Auto Win, Movement và các thiết lập tiện ích.",
+	90,
+	COLORS.Accent
+)
+
+createCard(
+	informationPage,
+	195,
+	"Author",
+	"Ly Phuc Thien\nLPT Hub",
+	80,
+	COLORS.PageFarm
+)
+
+createCard(
+	informationPage,
+	285,
+	"Features",
+	"• Auto Win — chọn Stage để tự động bay tới target.\n• Movement — Walk Speed, Jump Power, Fly Speed, Fly Height.\n• Infinite Jump — nhảy không giới hạn.\n• No Clip — đi xuyên vật thể.",
+	105,
+	COLORS.PageServer
+)
+
+createCard(
+	informationPage,
+	400,
+	"Status",
+	"Movement module: Loaded\nAuto Win: Ready\nUI: Active",
+	90,
+	COLORS.Online
+)
+
+informationPage.CanvasSize=UDim2.new(0,0,0,520)
 --========================================================
 -- AUTO WIN
 --========================================================
@@ -1806,18 +1841,18 @@ local function createSidebarButton(text,order,pageName,accentColor)
 	return button
 end
 
-createSidebarButton("Server",1,"Server",COLORS.PageServer)
+createSidebarButton("Information",1,"Information",COLORS.Accent)
 createSidebarButton("Auto Win",2,"AutoWin",COLORS.PageServer)
 createSidebarButton("Movement",3,"Movement",COLORS.PageFarm)
 
-currentPage="Server"
-serverPage.Visible=true
+currentPage="Information"
+informationPage.Visible=true
 autoWinPage.Visible=false
 movementPage.Visible=false
 
-buttons["Server"].button.BackgroundTransparency=0.1
-buttons["Server"].indicator.Visible=true
-buttons["Server"].label.TextColor3=COLORS.Text
+buttons["Information"].button.BackgroundTransparency=0.1
+buttons["Information"].indicator.Visible=true
+buttons["Information"].label.TextColor3=COLORS.Text
 
 --========================================================
 -- CLOSE
