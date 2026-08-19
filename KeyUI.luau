@@ -5,10 +5,6 @@ local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
---============================================================
--- CONFIG
---============================================================
-
 local GET_KEY_LINK = "https://link4sub.com/owycAYxKdu"
 local KEY_FILE = "LPT_Hub_Key.txt"
 
@@ -16,7 +12,7 @@ local VALID_KEYS = {
 	["LPT-HUB"] = true,
 }
 
-local GAME_CONFIG = {
+local GAME_HO_TRO = {
 	["+1 Speed Keyboard Escape"] = {
 		Name = "+1 Speed Keyboard Escape",
 		PlaceId = {95082159892680},
@@ -43,7 +39,7 @@ local State = {
 }
 
 --============================================================
--- COLORS
+-- Màu
 --============================================================
 
 local COLORS = {
@@ -81,7 +77,7 @@ local function applyGradient(obj, a, b, rotation)
 end
 
 --============================================================
--- KEY STORAGE
+-- Nơi Lưu KEY
 --============================================================
 
 local function getSavedKey()
@@ -117,10 +113,11 @@ screenGui.Name = "LPTKeyUI"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.IgnoreGuiInset = true
+screenGui.DisplayOrder = 999999
 screenGui.Parent = playerGui
 
 --============================================================
--- NOTIFICATION SYSTEM
+-- Thông Báo Góc Phải
 --============================================================
 
 local notificationHolder = Instance.new("Frame")
@@ -128,7 +125,7 @@ notificationHolder.Name = "NotificationHolder"
 notificationHolder.Size = UDim2.fromScale(1,1)
 notificationHolder.BackgroundTransparency = 1
 notificationHolder.BorderSizePixel = 0
-notificationHolder.ZIndex = 100
+notificationHolder.ZIndex = 101
 notificationHolder.Parent = screenGui
 
 local activeNotifications = {}
@@ -528,7 +525,7 @@ local function containsId(list, id)
 end
 
 local function findGameConfig(placeId, universeId)
-	for configKey, config in pairs(GAME_CONFIG) do
+	for configKey, config in pairs(GAME_HO_TRO) do
 		if type(config) ~= "table" then continue end
 
 		if containsId(config.PlaceId, placeId) then
@@ -593,11 +590,6 @@ local function resolveGame()
 	setStatus("Đã nhận diện: " .. State.GameName, COLORS.Success)
 	showNotification("Game Detected", State.GameName .. " • " .. tostring(matchType), "success")
 
-	print("[LPT HUB] Game:", State.GameName)
-	print("[LPT HUB] Match:", matchType)
-	print("[LPT HUB] PlaceId:", State.PlaceId)
-	print("[LPT HUB] UniverseId:", State.UniverseId)
-
 	return true
 end
 
@@ -607,11 +599,9 @@ end
 
 local function waitForGameData(config)
 	if type(config) ~= "table" or config.WaitForDataLoaded ~= true then
-		print("[LPT HUB] DataLoaded: Not Required")
 		return true
 	end
 
-	print("[LPT HUB] DataLoaded: Waiting...")
 	setStatus("Đang chờ dữ liệu game...", COLORS.Info)
 
 	local dataLoaded = player:FindFirstChild("DataLoaded")
@@ -637,7 +627,6 @@ local function waitForGameData(config)
 		end
 
 		if dataLoaded.Value then
-			print("[LPT HUB] DataLoaded = true")
 			return true
 		end
 
@@ -718,8 +707,6 @@ local function loadMainUI()
 
 	keyFrame.Visible = false
 	State.Loading = false
-
-	print("[LPT HUB] MainUI loaded:", State.GameName)
 end
 
 --============================================================
@@ -783,7 +770,6 @@ task.spawn(function()
 	local savedKey = getSavedKey()
 
 	if not savedKey or savedKey == "" then
-		print("[LPT HUB] No saved key.")
 		return
 	end
 
@@ -795,7 +781,3 @@ task.spawn(function()
 	task.wait(.4)
 	attemptSubmit()
 end)
-
-print("[LPT HUB] KeyUI started.")
-print("[LPT HUB] PlaceId:", game.PlaceId)
-print("[LPT HUB] Waiting for valid key...")
