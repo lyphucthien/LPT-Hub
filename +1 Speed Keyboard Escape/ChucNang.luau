@@ -514,15 +514,26 @@ function Module.RefreshTargets()
 	end
 
 	State.Scanning=true
+
 	table.clear(State.TargetCache)
 	table.clear(State.StageTargetCache)
 	table.clear(State.StageContainerCache)
 
+	-- Find all stage containers first.
 	for _,info in ipairs(WIN_STAGES) do
-		local container=findStageContainer(info.stage)
+		findStageContainer(info.stage)
+	end
+
+	-- Find exactly one target inside each exact Stage.
+	for _,info in ipairs(WIN_STAGES) do
+		local container=State.StageContainerCache[info.stage]
 
 		if container then
-			local target=findTargetInStage(container,info.stage,info.value)
+			local target=findTargetInStage(
+				container,
+				info.stage,
+				info.value
+			)
 
 			if isBasePart(target) then
 				State.StageTargetCache[info.stage]=target
@@ -532,6 +543,7 @@ function Module.RefreshTargets()
 	end
 
 	State.Scanning=false
+
 	return State.StageTargetCache
 end
 
@@ -758,16 +770,21 @@ end
 
 function Module.FlyToStage(stageNumber)
 	stageNumber=tonumber(stageNumber)
-	if not stageNumber then return false,"Invalid stage" end
+
+	if not stageNumber then
+		return false,"Invalid stage"
+	end
 
 	local stageInfo=Module.GetStage(stageNumber)
-	if not stageInfo then return false,"Stage does not exist" end
+
+	if not stageInfo then
+		return false,"Stage does not exist"
+	end
 
 	local target=State.StageTargetCache[stageNumber]
 
 	if not isBasePart(target) then
-		Module.RefreshTargets()
-		target=State.StageTargetCache[stageNumber]
+		target=Module.GetTarget(stageInfo.value)
 	end
 
 	if not isBasePart(target) then
@@ -783,7 +800,10 @@ end
 
 function Module.FlyToWin(winAmount)
 	winAmount=tonumber(winAmount)
-	if not winAmount then return false,"Invalid Win amount" end
+
+	if not winAmount then
+		return false,"Invalid Win amount"
+	end
 
 	for _,info in ipairs(WIN_STAGES) do
 		if info.value==winAmount then
