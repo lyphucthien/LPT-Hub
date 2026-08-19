@@ -129,7 +129,7 @@ notificationHolder.ZIndex = 101
 notificationHolder.Parent = screenGui
 
 local activeNotifications = {}
-local NOTIFICATION_WIDTH, NOTIFICATION_HEIGHT, NOTIFICATION_GAP = 310, 74, 10
+local NOTIFICATION_WIDTH, NOTIFICATION_HEIGHT, NOTIFICATION_GAP = 340, 82, 10
 local RIGHT_MARGIN, BOTTOM_MARGIN = 20, 20
 
 local function notificationPosition(index)
@@ -212,20 +212,20 @@ local function showNotification(titleText, messageText, notificationType)
 	title.BackgroundTransparency = 1
 	title.Text = titleText
 	title.TextColor3 = COLORS.Text
-	title.TextSize = 13
+	title.TextSize = 15
 	title.Font = Enum.Font.GothamBold
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.ZIndex = 102
 	title.Parent = notification
 
 	local message = Instance.new("TextLabel")
-	message.Size = UDim2.new(1,-62,0,30)
-	message.Position = UDim2.fromOffset(55,32)
+	message.Size = UDim2.new(1,-70,0,38)
+	message.Position = UDim2.fromOffset(55,34)
 	message.BackgroundTransparency = 1
 	message.Text = messageText
 	message.TextColor3 = COLORS.TextDim
-	message.TextSize = 11
-	message.Font = Enum.Font.Gotham
+	message.TextSize = 14
+	message.Font = Enum.Font.GothamMedium
 	message.TextWrapped = true
 	message.TextXAlignment = Enum.TextXAlignment.Left
 	message.TextYAlignment = Enum.TextYAlignment.Top
