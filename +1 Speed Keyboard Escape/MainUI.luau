@@ -1,29 +1,29 @@
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local HttpService = game:GetService("HttpService")
-local RunService = game:GetService("RunService")
+local Players=game:GetService("Players")
+local UserInputService=game:GetService("UserInputService")
+local TweenService=game:GetService("TweenService")
+local HttpService=game:GetService("HttpService")
+local RunService=game:GetService("RunService")
 
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-local MOVEMENT_MODULE_URL = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/%2B1%20Speed%20Keyboard%20Escape/ChucNang.luau"
+local player=Players.LocalPlayer
+local playerGui=player:WaitForChild("PlayerGui")
+local MOVEMENT_MODULE_URL="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/%2B1%20Speed%20Keyboard%20Escape/ChucNang.luau"
 
-local Movement = nil
-local movementLoadError = nil
+local Movement=nil
+local movementLoadError=nil
 
 --========================================================
 -- LOCAL FALLBACK MOVEMENT MODULE
 --========================================================
 
-local LOCAL_MOVEMENT_SOURCE = [[
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
+local LOCAL_MOVEMENT_SOURCE=[[
+local Players=game:GetService("Players")
+local UserInputService=game:GetService("UserInputService")
+local RunService=game:GetService("RunService")
 
-local LocalPlayer = Players.LocalPlayer
-local Module = {}
+local LocalPlayer=Players.LocalPlayer
+local Module={}
 
-local WIN_STAGES = {
+local WIN_STAGES={
 	{stage=1,value=1,text="Stage 1 (+1 Win)"},
 	{stage=2,value=3,text="Stage 2 (+3 Wins)"},
 	{stage=3,value=10,text="Stage 3 (+10 Wins)"},
@@ -41,7 +41,7 @@ local WIN_STAGES = {
 	{stage=15,value=150000,text="Stage 15 (+150K Wins)"},
 }
 
-local State = {
+local State={
 	WalkSpeed=16,
 	JumpPower=50,
 	InfiniteJump=false,
@@ -57,11 +57,11 @@ local State = {
 	Scanning=false,
 }
 
-local Connections = {}
-local OriginalCollision = {}
+local Connections={}
+local OriginalCollision={}
 
 local function disconnect(name)
-	local connection = Connections[name]
+	local connection=Connections[name]
 	if connection then
 		pcall(function() connection:Disconnect() end)
 		Connections[name]=nil
@@ -227,7 +227,6 @@ local function scoreTarget(part,stageNumber)
 	end
 
 	score+=belongsToStage(part,stageNumber) and 30000 or -30000
-
 	if hasInteractiveObject(part) then score+=30000 end
 	if isBadName(part.Name) then score-=100000 end
 
@@ -364,6 +363,7 @@ function Module.FlyToPart(part,stageNumber)
 
 	local oldAutoRotate=humanoid.AutoRotate
 	local oldPlatformStand=humanoid.PlatformStand
+
 	humanoid.AutoRotate=false
 	humanoid.PlatformStand=true
 
@@ -526,6 +526,7 @@ function Module.SetNoClip(enabled)
 	State.NoClip=enabled==true
 
 	local character=getCharacter()
+
 	if State.NoClip then
 		if character then rememberCollision(character) end
 	else
@@ -565,9 +566,11 @@ Connections.CharacterAdded=LocalPlayer.CharacterAdded:Connect(function(character
 	table.clear(State.StageContainerCache)
 
 	local humanoid=character:WaitForChild("Humanoid",10)
+
 	if humanoid then
 		task.wait(0.15)
 		applyCharacterSettings()
+
 		if State.NoClip then rememberCollision(character) end
 	end
 end)
@@ -579,8 +582,11 @@ end)
 
 function Module.GetState()
 	local found=0
+
 	for _,info in ipairs(WIN_STAGES) do
-		if isBasePart(State.StageTargetCache[info.stage]) then found+=1 end
+		if isBasePart(State.StageTargetCache[info.stage]) then
+			found+=1
+		end
 	end
 
 	return {
@@ -754,6 +760,7 @@ mainStroke.Color=COLORS.Border
 mainStroke.Thickness=1.5
 mainStroke.Transparency=0.2
 mainStroke.Parent=main
+
 applyGradient(mainStroke,COLORS.Accent,COLORS.AccentB,45)
 
 --========================================================
@@ -827,6 +834,7 @@ title.TextSize=17
 title.Font=Enum.Font.GothamBold
 title.TextXAlignment=Enum.TextXAlignment.Left
 title.Parent=topBar
+
 applyGradient(title,COLORS.Accent,COLORS.AccentB,0)
 
 local author=Instance.new("TextLabel")
@@ -944,6 +952,7 @@ local function setupTopButton(button,hoverColor,hoverBg)
 		tween(button,{TextColor3=hoverColor,BackgroundTransparency=0})
 		tween(button,{BackgroundColor3=hoverBg or COLORS.SurfaceLight})
 	end)
+
 	button.MouseLeave:Connect(function()
 		tween(button,{TextColor3=COLORS.TextDim,BackgroundTransparency=1})
 	end)
@@ -1099,6 +1108,7 @@ local function createCard(parent,yPos,titleText,bodyText,height,accentColor)
 	local accentCorner=Instance.new("UICorner")
 	accentCorner.CornerRadius=UDim.new(1,0)
 	accentCorner.Parent=accentBar
+
 	applyGradient(accentBar,accentColor or COLORS.Accent,COLORS.AccentB,90)
 
 	local cardTitle=Instance.new("TextLabel")
@@ -1207,9 +1217,7 @@ local function createSliderToggle(parent,text,yPos,accentColor,onChanged)
 			end)
 		end
 
-		if fireCallback~=false and onChanged then
-			onChanged(enabled)
-		end
+		if fireCallback~=false and onChanged then onChanged(enabled) end
 	end
 
 	toggle.MouseButton1Click:Connect(function()
@@ -1300,9 +1308,7 @@ local function createCheckbox(parent,text,yPos,accentColor,onChanged)
 			tween(checkboxStroke,{Color=COLORS.Border})
 		end
 
-		if fireCallback~=false and onChanged then
-			onChanged(checked)
-		end
+		if fireCallback~=false and onChanged then onChanged(checked) end
 	end
 
 	checkbox.MouseButton1Click:Connect(function()
@@ -1441,11 +1447,15 @@ local function createNumberControl(parent,titleText,yPos,defaultValue,minValue,m
 	end
 
 	track.InputBegan:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then beginDrag(input) end
+		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+			beginDrag(input)
+		end
 	end)
 
 	knob.InputBegan:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then beginDrag(input) end
+		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+			beginDrag(input)
+		end
 	end)
 
 	UserInputService.InputChanged:Connect(function(input)
@@ -1464,7 +1474,7 @@ local function createNumberControl(parent,titleText,yPos,defaultValue,minValue,m
 end
 
 --========================================================
--- SERVER PAGE
+-- SERVER
 --========================================================
 
 createPageTitle(serverPage,"Server","Server info & tools")
@@ -1472,7 +1482,7 @@ createCard(serverPage,95,"Server","Manage server information here.",90,COLORS.Pa
 serverPage.CanvasSize=UDim2.new(0,0,0,220)
 
 --========================================================
--- AUTO WIN PAGE
+-- AUTO WIN
 --========================================================
 
 createPageTitle(autoWinPage,"Auto Win","Chọn Stage để tự động bay tới nút Win tương ứng.")
@@ -1665,7 +1675,8 @@ end)
 
 infiniteJumpEnabled=getInfiniteJumpState
 
-local _,_,setNoClipUI,getNoClipState=createCheckbox(movementPage,"No Clip",515,COLORS.PageServer,function(enabled)
+-- No Clip dùng cùng màu xanh lá với Infinite Jump
+local _,_,setNoClipUI,getNoClipState=createCheckbox(movementPage,"No Clip",515,COLORS.PageFarm,function(enabled)
 	local module=loadMovementModule()
 	if module and module.SetNoClip then module.SetNoClip(enabled) end
 	task.defer(saveSettings)
@@ -1875,9 +1886,7 @@ minimize.MouseButton1Click:Connect(function()
 	else
 		sidebar.Visible=true
 		content.Visible=true
-		tween(main,{
-			Size=maximized and UDim2.new(1,-40,1,-40) or normalSize
-		},0.2)
+		tween(main,{Size=maximized and UDim2.new(1,-40,1,-40) or normalSize},0.2)
 	end
 end)
 
