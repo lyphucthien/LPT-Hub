@@ -2307,6 +2307,7 @@ local function updateESP()
 			end
 		end
 	end
+end
 
 local function refreshESP()
 	for targetPlayer in pairs(ESPState.Objects) do
