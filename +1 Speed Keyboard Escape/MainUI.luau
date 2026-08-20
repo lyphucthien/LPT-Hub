@@ -2174,18 +2174,29 @@ local function removeESP(targetPlayer)
 end
 
 local function createESP(targetPlayer)
-	if targetPlayer==LocalPlayer or not ESPState.Enabled then
+	if not targetPlayer or targetPlayer==player then
+		return
+	end
+
+	if not ESPState.Enabled then
 		return
 	end
 
 	removeESP(targetPlayer)
 
 	local character=targetPlayer.Character
-	local root=character and character:FindFirstChild("HumanoidRootPart")
-
-	if not character or not root then
+	if not character then
 		return
 	end
+
+	local root=character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return
+	end
+
+	--====================================================
+	-- HIGHLIGHT
+	--====================================================
 
 	local highlight=Instance.new("Highlight")
 	highlight.Name="LPTHubESP"
@@ -2195,33 +2206,52 @@ local function createESP(targetPlayer)
 	highlight.FillTransparency=0.78
 	highlight.OutlineColor=COLORS.PageServer
 	highlight.OutlineTransparency=0
+	highlight.Enabled=true
 	highlight.Parent=character
+
+	--====================================================
+	-- BILLBOARD
+	--====================================================
 
 	local billboard=Instance.new("BillboardGui")
 	billboard.Name="LPTHubESPInfo"
 	billboard.Adornee=root
-	billboard.Size=UDim2.new(0,190,0,48)
-	billboard.StudsOffset=Vector3.new(0,3.2,0)
+	billboard.Size=UDim2.new(0,220,0,58)
+	billboard.StudsOffset=Vector3.new(0,3.5,0)
 	billboard.AlwaysOnTop=true
+	billboard.Enabled=true
 	billboard.ResetOnSpawn=false
-	billboard.Parent=root
+	billboard.MaxDistance=10000
+	billboard.Parent=screenGui
+
+	--====================================================
+	-- PLAYER LABEL
+	--====================================================
 
 	local label=Instance.new("TextLabel")
+	label.Name="PlayerInfo"
 	label.Size=UDim2.new(1,0,1,0)
+	label.Position=UDim2.new(0,0,0,0)
 	label.BackgroundTransparency=1
-	label.TextColor3=COLORS.Text
-	label.TextStrokeTransparency=0.3
-	label.TextSize=13
+	label.Text=""
+	label.TextColor3=Color3.fromRGB(255,255,255)
+	label.TextStrokeColor3=Color3.fromRGB(0,0,0)
+	label.TextStrokeTransparency=0
+	label.TextTransparency=0
+	label.TextSize=14
 	label.Font=Enum.Font.GothamBold
 	label.TextXAlignment=Enum.TextXAlignment.Center
 	label.TextYAlignment=Enum.TextYAlignment.Center
 	label.TextWrapped=true
+	label.Visible=true
+	label.ZIndex=10
 	label.Parent=billboard
 
 	ESPState.Objects[targetPlayer]={
 		highlight=highlight,
 		billboard=billboard,
 		label=label,
+		root=root,
 	}
 end
 
@@ -2230,7 +2260,7 @@ local function updateESP()
 		return
 	end
 
-	local localCharacter=LocalPlayer.Character
+	local localCharacter=player.Character
 	local localRoot=localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
 
 	if not localRoot then
@@ -2246,7 +2276,18 @@ local function updateESP()
 		local character=targetPlayer.Character
 		local root=character and character:FindFirstChild("HumanoidRootPart")
 
-		if not character or not root or not data.label.Parent then
+		if not character or not root then
+			removeESP(targetPlayer)
+			createESP(targetPlayer)
+			continue
+		end
+
+		if not data.billboard or not data.billboard.Parent then
+			createESP(targetPlayer)
+			continue
+		end
+
+		if not data.label or not data.label.Parent then
 			createESP(targetPlayer)
 			continue
 		end
@@ -2254,28 +2295,39 @@ local function updateESP()
 		local distance=(root.Position-localRoot.Position).Magnitude
 		local distanceText=("%dm"):format(math.floor(distance+0.5))
 
+		data.root=root
+		data.billboard.Adornee=root
+		data.billboard.Enabled=true
+		data.label.Visible=true
+
 		data.label.Text=
 			targetPlayer.DisplayName
+			.."\n"
+			.."@"..targetPlayer.Name
 			.."\n"
 			.."["..distanceText.."]"
 	end
 end
 
 local function refreshESP()
-	if not ESPState.Enabled then
-		for targetPlayer in pairs(ESPState.Objects) do
-			removeESP(targetPlayer)
-		end
+	for targetPlayer in pairs(ESPState.Objects) do
+		removeESP(targetPlayer)
+	end
 
+	if not ESPState.Enabled then
 		return
 	end
 
 	for _,targetPlayer in ipairs(Players:GetPlayers()) do
-		if targetPlayer~=LocalPlayer then
+		if targetPlayer~=player then
 			createESP(targetPlayer)
 		end
 	end
 end
+
+--========================================================
+-- Công Tắt ESP
+--========================================================
 
 createCheckbox(
 	espPage,
@@ -2284,7 +2336,12 @@ createCheckbox(
 	COLORS.PageServer,
 	function(enabled)
 		ESPState.Enabled=enabled
-		refreshESP()
+
+		if enabled then
+			refreshESP()
+		else
+			refreshESP()
+		end
 	end
 )
 
@@ -2292,7 +2349,7 @@ espPage.CanvasSize=UDim2.new(0,0,0,180)
 
 Players.PlayerAdded:Connect(function(targetPlayer)
 	targetPlayer.CharacterAdded:Connect(function()
-		task.wait(0.25)
+		task.wait(0.5)
 
 		if ESPState.Enabled then
 			createESP(targetPlayer)
@@ -2305,9 +2362,9 @@ Players.PlayerRemoving:Connect(function(targetPlayer)
 end)
 
 for _,targetPlayer in ipairs(Players:GetPlayers()) do
-	if targetPlayer~=LocalPlayer then
+	if targetPlayer~=player then
 		targetPlayer.CharacterAdded:Connect(function()
-			task.wait(0.25)
+			task.wait(0.5)
 
 			if ESPState.Enabled then
 				createESP(targetPlayer)
@@ -2319,7 +2376,10 @@ end
 task.spawn(function()
 	while screenGui.Parent do
 		task.wait(0.1)
-		updateESP()
+
+		if ESPState.Enabled then
+			updateESP()
+		end
 	end
 end)
 
@@ -2939,16 +2999,8 @@ local dragStart=nil
 local startPos=nil
 
 --========================================================
--- MINIMIZED BUTTON VISUAL
+-- UPDATE MINIMIZED BUTTONS
 --========================================================
-
-local function setButtonInstant(button,visible,transparency)
-	button.Visible=visible
-
-	if button:IsA("TextButton") then
-		button.BackgroundTransparency=transparency
-	end
-end
 
 local function updateMinimizedButtons(animated)
 	local duration=animated and 0.15 or 0
@@ -2958,33 +3010,16 @@ local function updateMinimizedButtons(animated)
 		maximize.Visible=true
 		close.Visible=true
 
-		if duration>0 then
-			tween(maximize,{
-				BackgroundTransparency=1
-			},duration)
+		minimize.Active=true
+		maximize.Active=true
+		close.Active=true
 
-			tween(close,{
-				BackgroundTransparency=1
-			},duration)
+		maximize.BackgroundTransparency=1
+		close.BackgroundTransparency=1
 
-			tween(normalStroke,{
-				Transparency=0
-			},duration)
-
-			tween(restoreBackStroke,{
-				Transparency=0
-			},duration)
-
-			tween(restoreFrontStroke,{
-				Transparency=0
-			},duration)
-		else
-			maximize.BackgroundTransparency=1
-			close.BackgroundTransparency=1
-			normalStroke.Transparency=0
-			restoreBackStroke.Transparency=0
-			restoreFrontStroke.Transparency=0
-		end
+		normalStroke.Transparency=0
+		restoreBackStroke.Transparency=0
+		restoreFrontStroke.Transparency=0
 
 		return
 	end
@@ -2993,13 +3028,16 @@ local function updateMinimizedButtons(animated)
 	maximize.Visible=true
 	close.Visible=true
 
-	local visibleTransparency=minimizedHover and 0 or 1
+	maximize.Active=minimizedHover
+	close.Active=minimizedHover
+
+	local transparency=minimizedHover and 0 or 1
 
 	if duration>0 then
 		tween(
 			maximize,
 			{
-				BackgroundTransparency=visibleTransparency
+				BackgroundTransparency=transparency
 			},
 			duration
 		)
@@ -3007,7 +3045,7 @@ local function updateMinimizedButtons(animated)
 		tween(
 			close,
 			{
-				BackgroundTransparency=visibleTransparency
+				BackgroundTransparency=transparency
 			},
 			duration
 		)
@@ -3015,7 +3053,7 @@ local function updateMinimizedButtons(animated)
 		tween(
 			normalStroke,
 			{
-				Transparency=visibleTransparency
+				Transparency=transparency
 			},
 			duration
 		)
@@ -3023,7 +3061,7 @@ local function updateMinimizedButtons(animated)
 		tween(
 			restoreBackStroke,
 			{
-				Transparency=visibleTransparency
+				Transparency=transparency
 			},
 			duration
 		)
@@ -3031,17 +3069,17 @@ local function updateMinimizedButtons(animated)
 		tween(
 			restoreFrontStroke,
 			{
-				Transparency=visibleTransparency
+				Transparency=transparency
 			},
 			duration
 		)
 	else
-		maximize.BackgroundTransparency=visibleTransparency
-		close.BackgroundTransparency=visibleTransparency
+		maximize.BackgroundTransparency=transparency
+		close.BackgroundTransparency=transparency
 
-		normalStroke.Transparency=visibleTransparency
-		restoreBackStroke.Transparency=visibleTransparency
-		restoreFrontStroke.Transparency=visibleTransparency
+		normalStroke.Transparency=transparency
+		restoreBackStroke.Transparency=transparency
+		restoreFrontStroke.Transparency=transparency
 	end
 end
 
@@ -3059,6 +3097,7 @@ local function restoreFromMinimized()
 
 	sidebar.Visible=true
 	content.Visible=true
+	author.Visible=true
 
 	local restoreSize=savedBeforeMinimizeSize
 	local restorePosition=savedBeforeMinimizePosition
@@ -3091,7 +3130,6 @@ end
 maximize.MouseButton1Click:Connect(function()
 	if minimized then
 		restoreFromMinimized()
-
 		task.wait(0.28)
 	end
 
@@ -3148,6 +3186,7 @@ minimize.MouseButton1Click:Connect(function()
 
 	sidebar.Visible=false
 	content.Visible=false
+	author.Visible=false
 
 	updateMinimizedButtons(false)
 
@@ -3185,7 +3224,7 @@ topBar.MouseLeave:Connect(function()
 end)
 
 --========================================================
--- RESTORE BY CLICKING MINIMIZED BAR
+-- CLICK MINIMIZED BAR TO RESTORE
 --========================================================
 
 topBar.InputBegan:Connect(function(input)
