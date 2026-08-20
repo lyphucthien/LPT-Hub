@@ -3014,26 +3014,37 @@ local function updateMinimizedButtons(animated)
 		maximize.Active=true
 		close.Active=true
 
+		minimize.BackgroundTransparency=1
 		maximize.BackgroundTransparency=1
 		close.BackgroundTransparency=1
+
+		minimize.TextTransparency=0
+		close.TextTransparency=0
 
 		normalStroke.Transparency=0
 		restoreBackStroke.Transparency=0
 		restoreFrontStroke.Transparency=0
 
+		normalIcon.Visible=not maximized
+		restoreBack.Visible=maximized
+		restoreFront.Visible=maximized
+
 		return
 	end
 
 	--====================================================
-	-- MINIMIZED:
+	-- MINIMIZED
 	--====================================================
 
+	-- Không bao giờ hiện nút minimize / maximize
 	minimize.Visible=false
 	maximize.Visible=false
-	close.Visible=minimizedHover
 
 	minimize.Active=false
 	maximize.Active=false
+
+	-- Chỉ hiện × khi hover
+	close.Visible=true
 	close.Active=minimizedHover
 
 	local transparency=minimizedHover and 0 or 1
@@ -3056,6 +3067,7 @@ local function updateMinimizedButtons(animated)
 		normalStroke.Transparency=minimizedHover and 0.1 or 1
 	end
 
+	-- Ẩn toàn bộ icon maximize
 	normalIcon.Visible=false
 	restoreBack.Visible=false
 	restoreFront.Visible=false
@@ -3090,12 +3102,13 @@ local function restoreFromMinimized()
 
 	updateMinimizedButtons(false)
 
+	normalIcon.Visible=not maximized
+	restoreBack.Visible=maximized
+	restoreFront.Visible=maximized
+
 	tween(
 		main,
-		{
-			Size=restoreSize,
-			Position=restorePosition
-		},
+		{Size=restoreSize,Position=restorePosition},
 		0.28,
 		Enum.EasingStyle.Quint
 	)
