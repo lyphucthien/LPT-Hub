@@ -934,8 +934,8 @@ mainCorner.Parent=main
 
 local mainStroke=Instance.new("UIStroke")
 mainStroke.Color=COLORS.Border
-mainStroke.Thickness=2.5
-mainStroke.Transparency=0.35
+mainStroke.Thickness=2
+mainStroke.Transparency=0.1
 mainStroke.Parent=main
 
 applyGradient(mainStroke,COLORS.Accent,COLORS.AccentB,45)
@@ -2915,23 +2915,184 @@ close.MouseButton1Click:Connect(function()
 end)
 
 --========================================================
--- MAXIMIZE
+-- MAXIMIZE / MINIMIZE / DRAG
 --========================================================
 
 local maximized=false
 local minimized=false
 
-local normalSize=
-	UDim2.new(0,780,0,500)
+local savedBeforeMinimizeSize=nil
+local savedBeforeMinimizePosition=nil
 
-local normalPosition=
-	UDim2.new(0.5,-390,0.5,-250)
+local normalSize=UDim2.new(0,780,0,500)
+local normalPosition=UDim2.new(0.5,-390,0.5,-250)
+
+local maximizedSize=UDim2.new(1,-40,1,-40)
+local maximizedPosition=UDim2.new(0,20,0,20)
+
+local minimizedSize=UDim2.new(0,300,0,38)
+local minimizedPosition=UDim2.new(0.5,-150,0,15)
+
+local minimizedHover=false
+local dragging=false
+local dragStart=nil
+local startPos=nil
+
+--========================================================
+-- MINIMIZED BUTTON VISUAL
+--========================================================
+
+local function setButtonInstant(button,visible,transparency)
+	button.Visible=visible
+
+	if button:IsA("TextButton") then
+		button.BackgroundTransparency=transparency
+	end
+end
+
+local function updateMinimizedButtons(animated)
+	local duration=animated and 0.15 or 0
+
+	if not minimized then
+		minimize.Visible=true
+		maximize.Visible=true
+		close.Visible=true
+
+		if duration>0 then
+			tween(maximize,{
+				BackgroundTransparency=1
+			},duration)
+
+			tween(close,{
+				BackgroundTransparency=1
+			},duration)
+
+			tween(normalStroke,{
+				Transparency=0
+			},duration)
+
+			tween(restoreBackStroke,{
+				Transparency=0
+			},duration)
+
+			tween(restoreFrontStroke,{
+				Transparency=0
+			},duration)
+		else
+			maximize.BackgroundTransparency=1
+			close.BackgroundTransparency=1
+			normalStroke.Transparency=0
+			restoreBackStroke.Transparency=0
+			restoreFrontStroke.Transparency=0
+		end
+
+		return
+	end
+
+	minimize.Visible=false
+	maximize.Visible=true
+	close.Visible=true
+
+	local visibleTransparency=minimizedHover and 0 or 1
+
+	if duration>0 then
+		tween(
+			maximize,
+			{
+				BackgroundTransparency=visibleTransparency
+			},
+			duration
+		)
+
+		tween(
+			close,
+			{
+				BackgroundTransparency=visibleTransparency
+			},
+			duration
+		)
+
+		tween(
+			normalStroke,
+			{
+				Transparency=visibleTransparency
+			},
+			duration
+		)
+
+		tween(
+			restoreBackStroke,
+			{
+				Transparency=visibleTransparency
+			},
+			duration
+		)
+
+		tween(
+			restoreFrontStroke,
+			{
+				Transparency=visibleTransparency
+			},
+			duration
+		)
+	else
+		maximize.BackgroundTransparency=visibleTransparency
+		close.BackgroundTransparency=visibleTransparency
+
+		normalStroke.Transparency=visibleTransparency
+		restoreBackStroke.Transparency=visibleTransparency
+		restoreFrontStroke.Transparency=visibleTransparency
+	end
+end
+
+--========================================================
+-- RESTORE FROM MINIMIZED
+--========================================================
+
+local function restoreFromMinimized()
+	if not minimized then
+		return
+	end
+
+	minimized=false
+	minimizedHover=false
+
+	sidebar.Visible=true
+	content.Visible=true
+
+	local restoreSize=savedBeforeMinimizeSize
+	local restorePosition=savedBeforeMinimizePosition
+
+	if not restoreSize then
+		restoreSize=maximized and maximizedSize or normalSize
+	end
+
+	if not restorePosition then
+		restorePosition=maximized and maximizedPosition or normalPosition
+	end
+
+	updateMinimizedButtons(false)
+
+	tween(
+		main,
+		{
+			Size=restoreSize,
+			Position=restorePosition
+		},
+		0.28,
+		Enum.EasingStyle.Quint
+	)
+end
+
+--========================================================
+-- MAXIMIZE
+--========================================================
 
 maximize.MouseButton1Click:Connect(function()
 	if minimized then
-		minimized=false
-		sidebar.Visible=true
-		content.Visible=true
+		restoreFromMinimized()
+
+		task.wait(0.28)
 	end
 
 	maximized=not maximized
@@ -2940,10 +3101,11 @@ maximize.MouseButton1Click:Connect(function()
 		tween(
 			main,
 			{
-				Size=UDim2.new(1,-40,1,-40),
-				Position=UDim2.new(0,20,0,20)
+				Size=maximizedSize,
+				Position=maximizedPosition
 			},
-			0.25
+			0.25,
+			Enum.EasingStyle.Quint
 		)
 
 		normalIcon.Visible=false
@@ -2956,13 +3118,16 @@ maximize.MouseButton1Click:Connect(function()
 				Size=normalSize,
 				Position=normalPosition
 			},
-			0.25
+			0.25,
+			Enum.EasingStyle.Quint
 		)
 
 		normalIcon.Visible=true
 		restoreBack.Visible=false
 		restoreFront.Visible=false
 	end
+
+	updateMinimizedButtons(false)
 end)
 
 --========================================================
@@ -2970,49 +3135,72 @@ end)
 --========================================================
 
 minimize.MouseButton1Click:Connect(function()
-	minimized=not minimized
-
 	if minimized then
-		sidebar.Visible=false
-		content.Visible=false
-
-		tween(
-			main,
-			{
-				Size=UDim2.new(0,780,0,38)
-			},
-			0.2
-		)
-	else
-		sidebar.Visible=true
-		content.Visible=true
-
-		tween(
-			main,
-			{
-				Size=maximized
-					and UDim2.new(1,-40,1,-40)
-					or normalSize
-			},
-			0.2
-		)
+		restoreFromMinimized()
+		return
 	end
+
+	savedBeforeMinimizeSize=main.Size
+	savedBeforeMinimizePosition=main.Position
+
+	minimized=true
+	minimizedHover=false
+
+	sidebar.Visible=false
+	content.Visible=false
+
+	updateMinimizedButtons(false)
+
+	tween(
+		main,
+		{
+			Size=minimizedSize,
+			Position=minimizedPosition
+		},
+		0.28,
+		Enum.EasingStyle.Quint
+	)
 end)
 
 --========================================================
--- DRAG WINDOW
+-- MINIMIZED HOVER
 --========================================================
 
-local dragging=false
-local dragStart
-local startPos
+topBar.MouseEnter:Connect(function()
+	if not minimized then
+		return
+	end
+
+	minimizedHover=true
+	updateMinimizedButtons(true)
+end)
+
+topBar.MouseLeave:Connect(function()
+	if not minimized then
+		return
+	end
+
+	minimizedHover=false
+	updateMinimizedButtons(true)
+end)
+
+--========================================================
+-- RESTORE BY CLICKING MINIMIZED BAR
+--========================================================
 
 topBar.InputBegan:Connect(function(input)
-	if input.UserInputType==Enum.UserInputType.MouseButton1 then
-		dragging=true
-		dragStart=input.Position
-		startPos=main.Position
+	if input.UserInputType~=Enum.UserInputType.MouseButton1 then
+		return
 	end
+
+	if minimized then
+		restoreFromMinimized()
+		return
+	end
+
+	dragging=true
+	dragStart=input.Position
+	startPos=main.Position
 end)
 
 topBar.InputEnded:Connect(function(input)
@@ -3021,18 +3209,29 @@ topBar.InputEnded:Connect(function(input)
 	end
 end)
 
+--========================================================
+-- DRAG WINDOW
+--========================================================
+
 UserInputService.InputChanged:Connect(function(input)
-	if dragging
-		and input.UserInputType==Enum.UserInputType.MouseMovement then
-
-		local delta=input.Position-dragStart
-
-		main.Position=
-			UDim2.new(
-				startPos.X.Scale,
-				startPos.X.Offset+delta.X,
-				startPos.Y.Scale,
-				startPos.Y.Offset+delta.Y
-			)
+	if not dragging or minimized then
+		return
 	end
+
+	if input.UserInputType~=Enum.UserInputType.MouseMovement then
+		return
+	end
+
+	if not dragStart or not startPos then
+		return
+	end
+
+	local delta=input.Position-dragStart
+
+	main.Position=UDim2.new(
+		startPos.X.Scale,
+		startPos.X.Offset+delta.X,
+		startPos.Y.Scale,
+		startPos.Y.Offset+delta.Y
+	)
 end)
