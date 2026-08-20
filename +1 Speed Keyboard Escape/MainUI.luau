@@ -1792,8 +1792,8 @@ local informationCard=Instance.new("Frame")
 informationCard.Name="InformationCard"
 informationCard.Size=UDim2.new(1,0,0,350)
 informationCard.Position=UDim2.new(0,0,0,0)
-informationCard.BackgroundColor3=Color3.fromRGB(30,28,35)
-informationCard.BackgroundTransparency=0.05
+informationCard.BackgroundColor3=Color3.fromRGB(26,25,31)
+informationCard.BackgroundTransparency=0
 informationCard.BorderSizePixel=0
 informationCard.Parent=informationContainer
 
@@ -1808,11 +1808,32 @@ informationStroke.Thickness=1
 informationStroke.Parent=informationCard
 
 local informationPadding=Instance.new("UIPadding")
-informationPadding.PaddingTop=UDim.new(0,20)
+informationPadding.PaddingTop=UDim.new(0,40)
 informationPadding.PaddingLeft=UDim.new(0,24)
 informationPadding.PaddingRight=UDim.new(0,24)
 informationPadding.PaddingBottom=UDim.new(0,20)
 informationPadding.Parent=informationCard
+
+--========================================================
+-- OWNER BADGE
+--========================================================
+
+local ownerText=Instance.new("TextLabel")
+ownerText.Name="OwnerText"
+ownerText.Size=UDim2.new(0,100,0,20)
+ownerText.Position=UDim2.new(0,14,0,8)
+ownerText.BackgroundTransparency=1
+ownerText.Text="OWNER"
+ownerText.Font=Enum.Font.GothamBold
+ownerText.TextSize=13
+ownerText.TextColor3=Color3.fromRGB(255,196,0)
+ownerText.TextXAlignment=Enum.TextXAlignment.Left
+ownerText.ZIndex=2
+ownerText.Parent=informationCard
+
+--========================================================
+-- INFORMATION LIST
+--========================================================
 
 local informationList=Instance.new("Frame")
 informationList.Name="InformationList"
@@ -1826,7 +1847,11 @@ informationLayout.Padding=UDim.new(0,16)
 informationLayout.SortOrder=Enum.SortOrder.LayoutOrder
 informationLayout.Parent=informationList
 
-local function createInformationRow(order,labelText,valueText)
+--========================================================
+-- INFORMATION ROW
+--========================================================
+
+local function createInformationRow(order,labelText,valueText,valueColor)
 	local row=Instance.new("Frame")
 	row.Name=labelText.."Row"
 	row.Size=UDim2.new(1,0,0,44)
@@ -1836,13 +1861,13 @@ local function createInformationRow(order,labelText,valueText)
 
 	local label=Instance.new("TextLabel")
 	label.Name="Label"
-	label.Size=UDim2.new(1,0,0,18)
+	label.Size=UDim2.new(1,0,0,16)
 	label.Position=UDim2.new(0,0,0,0)
 	label.BackgroundTransparency=1
 	label.Text=labelText
 	label.Font=Enum.Font.Gotham
 	label.TextSize=13
-	label.TextColor3=Color3.fromRGB(160,158,165)
+	label.TextColor3=Color3.fromRGB(150,148,155)
 	label.TextXAlignment=Enum.TextXAlignment.Left
 	label.Parent=row
 
@@ -1853,8 +1878,8 @@ local function createInformationRow(order,labelText,valueText)
 	value.BackgroundTransparency=1
 	value.Text=valueText
 	value.Font=Enum.Font.GothamMedium
-	value.TextSize=16
-	value.TextColor3=Color3.fromRGB(240,240,240)
+	value.TextSize=17
+	value.TextColor3=valueColor or Color3.fromRGB(240,240,240)
 	value.TextXAlignment=Enum.TextXAlignment.Left
 	value.Parent=row
 
@@ -1863,29 +1888,57 @@ local function createInformationRow(order,labelText,valueText)
 	divider.Size=UDim2.new(1,0,0,1)
 	divider.Position=UDim2.new(0,0,1,6)
 	divider.BackgroundColor3=Color3.fromRGB(255,255,255)
-	divider.BackgroundTransparency=0.93
+	divider.BackgroundTransparency=0.9
 	divider.BorderSizePixel=0
 	divider.Parent=row
 
-	return row
+	return row,value
 end
+
+--========================================================
+-- INFORMATION DATA
+--========================================================
+
+local hoTenValue="Lý Phúc Thiện"
+local ngaySinhValue="18/3"
+local tuoiValue="15"
+local trangThaiValue="Online"
 
 createInformationRow(
 	1,
-	"Tên người dùng",
-	player.Name
+	"Họ và Tên",
+	hoTenValue
 )
 
 createInformationRow(
 	2,
-	"Vai trò",
-	"Thành viên"
+	"Ngày sinh",
+	ngaySinhValue
 )
 
 createInformationRow(
 	3,
-	"Trạng thái",
-	"Đang hoạt động"
+	"Tuổi",
+	tuoiValue
+)
+
+local statusColor=Color3.fromRGB(240,240,240)
+
+if trangThaiValue=="Online" then
+	statusColor=Color3.fromRGB(80,220,120)
+elseif trangThaiValue=="Update Script" then
+	statusColor=Color3.fromRGB(255,196,0)
+elseif trangThaiValue=="Sleep" then
+	statusColor=Color3.fromRGB(170,170,180)
+elseif trangThaiValue=="Offline" then
+	statusColor=Color3.fromRGB(150,148,155)
+end
+
+createInformationRow(
+	4,
+	"Trạng Thái",
+	trangThaiValue,
+	statusColor
 )
 
 --========================================================
@@ -1939,7 +1992,7 @@ if gameInfoOK and type(gameInfo)=="table" and gameInfo.Name then
 end
 
 gameRow.Text=string.format(
-	'<font color="rgb(160,158,165)" size="14">Tên Game: </font><font color="rgb(240,240,240)">%s</font>',
+	'<font color="rgb(160,158,165)">Tên Game: </font><font color="rgb(240,240,240)">%s</font>',
 	gameNameValue
 )
 
