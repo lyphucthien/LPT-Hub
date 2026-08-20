@@ -2419,16 +2419,18 @@ end
 -- PLAYER ESP TOGGLE
 --========================================================
 
-createCheckbox(
-	espPage,
-	"Player ESP",
-	95,
-	COLORS.PageServer,
-	function(enabled)
-		ESPState.Enabled=enabled
-		refreshESP()
-	end
-)
+local _,_,setPlayerESPUI,getPlayerESPState=
+	createCheckbox(
+		espPage,
+		"Player ESP",
+		95,
+		COLORS.PageServer,
+		function(enabled)
+			ESPState.Enabled=enabled
+			refreshESP()
+			task.defer(saveSettings)
+		end
+	)
 
 espPage.CanvasSize=
 	UDim2.new(0,0,0,180)
@@ -2496,6 +2498,7 @@ local DEFAULT_SETTINGS={
 	FlyHeight=5,
 	InfiniteJump=false,
 	NoClip=false,
+	PlayerESP=false,
 }
 
 local function loadSavedSettings()
@@ -2577,6 +2580,7 @@ local function saveSettings()
 			noClipEnabled
 			and noClipEnabled()
 			or false,
+		PlayerESP=ESPState.Enabled==true,
 	}
 
 	pcall(function()
@@ -2755,6 +2759,12 @@ task.defer(function()
 
 	if Loaded.NoClip==true then
 		setNoClipUI(true,true)
+	end
+	
+	if Loaded.PlayerESP==true then
+		setPlayerESPUI(true,true)
+		ESPState.Enabled=true
+		refreshESP()
 	end
 end)
 
