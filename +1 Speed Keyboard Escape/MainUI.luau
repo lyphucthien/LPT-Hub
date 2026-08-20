@@ -2221,7 +2221,7 @@ local function createESP(targetPlayer)
 	billboard.AlwaysOnTop=true
 	billboard.Enabled=true
 	billboard.ResetOnSpawn=false
-	billboard.MaxDistance=10000
+	billboard.MaxDistance=math.huge
 	billboard.Parent=screenGui
 
 	--====================================================
@@ -2231,7 +2231,6 @@ local function createESP(targetPlayer)
 	local label=Instance.new("TextLabel")
 	label.Name="PlayerInfo"
 	label.Size=UDim2.new(1,0,1,0)
-	label.Position=UDim2.new(0,0,0,0)
 	label.BackgroundTransparency=1
 	label.Text=""
 	label.TextColor3=Color3.fromRGB(255,255,255)
@@ -2267,47 +2266,47 @@ local function updateESP()
 		return
 	end
 
-	for targetPlayer,data in pairs(ESPState.Objects) do
-		if not targetPlayer.Parent then
-			removeESP(targetPlayer)
-			continue
+	for _,targetPlayer in ipairs(Players:GetPlayers()) do
+		if targetPlayer~=player then
+			local character=targetPlayer.Character
+			local root=character and character:FindFirstChild("HumanoidRootPart")
+			local data=ESPState.Objects[targetPlayer]
+
+			if character and root then
+				if not data
+					or not data.billboard
+					or not data.billboard.Parent
+					or not data.label
+					or not data.label.Parent
+					or data.root~=root then
+
+					createESP(targetPlayer)
+					data=ESPState.Objects[targetPlayer]
+				end
+
+				if data then
+					local distance=(root.Position-localRoot.Position).Magnitude
+					local distanceText=("%dm"):format(math.floor(distance+0.5))
+
+					data.root=root
+					data.billboard.Adornee=root
+					data.billboard.Enabled=true
+					data.label.Visible=true
+
+					data.label.Text=
+						targetPlayer.DisplayName
+						.."\n"
+						.."@"..targetPlayer.Name
+						.."\n"
+						.."["..distanceText.."]"
+				end
+			else
+				if data then
+					removeESP(targetPlayer)
+				end
+			end
 		end
-
-		local character=targetPlayer.Character
-		local root=character and character:FindFirstChild("HumanoidRootPart")
-
-		if not character or not root then
-			removeESP(targetPlayer)
-			createESP(targetPlayer)
-			continue
-		end
-
-		if not data.billboard or not data.billboard.Parent then
-			createESP(targetPlayer)
-			continue
-		end
-
-		if not data.label or not data.label.Parent then
-			createESP(targetPlayer)
-			continue
-		end
-
-		local distance=(root.Position-localRoot.Position).Magnitude
-		local distanceText=("%dm"):format(math.floor(distance+0.5))
-
-		data.root=root
-		data.billboard.Adornee=root
-		data.billboard.Enabled=true
-		data.label.Visible=true
-
-		data.label.Text=
-			targetPlayer.DisplayName
-			.."\n"
-			.."@"..targetPlayer.Name
-			.."\n"
-			.."["..distanceText.."]"
 	end
-end
 
 local function refreshESP()
 	for targetPlayer in pairs(ESPState.Objects) do
@@ -2323,6 +2322,8 @@ local function refreshESP()
 			createESP(targetPlayer)
 		end
 	end
+
+	updateESP()
 end
 
 --========================================================
