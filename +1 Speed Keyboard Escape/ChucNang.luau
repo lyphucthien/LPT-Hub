@@ -608,16 +608,19 @@ end
 --========================================================
 
 local function getContactPosition(part)
-	if not isBasePart(part) then
-		return nil
-	end
+	if not isBasePart(part) then return nil end
 
-	-- Put the HumanoidRootPart almost directly on the top of the target.
-	-- This is much lower than the old position and allows the character
-	-- to actually intersect/touch the win part.
+	local root=getRoot()
+	local humanoid=getHumanoid()
+
+	if not root then return nil end
+
+	local rootHalfHeight=root.Size.Y/2
+	local hipHeight=humanoid and humanoid.HipHeight or 2
+
 	return Vector3.new(
 		part.Position.X,
-		part.Position.Y+(part.Size.Y/2)+CONTACT_OFFSET+State.FlyHeight,
+		part.Position.Y+(part.Size.Y/2)+hipHeight+rootHalfHeight+CONTACT_OFFSET+State.FlyHeight,
 		part.Position.Z
 	)
 end
@@ -719,23 +722,41 @@ function Module.FlyToPart(part,stageNumber)
 
 	-- CONTACT PHASE
 	if reached and State.Flying and root.Parent and part.Parent then
-		local holdStart=os.clock()
+		local contactPosition=getContactPosition(part)
 
-		while State.Flying
-			and root.Parent
-			and part.Parent
-			and os.clock()-holdStart<CONTACT_HOLD_TIME
-		do
-			local contactPosition=getContactPosition(part)
+		if contactPosition then
+			pcall(function()
+				root.AssemblyLinearVelocity=Vector3.zero
+				root.AssemblyAngularVelocity=Vector3.zero
+				root.CFrame=CFrame.new(contactPosition)
+				humanoid.AutoRotate=false
+				humanoid.PlatformStand=true
+			end)
+		end
 
-			if contactPosition then
-				pcall(function()
-					root.AssemblyLinearVelocity=Vector3.zero
-					root.AssemblyAngularVelocity=Vector3.zero
-					root.CFrame=CFrame.new(contactPosition)
-					humanoid.PlatformStand=true
-					humanoid.AutoRotate=false
-				end)
+		task.wait(0.05)
+
+		pcall(function()
+			humanoid.PlatformStand=false
+			humanoid.AutoRotate=oldAutoRotate
+			root.AssemblyLinearVelocity=Vector3.new(0,-8,0)
+			root.AssemblyAngularVelocity=Vector3.zero
+		end)
+
+		local contactStart=os.clock()
+
+		while State.Flying and root.Parent and part.Parent and os.clock()-contactStart<CONTACT_HOLD_TIME do
+			local position=getContactPosition(part)
+
+			if position then
+				local current=root.Position
+				local distance=(position-current).Magnitude
+
+				if distance>1.25 then
+					pcall(function()
+						root.CFrame=CFrame.new(position)
+					end)
+				end
 			end
 
 			RunService.Heartbeat:Wait()
@@ -744,12 +765,16 @@ function Module.FlyToPart(part,stageNumber)
 
 	local stopped=not State.Flying
 
+	State.Flying=false
+
 	pcall(function()
 		humanoid.AutoRotate=oldAutoRotate
-		humanoid.PlatformStand=oldPlatformStand
+		humanoid.PlatformStand=false
+		humanoid.WalkSpeed=State.WalkSpeed
+		humanoid.JumpPower=State.JumpPower
+		humanoid:ChangeState(Enum.HumanoidStateType.Running)
 	end)
 
-	State.Flying=false
 	State.CurrentTarget=nil
 	State.CurrentStage=nil
 
