@@ -16,7 +16,7 @@ local movementLoadError=nil
 -- LOCAL FALLBACK MOVEMENT MODULE
 --========================================================
 
-local LOCAL_MOVEMENT_SOURCE=[[
+local LOCAL_MOVEMENT_SOURCE=[[ 
 local Players=game:GetService("Players")
 local UserInputService=game:GetService("UserInputService")
 local RunService=game:GetService("RunService")
@@ -546,7 +546,9 @@ function Module.FlyToPart(part,stageNumber)
 
 		root.AssemblyLinearVelocity=Vector3.zero
 		root.AssemblyAngularVelocity=Vector3.zero
-		root.CFrame=CFrame.new(root.Position+difference.Unit*step)
+		root.CFrame=CFrame.new(
+			root.Position+difference.Unit*step
+		)
 
 		humanoid.PlatformStand=true
 		humanoid.AutoRotate=false
@@ -643,7 +645,13 @@ function Module.FlyToWin(winAmount)
 end
 
 function Module.SetWalkSpeed(value)
-	State.WalkSpeed=getNumber(value,0,500,State.WalkSpeed)
+	State.WalkSpeed=getNumber(
+		value,
+		0,
+		500,
+		State.WalkSpeed
+	)
+
 	applyCharacterSettings()
 	return true
 end
@@ -653,7 +661,13 @@ function Module.GetWalkSpeed()
 end
 
 function Module.SetJumpPower(value)
-	State.JumpPower=getNumber(value,0,500,State.JumpPower)
+	State.JumpPower=getNumber(
+		value,
+		0,
+		500,
+		State.JumpPower
+	)
+
 	applyCharacterSettings()
 	return true
 end
@@ -663,7 +677,13 @@ function Module.GetJumpPower()
 end
 
 function Module.SetFlySpeed(value)
-	State.FlySpeed=getNumber(value,10,500,State.FlySpeed)
+	State.FlySpeed=getNumber(
+		value,
+		10,
+		500,
+		State.FlySpeed
+	)
+
 	return true
 end
 
@@ -672,7 +692,13 @@ function Module.GetFlySpeed()
 end
 
 function Module.SetFlyHeight(value)
-	State.FlyHeight=getNumber(value,0,100,State.FlyHeight)
+	State.FlyHeight=getNumber(
+		value,
+		0,
+		100,
+		State.FlyHeight
+	)
+
 	return true
 end
 
@@ -686,19 +712,22 @@ function Module.SetInfiniteJump(enabled)
 	disconnect("InfiniteJump")
 
 	if State.InfiniteJump then
-		Connections.InfiniteJump=UserInputService.JumpRequest:Connect(function()
-			if not State.InfiniteJump then
-				return
-			end
+		Connections.InfiniteJump=
+			UserInputService.JumpRequest:Connect(function()
+				if not State.InfiniteJump then
+					return
+				end
 
-			local humanoid=getHumanoid()
+				local humanoid=getHumanoid()
 
-			if humanoid then
-				pcall(function()
-					humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-				end)
-			end
-		end)
+				if humanoid then
+					pcall(function()
+						humanoid:ChangeState(
+							Enum.HumanoidStateType.Jumping
+						)
+					end)
+				end
+			end)
 	end
 
 	return true
@@ -750,27 +779,31 @@ Connections.NoClip=RunService.Stepped:Connect(function()
 	end
 end)
 
-Connections.CharacterAdded=LocalPlayer.CharacterAdded:Connect(function(character)
-	State.Flying=false
-	State.CurrentTarget=nil
-	State.CurrentStage=nil
+Connections.CharacterAdded=
+	LocalPlayer.CharacterAdded:Connect(function(character)
+		State.Flying=false
+		State.CurrentTarget=nil
+		State.CurrentStage=nil
 
-	table.clear(OriginalCollision)
-	table.clear(State.TargetCache)
-	table.clear(State.StageTargetCache)
-	table.clear(State.StageContainerCache)
+		table.clear(OriginalCollision)
+		table.clear(State.TargetCache)
+		table.clear(State.StageTargetCache)
+		table.clear(State.StageContainerCache)
 
-	local humanoid=character:WaitForChild("Humanoid",10)
+		local humanoid=character:WaitForChild(
+			"Humanoid",
+			10
+		)
 
-	if humanoid then
-		task.wait(0.15)
-		applyCharacterSettings()
+		if humanoid then
+			task.wait(0.15)
+			applyCharacterSettings()
 
-		if State.NoClip then
-			rememberCollision(character)
+			if State.NoClip then
+				rememberCollision(character)
+			end
 		end
-	end
-end)
+	end)
 
 task.defer(function()
 	task.wait(0.5)
@@ -866,7 +899,9 @@ local function loadMovementModule()
 	end
 
 	local remoteOK,remoteResult=pcall(function()
-		return loadstring(game:HttpGet(MOVEMENT_MODULE_URL))()
+		return loadstring(
+			game:HttpGet(MOVEMENT_MODULE_URL)
+		)()
 	end)
 
 	if remoteOK and moduleIsValid(remoteResult) then
@@ -874,7 +909,8 @@ local function loadMovementModule()
 		return Movement
 	end
 
-	movementLoadError=remoteOK
+	movementLoadError=
+		remoteOK
 		and "Remote movement module is missing required functions."
 		or tostring(remoteResult)
 
@@ -993,7 +1029,12 @@ mainStroke.Thickness=2
 mainStroke.Transparency=0.1
 mainStroke.Parent=main
 
-applyGradient(mainStroke,COLORS.Accent,COLORS.AccentB,45)
+applyGradient(
+	mainStroke,
+	COLORS.Accent,
+	COLORS.AccentB,
+	45
+)
 
 --========================================================
 -- TOP BAR
@@ -1016,6 +1057,10 @@ topBarMask.Position=UDim2.new(0,0,1,-20)
 topBarMask.BackgroundColor3=COLORS.Surface
 topBarMask.BorderSizePixel=0
 topBarMask.Parent=topBar
+
+--========================================================
+-- TITLE
+--========================================================
 
 local titleDot=Instance.new("Frame")
 titleDot.Size=UDim2.new(0,8,0,8)
@@ -1073,7 +1118,12 @@ title.Font=Enum.Font.GothamBold
 title.TextXAlignment=Enum.TextXAlignment.Left
 title.Parent=topBar
 
-applyGradient(title,COLORS.Accent,COLORS.AccentB,0)
+applyGradient(
+	title,
+	COLORS.Accent,
+	COLORS.AccentB,
+	0
+)
 
 local author=Instance.new("TextLabel")
 author.Size=UDim2.new(0,170,1,0)
@@ -1119,9 +1169,30 @@ local function topButton(name,xOffset,text,textSize)
 	return button
 end
 
-local minimize=topButton("MinimizeButton",-110,"—",13)
-local maximize=topButton("MaximizeButton",-76,"",0)
-local close=topButton("CloseButton",-40,"×",17)
+local minimize=topButton(
+	"MinimizeButton",
+	-110,
+	"—",
+	13
+)
+
+local maximize=topButton(
+	"MaximizeButton",
+	-76,
+	"",
+	0
+)
+
+local close=topButton(
+	"CloseButton",
+	-40,
+	"×",
+	17
+)
+
+--========================================================
+-- MAX ICON
+--========================================================
 
 local maxIcon=Instance.new("Frame")
 maxIcon.Size=UDim2.new(0,20,0,20)
@@ -1184,21 +1255,30 @@ restoreFrontStroke.Parent=restoreFront
 
 local function setupTopButton(button,hoverColor,hoverBg)
 	button.MouseEnter:Connect(function()
-		tween(button,{
-			TextColor3=hoverColor,
-			BackgroundTransparency=0
-		})
+		tween(
+			button,
+			{
+				TextColor3=hoverColor,
+				BackgroundTransparency=0
+			}
+		)
 
-		tween(button,{
-			BackgroundColor3=hoverBg or COLORS.SurfaceLight
-		})
+		tween(
+			button,
+			{
+				BackgroundColor3=hoverBg or COLORS.SurfaceLight
+			}
+		)
 	end)
 
 	button.MouseLeave:Connect(function()
-		tween(button,{
-			TextColor3=COLORS.TextDim,
-			BackgroundTransparency=1
-		})
+		tween(
+			button,
+			{
+				TextColor3=COLORS.TextDim,
+				BackgroundTransparency=1
+			}
+		)
 	end)
 end
 
@@ -1326,7 +1406,13 @@ end
 -- SWITCH TOGGLE
 --========================================================
 
-local function createSliderToggle(parent,text,yPos,accentColor,onChanged)
+local function createSliderToggle(
+	parent,
+	text,
+	yPos,
+	accentColor,
+	onChanged
+)
 	local row=Instance.new("Frame")
 	row.Size=UDim2.new(1,-56,0,56)
 	row.Position=UDim2.new(0,28,0,yPos)
@@ -1392,29 +1478,40 @@ local function createSliderToggle(parent,text,yPos,accentColor,onChanged)
 	local enabled=false
 
 	local function updateVisual()
-		local bgColor=enabled
+		local bgColor=
+			enabled
 			and Color3.fromRGB(90,190,245)
 			or Color3.fromRGB(120,120,125)
 
 		local bgTransparency=enabled and 0 or 0.35
 
-		local knobColor=enabled
+		local knobColor=
+			enabled
 			and Color3.fromRGB(15,15,20)
 			or Color3.fromRGB(230,230,230)
 
-		local knobPos=enabled
+		local knobPos=
+			enabled
 			and UDim2.new(0,26,0.5,-11)
 			or UDim2.new(0,3,0.5,-11)
 
-		tween(toggle,{
-			BackgroundColor3=bgColor,
-			BackgroundTransparency=bgTransparency
-		},0.2)
+		tween(
+			toggle,
+			{
+				BackgroundColor3=bgColor,
+				BackgroundTransparency=bgTransparency
+			},
+			0.2
+		)
 
-		tween(knob,{
-			BackgroundColor3=knobColor,
-			Position=knobPos
-		},0.2)
+		tween(
+			knob,
+			{
+				BackgroundColor3=knobColor,
+				Position=knobPos
+			},
+			0.2
+		)
 	end
 
 	local function setState(state,fireCallback)
@@ -1440,7 +1537,13 @@ end
 -- CHECKBOX / SWITCH
 --========================================================
 
-local function createCheckbox(parent,text,yPos,accentColor,onChanged)
+local function createCheckbox(
+	parent,
+	text,
+	yPos,
+	accentColor,
+	onChanged
+)
 	local row=Instance.new("Frame")
 	row.Size=UDim2.new(1,-56,0,56)
 	row.Position=UDim2.new(0,28,0,yPos)
@@ -1506,29 +1609,40 @@ local function createCheckbox(parent,text,yPos,accentColor,onChanged)
 	local checked=false
 
 	local function updateVisual()
-		local bgColor=checked
+		local bgColor=
+			checked
 			and Color3.fromRGB(90,190,245)
 			or Color3.fromRGB(120,120,125)
 
 		local bgTransparency=checked and 0 or 0.35
 
-		local knobColor=checked
+		local knobColor=
+			checked
 			and Color3.fromRGB(15,15,20)
 			or Color3.fromRGB(230,230,230)
 
-		local knobPos=checked
+		local knobPos=
+			checked
 			and UDim2.new(0,26,0.5,-11)
 			or UDim2.new(0,3,0.5,-11)
 
-		tween(checkbox,{
-			BackgroundColor3=bgColor,
-			BackgroundTransparency=bgTransparency
-		},0.2)
+		tween(
+			checkbox,
+			{
+				BackgroundColor3=bgColor,
+				BackgroundTransparency=bgTransparency
+			},
+			0.2
+		)
 
-		tween(knob,{
-			BackgroundColor3=knobColor,
-			Position=knobPos
-		},0.2)
+		tween(
+			knob,
+			{
+				BackgroundColor3=knobColor,
+				Position=knobPos
+			},
+			0.2
+		)
 	end
 
 	local function setState(state,fireCallback)
@@ -1554,7 +1668,16 @@ end
 -- NUMBER CONTROL
 --========================================================
 
-local function createNumberControl(parent,titleText,yPos,defaultValue,minValue,maxValue,accentColor,onChanged)
+local function createNumberControl(
+	parent,
+	titleText,
+	yPos,
+	defaultValue,
+	minValue,
+	maxValue,
+	accentColor,
+	onChanged
+)
 	local row=Instance.new("Frame")
 	row.Size=UDim2.new(1,-56,0,78)
 	row.Position=UDim2.new(0,28,0,yPos)
@@ -1688,7 +1811,9 @@ local function createNumberControl(parent,titleText,yPos,defaultValue,minValue,m
 	local dragging=false
 
 	local function updateFromInputPosition(inputPosition)
-		local relativeX=inputPosition.X-track.AbsolutePosition.X
+		local relativeX=
+			inputPosition.X-track.AbsolutePosition.X
+
 		local fraction=math.clamp(
 			relativeX/track.AbsoluteSize.X,
 			0,
@@ -1708,6 +1833,7 @@ local function createNumberControl(parent,titleText,yPos,defaultValue,minValue,m
 	track.InputBegan:Connect(function(input)
 		if input.UserInputType==Enum.UserInputType.MouseButton1
 			or input.UserInputType==Enum.UserInputType.Touch then
+
 			beginDrag(input)
 		end
 	end)
@@ -1715,6 +1841,7 @@ local function createNumberControl(parent,titleText,yPos,defaultValue,minValue,m
 	knob.InputBegan:Connect(function(input)
 		if input.UserInputType==Enum.UserInputType.MouseButton1
 			or input.UserInputType==Enum.UserInputType.Touch then
+
 			beginDrag(input)
 		end
 	end)
@@ -1800,7 +1927,12 @@ informationLayout.Padding=UDim.new(0,16)
 informationLayout.SortOrder=Enum.SortOrder.LayoutOrder
 informationLayout.Parent=informationList
 
-local function createInformationRow(order,labelText,valueText,valueColor)
+local function createInformationRow(
+	order,
+	labelText,
+	valueText,
+	valueColor
+)
 	local row=Instance.new("Frame")
 	row.Size=UDim2.new(1,0,0,44)
 	row.BackgroundTransparency=1
@@ -1824,16 +1956,32 @@ local function createInformationRow(order,labelText,valueText,valueColor)
 	value.Text=valueText
 	value.Font=Enum.Font.GothamMedium
 	value.TextSize=17
-	value.TextColor3=valueColor or Color3.fromRGB(240,240,240)
+	value.TextColor3=
+		valueColor or Color3.fromRGB(240,240,240)
 	value.TextXAlignment=Enum.TextXAlignment.Left
 	value.Parent=row
 
 	return row,value
 end
 
-createInformationRow(1,"Họ và Tên","Lý Phúc Thiện")
-createInformationRow(2,"Ngày sinh","18/3")
-createInformationRow(3,"Tuổi","15")
+createInformationRow(
+	1,
+	"Họ và Tên",
+	"Lý Phúc Thiện"
+)
+
+createInformationRow(
+	2,
+	"Ngày sinh",
+	"18/3"
+)
+
+createInformationRow(
+	3,
+	"Tuổi",
+	"15"
+)
+
 createInformationRow(
 	4,
 	"Trạng Thái",
@@ -1870,7 +2018,10 @@ local gameInfoOK,gameInfo=pcall(function()
 	return MarketplaceService:GetProductInfo(game.PlaceId)
 end)
 
-if gameInfoOK and type(gameInfo)=="table" and gameInfo.Name then
+if gameInfoOK
+	and type(gameInfo)=="table"
+	and gameInfo.Name then
+
 	gameNameValue=tostring(gameInfo.Name)
 end
 
@@ -1879,7 +2030,8 @@ gameRow.Text=string.format(
 	gameNameValue
 )
 
-informationPage.CanvasSize=UDim2.new(0,0,0,540)
+informationPage.CanvasSize=
+	UDim2.new(0,0,0,540)
 
 --========================================================
 -- AUTO WIN PAGE
@@ -1907,6 +2059,22 @@ local refreshCorner=Instance.new("UICorner")
 refreshCorner.CornerRadius=UDim.new(0,9)
 refreshCorner.Parent=refreshTargets
 
+refreshTargets.MouseEnter:Connect(function()
+	tween(
+		refreshTargets,
+		{BackgroundColor3=Color3.fromRGB(120,180,255)},
+		0.15
+	)
+end)
+
+refreshTargets.MouseLeave:Connect(function()
+	tween(
+		refreshTargets,
+		{BackgroundColor3=COLORS.PageServer},
+		0.15
+	)
+end)
+
 local WIN_STAGES={
 	{stage=1,value=1,text="Stage 1 (+1 Win)"},
 	{stage=2,value=3,text="Stage 2 (+3 Wins)"},
@@ -1925,14 +2093,6 @@ local WIN_STAGES={
 	{stage=15,value=150000,text="Stage 15 (+150K Wins)"},
 }
 
-refreshTargets.MouseEnter:Connect(function()
-	tween(refreshTargets,{BackgroundColor3=Color3.fromRGB(120,180,255)},0.15)
-end)
-
-refreshTargets.MouseLeave:Connect(function()
-	tween(refreshTargets,{BackgroundColor3=COLORS.PageServer},0.15)
-end)
-
 refreshTargets.MouseButton1Click:Connect(function()
 	local module=loadMovementModule()
 
@@ -1948,54 +2108,72 @@ local winTargetRows={}
 local selectedWinTarget=nil
 
 for index,stageData in ipairs(WIN_STAGES) do
-	local rowY=WIN_TARGET_START_Y+(index-1)*(WIN_TARGET_ROW_HEIGHT+WIN_TARGET_ROW_GAP)
+	local rowY=
+		WIN_TARGET_START_Y+
+		(index-1)*
+		(WIN_TARGET_ROW_HEIGHT+WIN_TARGET_ROW_GAP)
 
-	local _,_,setStageState=createSliderToggle(
-		autoWinPage,
-		stageData.text,
-		rowY,
-		COLORS.PageServer,
-		function(isEnabled)
-			if isEnabled then
-				selectedWinTarget=stageData.value
+	local _,_,setStageState=
+		createSliderToggle(
+			autoWinPage,
+			stageData.text,
+			rowY,
+			COLORS.PageServer,
+			function(isEnabled)
+				if isEnabled then
+					selectedWinTarget=stageData.value
 
-				for _,entry in ipairs(winTargetRows) do
-					if entry.index~=index then
-						entry.setState(false,false)
+					for _,entry in ipairs(winTargetRows) do
+						if entry.index~=index then
+							entry.setState(false,false)
+						end
+					end
+
+					local module=loadMovementModule()
+
+					if module
+						and module.RefreshTargets then
+
+						module.RefreshTargets()
+					end
+
+				elseif selectedWinTarget==stageData.value then
+					selectedWinTarget=nil
+
+					local module=loadMovementModule()
+
+					if module
+						and module.StopFlying then
+
+						module.StopFlying()
 					end
 				end
-
-				local module=loadMovementModule()
-
-				if module and module.RefreshTargets then
-					module.RefreshTargets()
-				end
-			elseif selectedWinTarget==stageData.value then
-				selectedWinTarget=nil
-
-				local module=loadMovementModule()
-
-				if module and module.StopFlying then
-					module.StopFlying()
-				end
 			end
-		end
-	)
+		)
 
-	table.insert(winTargetRows,{
-		index=index,
-		stage=stageData.stage,
-		value=stageData.value,
-		setState=setStageState
-	})
+	table.insert(
+		winTargetRows,
+		{
+			index=index,
+			stage=stageData.stage,
+			value=stageData.value,
+			setState=setStageState
+		}
+	)
 end
 
 local winTargetsBottom=
-	WIN_TARGET_START_Y
-	+(#WIN_STAGES*WIN_TARGET_ROW_HEIGHT)
-	+((#WIN_STAGES-1)*WIN_TARGET_ROW_GAP)
+	WIN_TARGET_START_Y+
+	(#WIN_STAGES*WIN_TARGET_ROW_HEIGHT)+
+	((#WIN_STAGES-1)*WIN_TARGET_ROW_GAP)
 
-autoWinPage.CanvasSize=UDim2.new(0,0,0,winTargetsBottom+25)
+autoWinPage.CanvasSize=
+	UDim2.new(
+		0,
+		0,
+		0,
+		winTargetsBottom+25
+	)
 
 --========================================================
 -- ESP PAGE
@@ -2004,17 +2182,17 @@ autoWinPage.CanvasSize=UDim2.new(0,0,0,winTargetsBottom+25)
 createPageTitle(
 	espPage,
 	"ESP",
-	"Hiển thị người chơi và các nút Win trong map."
+	"Hiển thị người chơi và khoảng cách."
 )
-
---========================================================
--- PLAYER ESP
---========================================================
 
 local ESPState={
 	Enabled=false,
 	Objects={},
 }
+
+--========================================================
+-- PLAYER ESP REMOVE
+--========================================================
 
 local function removeESP(targetPlayer)
 	local data=ESPState.Objects[targetPlayer]
@@ -2038,8 +2216,14 @@ local function removeESP(targetPlayer)
 	ESPState.Objects[targetPlayer]=nil
 end
 
+--========================================================
+-- PLAYER ESP CREATE
+--========================================================
+
 local function createESP(targetPlayer)
-	if not targetPlayer or targetPlayer==player then
+	if not targetPlayer
+		or targetPlayer==player then
+
 		return
 	end
 
@@ -2050,11 +2234,15 @@ local function createESP(targetPlayer)
 	removeESP(targetPlayer)
 
 	local character=targetPlayer.Character
+
 	if not character then
 		return
 	end
 
-	local root=character:FindFirstChild("HumanoidRootPart")
+	local root=character:FindFirstChild(
+		"HumanoidRootPart"
+	)
+
 	if not root then
 		return
 	end
@@ -2062,7 +2250,8 @@ local function createESP(targetPlayer)
 	local highlight=Instance.new("Highlight")
 	highlight.Name="LPTHubESP"
 	highlight.Adornee=character
-	highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.DepthMode=
+		Enum.HighlightDepthMode.AlwaysOnTop
 	highlight.FillColor=COLORS.Accent
 	highlight.FillTransparency=0.78
 	highlight.OutlineColor=COLORS.PageServer
@@ -2074,7 +2263,8 @@ local function createESP(targetPlayer)
 	billboard.Name="LPTHubESPInfo"
 	billboard.Adornee=root
 	billboard.Size=UDim2.new(0,220,0,58)
-	billboard.StudsOffset=Vector3.new(0,3.5,0)
+	billboard.StudsOffset=
+		Vector3.new(0,3.5,0)
 	billboard.AlwaysOnTop=true
 	billboard.Enabled=true
 	billboard.ResetOnSpawn=false
@@ -2085,14 +2275,27 @@ local function createESP(targetPlayer)
 	label.Name="PlayerInfo"
 	label.Size=UDim2.new(1,0,1,0)
 	label.BackgroundTransparency=1
-	label.TextColor3=Color3.fromRGB(255,255,255)
-	label.TextStrokeColor3=Color3.fromRGB(0,0,0)
+	label.Text=""
+	label.TextColor3=Color3.fromRGB(
+		255,
+		255,
+		255
+	)
+	label.TextStrokeColor3=Color3.fromRGB(
+		0,
+		0,
+		0
+	)
 	label.TextStrokeTransparency=0
 	label.TextSize=14
 	label.Font=Enum.Font.GothamBold
-	label.TextXAlignment=Enum.TextXAlignment.Center
-	label.TextYAlignment=Enum.TextYAlignment.Center
+	label.TextXAlignment=
+		Enum.TextXAlignment.Center
+	label.TextYAlignment=
+		Enum.TextYAlignment.Center
 	label.TextWrapped=true
+	label.Visible=true
+	label.ZIndex=10
 	label.Parent=billboard
 
 	ESPState.Objects[targetPlayer]={
@@ -2103,23 +2306,42 @@ local function createESP(targetPlayer)
 	}
 end
 
+--========================================================
+-- PLAYER ESP UPDATE
+--========================================================
+
 local function updateESP()
 	if not ESPState.Enabled then
 		return
 	end
 
 	local character=player.Character
-	local localRoot=character and character:FindFirstChild("HumanoidRootPart")
+	local localRoot=
+		character
+		and character:FindFirstChild(
+			"HumanoidRootPart"
+		)
 
 	if not localRoot then
 		return
 	end
 
-	for _,targetPlayer in ipairs(Players:GetPlayers()) do
+	for _,targetPlayer in ipairs(
+		Players:GetPlayers()
+	) do
+
 		if targetPlayer~=player then
-			local targetCharacter=targetPlayer.Character
-			local root=targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
-			local data=ESPState.Objects[targetPlayer]
+			local targetCharacter=
+				targetPlayer.Character
+
+			local root=
+				targetCharacter
+				and targetCharacter:FindFirstChild(
+					"HumanoidRootPart"
+				)
+
+			local data=
+				ESPState.Objects[targetPlayer]
 
 			if targetCharacter and root then
 				if not data
@@ -2130,14 +2352,25 @@ local function updateESP()
 					or data.root~=root then
 
 					createESP(targetPlayer)
-					data=ESPState.Objects[targetPlayer]
+
+					data=
+						ESPState.Objects[targetPlayer]
 				end
 
 				if data then
-					local distance=(root.Position-localRoot.Position).Magnitude
-					local distanceText=("%dm"):format(math.floor(distance+0.5))
+					local distance=
+						(root.Position-
+						localRoot.Position).Magnitude
+
+					local distanceText=
+						("%dm"):format(
+							math.floor(
+								distance+0.5
+							)
+						)
 
 					data.root=root
+
 					data.billboard.Adornee=root
 					data.billboard.Enabled=true
 					data.label.Visible=true
@@ -2145,9 +2378,12 @@ local function updateESP()
 					data.label.Text=
 						targetPlayer.DisplayName
 						.."\n"
-						.."@"..targetPlayer.Name
+						.."@"
+						..targetPlayer.Name
 						.."\n"
-						.."["..distanceText.."]"
+						.."["
+						..distanceText
+						.."]"
 				end
 			elseif data then
 				removeESP(targetPlayer)
@@ -2157,7 +2393,9 @@ local function updateESP()
 end
 
 local function refreshESP()
-	for targetPlayer in pairs(ESPState.Objects) do
+	for targetPlayer in pairs(
+		ESPState.Objects
+	) do
 		removeESP(targetPlayer)
 	end
 
@@ -2165,7 +2403,10 @@ local function refreshESP()
 		return
 	end
 
-	for _,targetPlayer in ipairs(Players:GetPlayers()) do
+	for _,targetPlayer in ipairs(
+		Players:GetPlayers()
+	) do
+
 		if targetPlayer~=player then
 			createESP(targetPlayer)
 		end
@@ -2175,235 +2416,7 @@ local function refreshESP()
 end
 
 --========================================================
--- WIN ESP
---========================================================
-
-local WinESPState={
-	Enabled=false,
-	Objects={},
-}
-
-local WIN_ESP_SCAN_INTERVAL=1
-local lastWinESPScan=0
-
-local function removeWinESP(stageNumber)
-	local data=WinESPState.Objects[stageNumber]
-
-	if not data then
-		return
-	end
-
-	if data.highlight then
-		pcall(function()
-			data.highlight:Destroy()
-		end)
-	end
-
-	if data.billboard then
-		pcall(function()
-			data.billboard:Destroy()
-		end)
-	end
-
-	WinESPState.Objects[stageNumber]=nil
-end
-
-local function createWinESP(stageNumber,target,stageData)
-	if not WinESPState.Enabled then
-		return
-	end
-
-	if not target
-		or not target:IsA("BasePart")
-		or not target.Parent then
-
-		removeWinESP(stageNumber)
-		return
-	end
-
-	removeWinESP(stageNumber)
-
-	local highlight=Instance.new("Highlight")
-	highlight.Name="LPTHubWinESP"
-	highlight.Adornee=target
-	highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.FillColor=COLORS.PageFarm
-	highlight.FillTransparency=0.78
-	highlight.OutlineColor=COLORS.PageServer
-	highlight.OutlineTransparency=0
-	highlight.Enabled=true
-	highlight.Parent=target
-
-	local billboard=Instance.new("BillboardGui")
-	billboard.Name="LPTHubWinESPInfo"
-	billboard.Adornee=target
-	billboard.Size=UDim2.new(0,180,0,48)
-	billboard.StudsOffset=Vector3.new(0,4,0)
-	billboard.AlwaysOnTop=true
-	billboard.Enabled=true
-	billboard.ResetOnSpawn=false
-	billboard.MaxDistance=math.huge
-	billboard.Parent=screenGui
-
-	local label=Instance.new("TextLabel")
-	label.Name="WinInfo"
-	label.Size=UDim2.new(1,0,1,0)
-	label.BackgroundTransparency=1
-	label.TextColor3=Color3.fromRGB(255,255,255)
-	label.TextStrokeColor3=Color3.fromRGB(0,0,0)
-	label.TextStrokeTransparency=0
-	label.TextSize=14
-	label.Font=Enum.Font.GothamBold
-	label.TextXAlignment=Enum.TextXAlignment.Center
-	label.TextYAlignment=Enum.TextYAlignment.Center
-	label.TextWrapped=true
-	label.ZIndex=10
-	label.Parent=billboard
-
-	WinESPState.Objects[stageNumber]={
-		target=target,
-		highlight=highlight,
-		billboard=billboard,
-		label=label,
-	}
-end
-
-local function getWinESPTarget(module,stageData)
-	if not module then
-		return nil
-	end
-
-	if module.GetStageTarget then
-		local target=module.GetStageTarget(stageData.stage)
-
-		if target and target:IsA("BasePart") and target.Parent then
-			return target
-		end
-	end
-
-	if module.GetTarget then
-		local target=module.GetTarget(stageData.value)
-
-		if target and target:IsA("BasePart") and target.Parent then
-			return target
-		end
-	end
-
-	return nil
-end
-
-local function refreshWinESP()
-	for stageNumber in pairs(WinESPState.Objects) do
-		removeWinESP(stageNumber)
-	end
-
-	if not WinESPState.Enabled then
-		return
-	end
-
-	local module=loadMovementModule()
-
-	if not module then
-		return
-	end
-
-	if module.RefreshTargets then
-		module.RefreshTargets()
-	end
-
-	for _,stageData in ipairs(WIN_STAGES) do
-		local target=getWinESPTarget(module,stageData)
-
-		if target then
-			createWinESP(
-				stageData.stage,
-				target,
-				stageData
-			)
-		end
-	end
-
-	lastWinESPScan=os.clock()
-end
-
-local function updateWinESP()
-	if not WinESPState.Enabled then
-		return
-	end
-
-	local module=Movement
-
-	if not module then
-		return
-	end
-
-	local character=player.Character
-	local localRoot=character and character:FindFirstChild("HumanoidRootPart")
-
-	if not localRoot then
-		return
-	end
-
-	local now=os.clock()
-
-	if now-lastWinESPScan>=WIN_ESP_SCAN_INTERVAL then
-		lastWinESPScan=now
-
-		if module.RefreshTargets then
-			module.RefreshTargets()
-		end
-	end
-
-	for _,stageData in ipairs(WIN_STAGES) do
-		local target=getWinESPTarget(module,stageData)
-		local data=WinESPState.Objects[stageData.stage]
-
-		if target then
-			if not data
-				or not data.target
-				or data.target~=target
-				or not data.highlight
-				or not data.highlight.Parent
-				or not data.billboard
-				or not data.billboard.Parent
-				or not data.label
-				or not data.label.Parent then
-
-				createWinESP(
-					stageData.stage,
-					target,
-					stageData
-				)
-
-				data=WinESPState.Objects[stageData.stage]
-			end
-
-			if data then
-				local distance=(target.Position-localRoot.Position).Magnitude
-				local distanceText=("%dm"):format(
-					math.floor(distance+0.5)
-				)
-
-				data.target=target
-				data.highlight.Adornee=target
-				data.billboard.Adornee=target
-				data.billboard.Enabled=true
-				data.label.Visible=true
-
-				data.label.Text=
-					"Stage "
-					..tostring(stageData.stage)
-					.."\n"
-					.."["..distanceText.."]"
-			end
-		elseif data then
-			removeWinESP(stageData.stage)
-		end
-	end
-end
-
---========================================================
--- ESP TOGGLES
+-- PLAYER ESP TOGGLE
 --========================================================
 
 createCheckbox(
@@ -2417,25 +2430,8 @@ createCheckbox(
 	end
 )
 
-createCheckbox(
-	espPage,
-	"Win ESP",
-	163,
-	COLORS.PageFarm,
-	function(enabled)
-		WinESPState.Enabled=enabled
-
-		if enabled then
-			refreshWinESP()
-		else
-			for stageNumber in pairs(WinESPState.Objects) do
-				removeWinESP(stageNumber)
-			end
-		end
-	end
-)
-
-espPage.CanvasSize=UDim2.new(0,0,0,240)
+espPage.CanvasSize=
+	UDim2.new(0,0,0,180)
 
 --========================================================
 -- PLAYER EVENTS
@@ -2455,7 +2451,10 @@ Players.PlayerRemoving:Connect(function(targetPlayer)
 	removeESP(targetPlayer)
 end)
 
-for _,targetPlayer in ipairs(Players:GetPlayers()) do
+for _,targetPlayer in ipairs(
+	Players:GetPlayers()
+) do
+
 	if targetPlayer~=player then
 		targetPlayer.CharacterAdded:Connect(function()
 			task.wait(0.5)
@@ -2474,10 +2473,6 @@ task.spawn(function()
 		if ESPState.Enabled then
 			updateESP()
 		end
-
-		if WinESPState.Enabled then
-			updateWinESP()
-		end
 	end
 end)
 
@@ -2491,7 +2486,8 @@ createPageTitle(
 	"Điều Chỉnh Theo Ý Muốn Của Bạn."
 )
 
-local SETTINGS_FILE="LPT_Hub_Settings.json"
+local SETTINGS_FILE=
+	"LPT_Hub_Settings.json"
 
 local DEFAULT_SETTINGS={
 	WalkSpeed=16,
@@ -2505,7 +2501,9 @@ local DEFAULT_SETTINGS={
 local function loadSavedSettings()
 	local settings={}
 
-	for key,value in pairs(DEFAULT_SETTINGS) do
+	for key,value in pairs(
+		DEFAULT_SETTINGS
+	) do
 		settings[key]=value
 	end
 
@@ -2528,7 +2526,9 @@ local function loadSavedSettings()
 	end)
 
 	if success and type(result)=="table" then
-		for key in pairs(DEFAULT_SETTINGS) do
+		for key in pairs(
+			DEFAULT_SETTINGS
+		) do
 			if result[key]~=nil then
 				settings[key]=result[key]
 			end
@@ -2540,10 +2540,21 @@ end
 
 local Loaded=loadSavedSettings()
 
-local speedValue=tonumber(Loaded.WalkSpeed) or 16
-local jumpValue=tonumber(Loaded.JumpPower) or 50
-local flySpeedValue=tonumber(Loaded.FlySpeed) or 90
-local flyHeightValue=tonumber(Loaded.FlyHeight) or 5
+local speedValue=
+	tonumber(Loaded.WalkSpeed)
+	or 16
+
+local jumpValue=
+	tonumber(Loaded.JumpPower)
+	or 50
+
+local flySpeedValue=
+	tonumber(Loaded.FlySpeed)
+	or 90
+
+local flyHeightValue=
+	tonumber(Loaded.FlyHeight)
+	or 5
 
 local infiniteJumpEnabled
 local noClipEnabled
@@ -2589,7 +2600,9 @@ createNumberControl(
 
 		local module=loadMovementModule()
 
-		if module and module.SetWalkSpeed then
+		if module
+			and module.SetWalkSpeed then
+
 			module.SetWalkSpeed(value)
 		end
 
@@ -2610,7 +2623,9 @@ createNumberControl(
 
 		local module=loadMovementModule()
 
-		if module and module.SetJumpPower then
+		if module
+			and module.SetJumpPower then
+
 			module.SetJumpPower(value)
 		end
 
@@ -2631,7 +2646,9 @@ createNumberControl(
 
 		local module=loadMovementModule()
 
-		if module and module.SetFlySpeed then
+		if module
+			and module.SetFlySpeed then
+
 			module.SetFlySpeed(value)
 		end
 
@@ -2652,7 +2669,9 @@ createNumberControl(
 
 		local module=loadMovementModule()
 
-		if module and module.SetFlyHeight then
+		if module
+			and module.SetFlyHeight then
+
 			module.SetFlyHeight(value)
 		end
 
@@ -2669,7 +2688,9 @@ local _,_,setInfiniteJumpUI,getInfiniteJumpState=
 		function(enabled)
 			local module=loadMovementModule()
 
-			if module and module.SetInfiniteJump then
+			if module
+				and module.SetInfiniteJump then
+
 				module.SetInfiniteJump(enabled)
 			end
 
@@ -2688,7 +2709,9 @@ local _,_,setNoClipUI,getNoClipState=
 		function(enabled)
 			local module=loadMovementModule()
 
-			if module and module.SetNoClip then
+			if module
+				and module.SetNoClip then
+
 				module.SetNoClip(enabled)
 			end
 
@@ -2698,7 +2721,8 @@ local _,_,setNoClipUI,getNoClipState=
 
 noClipEnabled=getNoClipState
 
-settingsPage.CanvasSize=UDim2.new(0,0,0,610)
+settingsPage.CanvasSize=
+	UDim2.new(0,0,0,610)
 
 --========================================================
 -- APPLY SAVED SETTINGS
@@ -2751,9 +2775,13 @@ task.spawn(function()
 		if selectedWinTarget then
 			local target=
 				module.GetTarget
-				and module.GetTarget(selectedWinTarget)
+				and module.GetTarget(
+					selectedWinTarget
+				)
 
-			if not target and module.RefreshTargets then
+			if not target
+				and module.RefreshTargets then
+
 				module.RefreshTargets()
 			end
 
@@ -2761,8 +2789,11 @@ task.spawn(function()
 				and module.FlyToWin
 				and not module.IsFlying() then
 
-				module.FlyToWin(selectedWinTarget)
+				module.FlyToWin(
+					selectedWinTarget
+				)
 			end
+
 		elseif module.IsFlying
 			and module.IsFlying() then
 
@@ -2780,13 +2811,25 @@ end)
 local currentPage=nil
 local buttons={}
 
-local function createSidebarButton(text,order,pageName,accentColor)
-	accentColor=accentColor or COLORS.PageServer
+local function createSidebarButton(
+	text,
+	order,
+	pageName,
+	accentColor
+)
+	accentColor=
+		accentColor or COLORS.PageServer
 
 	local button=Instance.new("TextButton")
 	button.Name=pageName.."Button"
 	button.Size=UDim2.new(1,-24,0,48)
-	button.Position=UDim2.new(0,12,0,16+(order-1)*54)
+	button.Position=
+		UDim2.new(
+			0,
+			12,
+			0,
+			16+(order-1)*54
+		)
 	button.BackgroundColor3=COLORS.SurfaceLight
 	button.BackgroundTransparency=1
 	button.BorderSizePixel=0
@@ -2806,33 +2849,67 @@ local function createSidebarButton(text,order,pageName,accentColor)
 	textLabel.TextColor3=COLORS.TextDim
 	textLabel.TextSize=16.5
 	textLabel.Font=Enum.Font.GothamMedium
-	textLabel.TextXAlignment=Enum.TextXAlignment.Left
+	textLabel.TextXAlignment=
+		Enum.TextXAlignment.Left
 	textLabel.Parent=button
 
 	local indicator=Instance.new("Frame")
 	indicator.Name="Indicator"
 	indicator.Size=UDim2.new(0,4,0,28)
-	indicator.Position=UDim2.new(0,0,0.5,-14)
+	indicator.Position=
+		UDim2.new(0,0,0.5,-14)
 	indicator.BackgroundColor3=accentColor
 	indicator.BorderSizePixel=0
 	indicator.Visible=false
 	indicator.Parent=button
 
 	local indicatorCorner=Instance.new("UICorner")
-	indicatorCorner.CornerRadius=UDim.new(1,0)
+	indicatorCorner.CornerRadius=
+		UDim.new(1,0)
 	indicatorCorner.Parent=indicator
 
 	button.MouseEnter:Connect(function()
 		if currentPage~=pageName then
-			tween(button,{BackgroundTransparency=0.72},0.16)
-			tween(textLabel,{TextColor3=Color3.fromRGB(205,210,220)},0.16)
+			tween(
+				button,
+				{
+					BackgroundTransparency=0.72
+				},
+				0.16
+			)
+
+			tween(
+				textLabel,
+				{
+					TextColor3=
+						Color3.fromRGB(
+							205,
+							210,
+							220
+						)
+				},
+				0.16
+			)
 		end
 	end)
 
 	button.MouseLeave:Connect(function()
 		if currentPage~=pageName then
-			tween(button,{BackgroundTransparency=1},0.16)
-			tween(textLabel,{TextColor3=COLORS.TextDim},0.16)
+			tween(
+				button,
+				{
+					BackgroundTransparency=1
+				},
+				0.16
+			)
+
+			tween(
+				textLabel,
+				{
+					TextColor3=COLORS.TextDim
+				},
+				0.16
+			)
 		end
 	end)
 
@@ -2841,12 +2918,28 @@ local function createSidebarButton(text,order,pageName,accentColor)
 			return
 		end
 
-		local oldButtonData=buttons[currentPage]
-		local newButtonData=buttons[pageName]
+		local oldButtonData=
+			buttons[currentPage]
+
+		local newButtonData=
+			buttons[pageName]
 
 		if oldButtonData then
-			tween(oldButtonData.button,{BackgroundTransparency=1},0.16)
-			tween(oldButtonData.label,{TextColor3=COLORS.TextDim},0.16)
+			tween(
+				oldButtonData.button,
+				{
+					BackgroundTransparency=1
+				},
+				0.16
+			)
+
+			tween(
+				oldButtonData.label,
+				{
+					TextColor3=COLORS.TextDim
+				},
+				0.16
+			)
 		end
 
 		for _,page in pairs(pages) do
@@ -2856,22 +2949,54 @@ local function createSidebarButton(text,order,pageName,accentColor)
 		currentPage=pageName
 
 		if newButtonData then
-			tween(newButtonData.button,{BackgroundTransparency=0.12},0.18)
-			tween(newButtonData.label,{TextColor3=COLORS.Text},0.18)
+			tween(
+				newButtonData.button,
+				{
+					BackgroundTransparency=0.12
+				},
+				0.18
+			)
+
+			tween(
+				newButtonData.label,
+				{
+					TextColor3=COLORS.Text
+				},
+				0.18
+			)
 		end
 
 		if oldButtonData and newButtonData then
-			local oldY=oldButtonData.button.Position.Y.Offset
-			local newY=newButtonData.button.Position.Y.Offset
-			local indicatorProxy=oldButtonData.indicator
+			local oldY=
+				oldButtonData.button.Position.Y.Offset
+
+			local newY=
+				newButtonData.button.Position.Y.Offset
+
+			local indicatorProxy=
+				oldButtonData.indicator
 
 			indicatorProxy.Parent=sidebar
 			indicatorProxy.Visible=true
-			indicatorProxy.Position=UDim2.new(0,12,0,oldY+10)
+			indicatorProxy.Position=
+				UDim2.new(
+					0,
+					12,
+					0,
+					oldY+10
+				)
 
 			tween(
 				indicatorProxy,
-				{Position=UDim2.new(0,12,0,newY+10)},
+				{
+					Position=
+						UDim2.new(
+							0,
+							12,
+							0,
+							newY+10
+						)
+				},
 				0.28,
 				Enum.EasingStyle.Quint
 			)
@@ -2882,13 +3007,16 @@ local function createSidebarButton(text,order,pageName,accentColor)
 				end
 			end
 
-			newButtonData.indicator=indicatorProxy
+			newButtonData.indicator=
+				indicatorProxy
 		else
 			newButtonData.indicator.Visible=true
 		end
 
 		newButtonData.indicator.Visible=true
-		newButtonData.indicator.BackgroundColor3=accentColor
+		newButtonData.indicator.BackgroundColor3=
+			accentColor
+
 		pages[pageName].Visible=true
 	end)
 
@@ -2902,10 +3030,33 @@ local function createSidebarButton(text,order,pageName,accentColor)
 	return button
 end
 
-createSidebarButton("Information",1,"Information",COLORS.Accent)
-createSidebarButton("Auto Win",2,"AutoWin",COLORS.PageServer)
-createSidebarButton("ESP",3,"ESP",COLORS.PageFarm)
-createSidebarButton("Settings",4,"Settings",COLORS.PageFarm)
+createSidebarButton(
+	"Information",
+	1,
+	"Information",
+	COLORS.Accent
+)
+
+createSidebarButton(
+	"Auto Win",
+	2,
+	"AutoWin",
+	COLORS.PageServer
+)
+
+createSidebarButton(
+	"ESP",
+	3,
+	"ESP",
+	COLORS.PageFarm
+)
+
+createSidebarButton(
+	"Settings",
+	4,
+	"Settings",
+	COLORS.PageFarm
+)
 
 currentPage="Information"
 
@@ -2916,8 +3067,10 @@ settingsPage.Visible=false
 
 buttons["Information"].button.BackgroundTransparency=0.12
 buttons["Information"].indicator.Visible=true
-buttons["Information"].indicator.BackgroundColor3=COLORS.Accent
-buttons["Information"].label.TextColor3=COLORS.Text
+buttons["Information"].indicator.BackgroundColor3=
+	COLORS.Accent
+buttons["Information"].label.TextColor3=
+	COLORS.Text
 
 --========================================================
 -- CLOSE
@@ -2944,19 +3097,17 @@ close.MouseButton1Click:Connect(function()
 		end
 	end
 
-	WinESPState.Enabled=false
-
-	for stageNumber in pairs(WinESPState.Objects) do
-		removeWinESP(stageNumber)
-	end
-
-	for targetPlayer in pairs(ESPState.Objects) do
+	for targetPlayer in pairs(
+		ESPState.Objects
+	) do
 		removeESP(targetPlayer)
 	end
 
 	tween(
 		main,
-		{BackgroundTransparency=1},
+		{
+			BackgroundTransparency=1
+		},
 		0.15
 	)
 
@@ -2977,22 +3128,36 @@ local minimized=false
 local savedBeforeMinimizeSize=nil
 local savedBeforeMinimizePosition=nil
 
-local normalSize=UDim2.new(0,780,0,500)
-local normalPosition=UDim2.new(0.5,-390,0.5,-250)
+local normalSize=
+	UDim2.new(0,780,0,500)
 
-local maximizedSize=UDim2.new(1,-40,1,-40)
-local maximizedPosition=UDim2.new(0,20,0,20)
+local normalPosition=
+	UDim2.new(0.5,-390,0.5,-250)
 
-local minimizedSize=UDim2.new(0,300,0,38)
-local minimizedPosition=UDim2.new(0.5,-150,-0.060,15)
+local maximizedSize=
+	UDim2.new(1,-40,1,-40)
+
+local maximizedPosition=
+	UDim2.new(0,20,0,20)
+
+local minimizedSize=
+	UDim2.new(0,300,0,38)
+
+local minimizedPosition=
+	UDim2.new(0.5,-150,-0.060,15)
 
 local minimizedHover=false
 local dragging=false
 local dragStart=nil
 local startPos=nil
 
+--========================================================
+-- UPDATE MINIMIZED BUTTONS
+--========================================================
+
 local function updateMinimizedButtons(animated)
-	local duration=animated and 0.15 or 0
+	local duration=
+		animated and 0.15 or 0
 
 	if not minimized then
 		minimize.Visible=true
@@ -3030,7 +3195,8 @@ local function updateMinimizedButtons(animated)
 	close.Visible=true
 	close.Active=minimizedHover
 
-	local transparency=minimizedHover and 0 or 1
+	local transparency=
+		minimizedHover and 0 or 1
 
 	if duration>0 then
 		tween(
@@ -3044,19 +3210,35 @@ local function updateMinimizedButtons(animated)
 
 		tween(
 			normalStroke,
-			{Transparency=minimizedHover and 0.1 or 1},
+			{
+				Transparency=
+					minimizedHover
+					and 0.1
+					or 1
+			},
 			duration
 		)
 	else
-		close.BackgroundTransparency=transparency
-		close.TextTransparency=transparency
-		normalStroke.Transparency=minimizedHover and 0.1 or 1
+		close.BackgroundTransparency=
+			transparency
+
+		close.TextTransparency=
+			transparency
+
+		normalStroke.Transparency=
+			minimizedHover
+			and 0.1
+			or 1
 	end
 
 	normalIcon.Visible=false
 	restoreBack.Visible=false
 	restoreFront.Visible=false
 end
+
+--========================================================
+-- RESTORE FROM MINIMIZED
+--========================================================
 
 local function restoreFromMinimized()
 	if not minimized then
@@ -3070,15 +3252,24 @@ local function restoreFromMinimized()
 	content.Visible=true
 	author.Visible=true
 
-	local restoreSize=savedBeforeMinimizeSize
-	local restorePosition=savedBeforeMinimizePosition
+	local restoreSize=
+		savedBeforeMinimizeSize
+
+	local restorePosition=
+		savedBeforeMinimizePosition
 
 	if not restoreSize then
-		restoreSize=maximized and maximizedSize or normalSize
+		restoreSize=
+			maximized
+			and maximizedSize
+			or normalSize
 	end
 
 	if not restorePosition then
-		restorePosition=maximized and maximizedPosition or normalPosition
+		restorePosition=
+			maximized
+			and maximizedPosition
+			or normalPosition
 	end
 
 	updateMinimizedButtons(false)
@@ -3089,11 +3280,18 @@ local function restoreFromMinimized()
 
 	tween(
 		main,
-		{Size=restoreSize,Position=restorePosition},
+		{
+			Size=restoreSize,
+			Position=restorePosition
+		},
 		0.28,
 		Enum.EasingStyle.Quint
 	)
 end
+
+--========================================================
+-- MAXIMIZE
+--========================================================
 
 maximize.MouseButton1Click:Connect(function()
 	if minimized then
@@ -3136,6 +3334,10 @@ maximize.MouseButton1Click:Connect(function()
 	updateMinimizedButtons(false)
 end)
 
+--========================================================
+-- MINIMIZE
+--========================================================
+
 minimize.MouseButton1Click:Connect(function()
 	if minimized then
 		restoreFromMinimized()
@@ -3165,6 +3367,10 @@ minimize.MouseButton1Click:Connect(function()
 	)
 end)
 
+--========================================================
+-- MINIMIZED HOVER
+--========================================================
+
 topBar.MouseEnter:Connect(function()
 	if not minimized then
 		return
@@ -3183,8 +3389,14 @@ topBar.MouseLeave:Connect(function()
 	updateMinimizedButtons(true)
 end)
 
+--========================================================
+-- CLICK MINIMIZED BAR TO RESTORE
+--========================================================
+
 topBar.InputBegan:Connect(function(input)
-	if input.UserInputType~=Enum.UserInputType.MouseButton1 then
+	if input.UserInputType~=
+		Enum.UserInputType.MouseButton1 then
+
 		return
 	end
 
@@ -3199,17 +3411,25 @@ topBar.InputBegan:Connect(function(input)
 end)
 
 topBar.InputEnded:Connect(function(input)
-	if input.UserInputType==Enum.UserInputType.MouseButton1 then
+	if input.UserInputType==
+		Enum.UserInputType.MouseButton1 then
+
 		dragging=false
 	end
 end)
+
+--========================================================
+-- DRAG WINDOW
+--========================================================
 
 UserInputService.InputChanged:Connect(function(input)
 	if not dragging or minimized then
 		return
 	end
 
-	if input.UserInputType~=Enum.UserInputType.MouseMovement then
+	if input.UserInputType~=
+		Enum.UserInputType.MouseMovement then
+
 		return
 	end
 
