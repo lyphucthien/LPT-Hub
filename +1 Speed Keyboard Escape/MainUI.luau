@@ -1041,7 +1041,8 @@ end
 
 local informationPage=createPage("Information")
 local autoWinPage=createPage("AutoWin")
-local movementPage=createPage("Movement")
+local espPage=createPage("ESP")
+local settingsPage=createPage("Settings")
 
 --========================================================
 -- PAGE TITLE
@@ -1139,12 +1140,10 @@ local function createCard(parent,yPos,titleText,bodyText,height,accentColor)
 end
 
 --========================================================
--- SLIDER TOGGLE - AUTO WIN
+-- SWITCH TOGGLE
 --========================================================
 
 local function createSliderToggle(parent,text,yPos,accentColor,onChanged)
-	accentColor=accentColor or COLORS.Accent
-
 	local row=Instance.new("Frame")
 	row.Size=UDim2.new(1,-56,0,56)
 	row.Position=UDim2.new(0,28,0,yPos)
@@ -1174,9 +1173,11 @@ local function createSliderToggle(parent,text,yPos,accentColor,onChanged)
 	label.Parent=row
 
 	local toggle=Instance.new("TextButton")
+	toggle.Name="Toggle"
 	toggle.Size=UDim2.new(0,50,0,26)
 	toggle.Position=UDim2.new(1,-68,0.5,-13)
-	toggle.BackgroundColor3=COLORS.SurfaceLight
+	toggle.BackgroundColor3=Color3.fromRGB(120,120,125)
+	toggle.BackgroundTransparency=0.35
 	toggle.BorderSizePixel=0
 	toggle.Text=""
 	toggle.AutoButtonColor=false
@@ -1186,54 +1187,69 @@ local function createSliderToggle(parent,text,yPos,accentColor,onChanged)
 	toggleCorner.CornerRadius=UDim.new(1,0)
 	toggleCorner.Parent=toggle
 
-	local gradient=applyGradient(toggle,accentColor,COLORS.AccentB,0)
-	gradient.Enabled=false
+	local toggleStroke=Instance.new("UIStroke")
+	toggleStroke.Color=Color3.fromRGB(255,255,255)
+	toggleStroke.Transparency=0.6
+	toggleStroke.Thickness=1
+	toggleStroke.Parent=toggle
 
-	local circle=Instance.new("Frame")
-	circle.Size=UDim2.new(0,20,0,20)
-	circle.Position=UDim2.new(0,3,0.5,-10)
-	circle.BackgroundColor3=Color3.new(1,1,1)
-	circle.BorderSizePixel=0
-	circle.Parent=toggle
+	local knob=Instance.new("Frame")
+	knob.Name="Knob"
+	knob.Size=UDim2.new(0,22,0,22)
+	knob.Position=UDim2.new(0,3,0.5,-11)
+	knob.BackgroundColor3=Color3.fromRGB(230,230,230)
+	knob.BorderSizePixel=0
+	knob.ZIndex=2
+	knob.Parent=toggle
 
-	local circleCorner=Instance.new("UICorner")
-	circleCorner.CornerRadius=UDim.new(1,0)
-	circleCorner.Parent=circle
+	local knobCorner=Instance.new("UICorner")
+	knobCorner.CornerRadius=UDim.new(1,0)
+	knobCorner.Parent=knob
 
 	local enabled=false
 
+	local function updateVisual()
+		local bgColor=enabled and Color3.fromRGB(90,190,245) or Color3.fromRGB(120,120,125)
+		local bgTransparency=enabled and 0 or 0.35
+		local knobColor=enabled and Color3.fromRGB(15,15,20) or Color3.fromRGB(230,230,230)
+		local knobPos=enabled
+			and UDim2.new(0,26,0.5,-11)
+			or UDim2.new(0,3,0.5,-11)
+
+		tween(toggle,{
+			BackgroundColor3=bgColor,
+			BackgroundTransparency=bgTransparency
+		},0.2)
+
+		tween(knob,{
+			BackgroundColor3=knobColor,
+			Position=knobPos
+		},0.2)
+	end
+
 	local function setState(state,fireCallback)
 		enabled=state==true
+		updateVisual()
 
-		if enabled then
-			gradient.Enabled=true
-			tween(toggle,{BackgroundColor3=accentColor})
-			tween(circle,{Position=UDim2.new(1,-23,0.5,-10)})
-		else
-			tween(toggle,{BackgroundColor3=COLORS.SurfaceLight})
-			tween(circle,{Position=UDim2.new(0,3,0.5,-10)})
-			task.delay(0.18,function()
-				if not enabled then gradient.Enabled=false end
-			end)
+		if fireCallback~=false and onChanged then
+			onChanged(enabled)
 		end
-
-		if fireCallback~=false and onChanged then onChanged(enabled) end
 	end
 
 	toggle.MouseButton1Click:Connect(function()
 		setState(not enabled,true)
 	end)
 
-	return row,toggle,setState,function() return enabled end
+	return row,toggle,setState,function()
+		return enabled
+	end
 end
 
 --========================================================
--- CHECKBOX - MOVEMENT
+-- CHECKBOX / SWITCH
 --========================================================
 
 local function createCheckbox(parent,text,yPos,accentColor,onChanged)
-	accentColor=accentColor or COLORS.Accent
-
 	local row=Instance.new("Frame")
 	row.Size=UDim2.new(1,-56,0,56)
 	row.Position=UDim2.new(0,28,0,yPos)
@@ -1252,7 +1268,7 @@ local function createCheckbox(parent,text,yPos,accentColor,onChanged)
 	stroke.Parent=row
 
 	local label=Instance.new("TextLabel")
-	label.Size=UDim2.new(1,-80,1,0)
+	label.Size=UDim2.new(1,-90,1,0)
 	label.Position=UDim2.new(0,18,0,0)
 	label.BackgroundTransparency=1
 	label.Text=text
@@ -1264,58 +1280,75 @@ local function createCheckbox(parent,text,yPos,accentColor,onChanged)
 
 	local checkbox=Instance.new("TextButton")
 	checkbox.Name="Checkbox"
-	checkbox.Size=UDim2.new(0,26,0,26)
-	checkbox.Position=UDim2.new(1,-50,0.5,-13)
-	checkbox.BackgroundColor3=COLORS.SurfaceLight
+	checkbox.Size=UDim2.new(0,50,0,26)
+	checkbox.Position=UDim2.new(1,-68,0.5,-13)
+	checkbox.BackgroundColor3=Color3.fromRGB(120,120,125)
+	checkbox.BackgroundTransparency=0.35
 	checkbox.BorderSizePixel=0
 	checkbox.Text=""
 	checkbox.AutoButtonColor=false
 	checkbox.Parent=row
 
 	local checkboxCorner=Instance.new("UICorner")
-	checkboxCorner.CornerRadius=UDim.new(0,7)
+	checkboxCorner.CornerRadius=UDim.new(1,0)
 	checkboxCorner.Parent=checkbox
 
 	local checkboxStroke=Instance.new("UIStroke")
-	checkboxStroke.Color=COLORS.Border
-	checkboxStroke.Thickness=1.5
+	checkboxStroke.Color=Color3.fromRGB(255,255,255)
+	checkboxStroke.Transparency=0.6
+	checkboxStroke.Thickness=1
 	checkboxStroke.Parent=checkbox
 
-	local check=Instance.new("TextLabel")
-	check.Size=UDim2.new(1,0,1,0)
-	check.BackgroundTransparency=1
-	check.Text="✓"
-	check.TextColor3=Color3.new(1,1,1)
-	check.TextSize=18
-	check.Font=Enum.Font.GothamBold
-	check.TextXAlignment=Enum.TextXAlignment.Center
-	check.TextYAlignment=Enum.TextYAlignment.Center
-	check.Visible=false
-	check.Parent=checkbox
+	local knob=Instance.new("Frame")
+	knob.Name="Knob"
+	knob.Size=UDim2.new(0,22,0,22)
+	knob.Position=UDim2.new(0,3,0.5,-11)
+	knob.BackgroundColor3=Color3.fromRGB(230,230,230)
+	knob.BorderSizePixel=0
+	knob.ZIndex=2
+	knob.Parent=checkbox
+
+	local knobCorner=Instance.new("UICorner")
+	knobCorner.CornerRadius=UDim.new(1,0)
+	knobCorner.Parent=knob
 
 	local checked=false
 
+	local function updateVisual()
+		local bgColor=checked and Color3.fromRGB(90,190,245) or Color3.fromRGB(120,120,125)
+		local bgTransparency=checked and 0 or 0.35
+		local knobColor=checked and Color3.fromRGB(15,15,20) or Color3.fromRGB(230,230,230)
+		local knobPos=checked
+			and UDim2.new(0,26,0.5,-11)
+			or UDim2.new(0,3,0.5,-11)
+
+		tween(checkbox,{
+			BackgroundColor3=bgColor,
+			BackgroundTransparency=bgTransparency
+		},0.2)
+
+		tween(knob,{
+			BackgroundColor3=knobColor,
+			Position=knobPos
+		},0.2)
+	end
+
 	local function setState(state,fireCallback)
 		checked=state==true
+		updateVisual()
 
-		if checked then
-			check.Visible=true
-			tween(checkbox,{BackgroundColor3=accentColor})
-			tween(checkboxStroke,{Color=accentColor})
-		else
-			check.Visible=false
-			tween(checkbox,{BackgroundColor3=COLORS.SurfaceLight})
-			tween(checkboxStroke,{Color=COLORS.Border})
+		if fireCallback~=false and onChanged then
+			onChanged(checked)
 		end
-
-		if fireCallback~=false and onChanged then onChanged(checked) end
 	end
 
 	checkbox.MouseButton1Click:Connect(function()
 		setState(not checked,true)
 	end)
 
-	return row,checkbox,setState,function() return checked end
+	return row,checkbox,setState,function()
+		return checked
+	end
 end
 
 --========================================================
@@ -1477,13 +1510,13 @@ end
 -- INFORMATION
 --========================================================
 
-createPageTitle(informationPage,"Information","Thông tin về LPT Hub và các chức năng hiện tại.")
+createPageTitle(informationPage,"Thông Tin","Thông tin Owner, Tên Game, Chức năng và trạng thái.")
 
 createCard(
 	informationPage,
 	95,
 	"LPT Hub",
-	"Hub hỗ trợ Auto Win, Movement và các thiết lập tiện ích.",
+	"Hub hỗ trợ Auto Win, ESP, Settings và các tiện ích.",
 	90,
 	COLORS.Accent
 )
@@ -1501,7 +1534,7 @@ createCard(
 	informationPage,
 	285,
 	"Features",
-	"• Auto Win — chọn Stage để tự động bay tới target.\n• Movement — Walk Speed, Jump Power, Fly Speed, Fly Height.\n• Infinite Jump — nhảy không giới hạn.\n• No Clip — đi xuyên vật thể.",
+	"• Auto Win — chọn Stage để tự động bay tới target.\n• ESP — hiển thị người chơi và khoảng cách nút.\n• Settings — Walk Speed, Jump Power, Fly Speed, Fly Height.\n• Infinite Jump — nhảy không giới hạn.\n• No Clip — đi xuyên vật thể.",
 	105,
 	COLORS.PageServer
 )
@@ -1610,10 +1643,185 @@ local winTargetsBottom=WIN_TARGET_START_Y+(#WIN_STAGES*WIN_TARGET_ROW_HEIGHT)+((
 autoWinPage.CanvasSize=UDim2.new(0,0,0,winTargetsBottom+25)
 
 --========================================================
--- MOVEMENT PAGE
+-- ESP PAGE
 --========================================================
 
-createPageTitle(movementPage,"Chức Năng","Các điều khiển việc di chuyển, nhảy và điều hướng.")
+createPageTitle(espPage,"ESP","Hiển thị người chơi với tên và khoảng cách.")
+
+local ESPState={
+	Enabled=false,
+	ShowName=true,
+	ShowDistance=true,
+	Objects={},
+}
+
+local function removeESP(targetPlayer)
+	local data=ESPState.Objects[targetPlayer]
+	if not data then return end
+	if data.highlight then data.highlight:Destroy() end
+	if data.billboard then data.billboard:Destroy() end
+	ESPState.Objects[targetPlayer]=nil
+end
+
+local function createESP(targetPlayer)
+	if targetPlayer==LocalPlayer or not ESPState.Enabled then return end
+
+	removeESP(targetPlayer)
+
+	local character=targetPlayer.Character
+	local root=character and character:FindFirstChild("HumanoidRootPart")
+	if not character or not root then return end
+
+	local highlight=Instance.new("Highlight")
+	highlight.Name="LPTHubESP"
+	highlight.Adornee=character
+	highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.FillColor=COLORS.Accent
+	highlight.FillTransparency=0.78
+	highlight.OutlineColor=COLORS.PageFarm
+	highlight.OutlineTransparency=0
+	highlight.Parent=character
+
+	local billboard=Instance.new("BillboardGui")
+	billboard.Name="LPTHubESPInfo"
+	billboard.Adornee=root
+	billboard.Size=UDim2.new(0,190,0,45)
+	billboard.StudsOffset=Vector3.new(0,3.2,0)
+	billboard.AlwaysOnTop=true
+	billboard.ResetOnSpawn=false
+	billboard.Parent=root
+
+	local label=Instance.new("TextLabel")
+	label.Size=UDim2.new(1,0,1,0)
+	label.BackgroundTransparency=1
+	label.TextColor3=COLORS.Text
+	label.TextStrokeTransparency=0.3
+	label.TextSize=13
+	label.Font=Enum.Font.GothamBold
+	label.TextXAlignment=Enum.TextXAlignment.Center
+	label.TextYAlignment=Enum.TextYAlignment.Center
+	label.Parent=billboard
+
+	ESPState.Objects[targetPlayer]={
+		highlight=highlight,
+		billboard=billboard,
+		label=label,
+	}
+end
+
+local function updateESP()
+	if not ESPState.Enabled then return end
+
+	local localCharacter=LocalPlayer.Character
+	local localRoot=localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
+
+	for targetPlayer,data in pairs(ESPState.Objects) do
+		if not targetPlayer.Parent then
+			removeESP(targetPlayer)
+			continue
+		end
+
+		local character=targetPlayer.Character
+		local root=character and character:FindFirstChild("HumanoidRootPart")
+
+		if not character or not root or not data.label.Parent then
+			createESP(targetPlayer)
+			continue
+		end
+
+		local text=""
+
+		if ESPState.ShowName then
+			text=targetPlayer.DisplayName
+		end
+
+		if ESPState.ShowDistance and localRoot then
+			local distance=(root.Position-localRoot.Position).Magnitude
+			local distanceText=("%dm"):format(math.floor(distance+0.5))
+			text=text~="" and (text.."  ["..distanceText.."]") or distanceText
+		end
+
+		data.label.Text=text
+	end
+end
+
+local function refreshESP()
+	if not ESPState.Enabled then
+		for targetPlayer in pairs(ESPState.Objects) do
+			removeESP(targetPlayer)
+		end
+		return
+	end
+
+	for _,targetPlayer in ipairs(Players:GetPlayers()) do
+		if targetPlayer~=LocalPlayer then
+			createESP(targetPlayer)
+		end
+	end
+end
+
+local _,_,setESPUI=createCheckbox(espPage,"Player ESP",95,COLORS.Accent,function(enabled)
+	ESPState.Enabled=enabled
+	refreshESP()
+end)
+
+local _,_,setESPNameUI=createCheckbox(espPage,"Show Player Name",163,COLORS.PageFarm,function(enabled)
+	ESPState.ShowName=enabled
+	updateESP()
+end)
+
+local _,_,setESPDistanceUI=createCheckbox(espPage,"Show Distance",231,COLORS.PageServer,function(enabled)
+	ESPState.ShowDistance=enabled
+	updateESP()
+end)
+
+createCard(
+	espPage,
+	299,
+	"ESP",
+	"Player ESP highlights other players and displays useful information above them.",
+	90,
+	COLORS.Accent
+)
+
+espPage.CanvasSize=UDim2.new(0,0,0,415)
+
+Players.PlayerAdded:Connect(function(targetPlayer)
+	targetPlayer.CharacterAdded:Connect(function()
+		task.wait(0.25)
+		if ESPState.Enabled then
+			createESP(targetPlayer)
+		end
+	end)
+end)
+
+Players.PlayerRemoving:Connect(function(targetPlayer)
+	removeESP(targetPlayer)
+end)
+
+for _,targetPlayer in ipairs(Players:GetPlayers()) do
+	if targetPlayer~=LocalPlayer then
+		targetPlayer.CharacterAdded:Connect(function()
+			task.wait(0.25)
+			if ESPState.Enabled then
+				createESP(targetPlayer)
+			end
+		end)
+	end
+end
+
+task.spawn(function()
+	while screenGui.Parent do
+		task.wait(0.1)
+		updateESP()
+	end
+end)
+
+--========================================================
+-- SETTINGS PAGE
+--========================================================
+
+createPageTitle(settingsPage,"Settings","Điều Chỉnh Theo Ý Muốn Của Bạn.")
 
 local SETTINGS_FILE="LPT_Hub_Settings.json"
 
@@ -1674,35 +1882,35 @@ local function saveSettings()
 	end)
 end
 
-createNumberControl(movementPage,"Walk Speed",95,speedValue,0,500,COLORS.PageFarm,function(value)
+createNumberControl(settingsPage,"Walk Speed",95,speedValue,0,500,COLORS.PageFarm,function(value)
 	speedValue=value
 	local module=loadMovementModule()
 	if module and module.SetWalkSpeed then module.SetWalkSpeed(value) end
 	task.defer(saveSettings)
 end)
 
-createNumberControl(movementPage,"Jump Power",183,jumpValue,0,500,COLORS.PageFarm,function(value)
+createNumberControl(settingsPage,"Jump Power",183,jumpValue,0,500,COLORS.PageFarm,function(value)
 	jumpValue=value
 	local module=loadMovementModule()
 	if module and module.SetJumpPower then module.SetJumpPower(value) end
 	task.defer(saveSettings)
 end)
 
-createNumberControl(movementPage,"Auto-Fly Speed",271,flySpeedValue,10,500,COLORS.PageServer,function(value)
+createNumberControl(settingsPage,"Auto-Fly Speed",271,flySpeedValue,10,500,COLORS.PageServer,function(value)
 	flySpeedValue=value
 	local module=loadMovementModule()
 	if module and module.SetFlySpeed then module.SetFlySpeed(value) end
 	task.defer(saveSettings)
 end)
 
-createNumberControl(movementPage,"Fly Height Offset",359,flyHeightValue,0,100,COLORS.PageServer,function(value)
+createNumberControl(settingsPage,"Fly Height Offset",359,flyHeightValue,0,100,COLORS.PageServer,function(value)
 	flyHeightValue=value
 	local module=loadMovementModule()
 	if module and module.SetFlyHeight then module.SetFlyHeight(value) end
 	task.defer(saveSettings)
 end)
 
-local _,_,setInfiniteJumpUI,getInfiniteJumpState=createCheckbox(movementPage,"Infinite Jump",447,COLORS.PageFarm,function(enabled)
+local _,_,setInfiniteJumpUI,getInfiniteJumpState=createCheckbox(settingsPage,"Infinite Jump",447,COLORS.PageFarm,function(enabled)
 	local module=loadMovementModule()
 	if module and module.SetInfiniteJump then module.SetInfiniteJump(enabled) end
 	task.defer(saveSettings)
@@ -1710,15 +1918,14 @@ end)
 
 infiniteJumpEnabled=getInfiniteJumpState
 
--- No Clip dùng cùng màu xanh lá với Infinite Jump
-local _,_,setNoClipUI,getNoClipState=createCheckbox(movementPage,"No Clip",515,COLORS.PageFarm,function(enabled)
+local _,_,setNoClipUI,getNoClipState=createCheckbox(settingsPage,"No Clip",515,COLORS.PageFarm,function(enabled)
 	local module=loadMovementModule()
 	if module and module.SetNoClip then module.SetNoClip(enabled) end
 	task.defer(saveSettings)
 end)
 
 noClipEnabled=getNoClipState
-movementPage.CanvasSize=UDim2.new(0,0,0,610)
+settingsPage.CanvasSize=UDim2.new(0,0,0,610)
 
 --========================================================
 -- APPLY SAVED SETTINGS
@@ -1843,12 +2050,14 @@ end
 
 createSidebarButton("Information",1,"Information",COLORS.Accent)
 createSidebarButton("Auto Win",2,"AutoWin",COLORS.PageServer)
-createSidebarButton("Movement",3,"Movement",COLORS.PageFarm)
+createSidebarButton("ESP",3,"ESP",COLORS.PageServer)
+createSidebarButton("Settings",4,"Settings",COLORS.PageFarm)
 
 currentPage="Information"
 informationPage.Visible=true
 autoWinPage.Visible=false
-movementPage.Visible=false
+espPage.Visible=false
+settingsPage.Visible=false
 
 buttons["Information"].button.BackgroundTransparency=0.1
 buttons["Information"].indicator.Visible=true
