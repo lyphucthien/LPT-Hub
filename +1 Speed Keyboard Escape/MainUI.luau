@@ -929,13 +929,13 @@ main.ClipsDescendants=true
 main.Parent=screenGui
 
 local mainCorner=Instance.new("UICorner")
-mainCorner.CornerRadius=UDim.new(0,20)
+mainCorner.CornerRadius=UDim.new(0,8)
 mainCorner.Parent=main
 
 local mainStroke=Instance.new("UIStroke")
 mainStroke.Color=COLORS.Border
-mainStroke.Thickness=1.5
-mainStroke.Transparency=0.2
+mainStroke.Thickness=2.5
+mainStroke.Transparency=0.35
 mainStroke.Parent=main
 
 applyGradient(mainStroke,COLORS.Accent,COLORS.AccentB,45)
@@ -2143,13 +2143,11 @@ autoWinPage.CanvasSize=
 createPageTitle(
 	espPage,
 	"ESP",
-	"Hiển thị người chơi với tên và khoảng cách."
+	"Hiển thị tên người chơi và khoảng cách."
 )
 
 local ESPState={
 	Enabled=false,
-	ShowName=true,
-	ShowDistance=true,
 	Objects={},
 }
 
@@ -2161,11 +2159,15 @@ local function removeESP(targetPlayer)
 	end
 
 	if data.highlight then
-		data.highlight:Destroy()
+		pcall(function()
+			data.highlight:Destroy()
+		end)
 	end
 
 	if data.billboard then
-		data.billboard:Destroy()
+		pcall(function()
+			data.billboard:Destroy()
+		end)
 	end
 
 	ESPState.Objects[targetPlayer]=nil
@@ -2191,14 +2193,14 @@ local function createESP(targetPlayer)
 	highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
 	highlight.FillColor=COLORS.Accent
 	highlight.FillTransparency=0.78
-	highlight.OutlineColor=COLORS.PageFarm
+	highlight.OutlineColor=COLORS.PageServer
 	highlight.OutlineTransparency=0
 	highlight.Parent=character
 
 	local billboard=Instance.new("BillboardGui")
 	billboard.Name="LPTHubESPInfo"
 	billboard.Adornee=root
-	billboard.Size=UDim2.new(0,190,0,45)
+	billboard.Size=UDim2.new(0,190,0,48)
 	billboard.StudsOffset=Vector3.new(0,3.2,0)
 	billboard.AlwaysOnTop=true
 	billboard.ResetOnSpawn=false
@@ -2213,6 +2215,7 @@ local function createESP(targetPlayer)
 	label.Font=Enum.Font.GothamBold
 	label.TextXAlignment=Enum.TextXAlignment.Center
 	label.TextYAlignment=Enum.TextYAlignment.Center
+	label.TextWrapped=true
 	label.Parent=billboard
 
 	ESPState.Objects[targetPlayer]={
@@ -2230,6 +2233,10 @@ local function updateESP()
 	local localCharacter=LocalPlayer.Character
 	local localRoot=localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
 
+	if not localRoot then
+		return
+	end
+
 	for targetPlayer,data in pairs(ESPState.Objects) do
 		if not targetPlayer.Parent then
 			removeESP(targetPlayer)
@@ -2244,26 +2251,13 @@ local function updateESP()
 			continue
 		end
 
-		local text=""
+		local distance=(root.Position-localRoot.Position).Magnitude
+		local distanceText=("%dm"):format(math.floor(distance+0.5))
 
-		if ESPState.ShowName then
-			text=targetPlayer.DisplayName
-		end
-
-		if ESPState.ShowDistance and localRoot then
-			local distance=
-				(root.Position-localRoot.Position).Magnitude
-
-			local distanceText=
-				("%dm"):format(math.floor(distance+0.5))
-
-			text=
-				text~=""
-				and (text.."  ["..distanceText.."]")
-				or distanceText
-		end
-
-		data.label.Text=text
+		data.label.Text=
+			targetPlayer.DisplayName
+			.."\n"
+			.."["..distanceText.."]"
 	end
 end
 
@@ -2283,52 +2277,18 @@ local function refreshESP()
 	end
 end
 
-local _,_,setESPUI=
-	createCheckbox(
-		espPage,
-		"Player ESP",
-		95,
-		COLORS.Accent,
-		function(enabled)
-			ESPState.Enabled=enabled
-			refreshESP()
-		end
-	)
-
-local _,_,setESPNameUI=
-	createCheckbox(
-		espPage,
-		"Show Player Name",
-		163,
-		COLORS.PageFarm,
-		function(enabled)
-			ESPState.ShowName=enabled
-			updateESP()
-		end
-	)
-
-local _,_,setESPDistanceUI=
-	createCheckbox(
-		espPage,
-		"Show Distance",
-		231,
-		COLORS.PageServer,
-		function(enabled)
-			ESPState.ShowDistance=enabled
-			updateESP()
-		end
-	)
-
-createCard(
+createCheckbox(
 	espPage,
-	299,
-	"ESP",
-	"Player ESP highlights other players and displays useful information above them.",
-	90,
-	COLORS.Accent
+	"Player ESP",
+	95,
+	COLORS.PageServer,
+	function(enabled)
+		ESPState.Enabled=enabled
+		refreshESP()
+	end
 )
 
-espPage.CanvasSize=UDim2.new(0,0,0,415)
+espPage.CanvasSize=UDim2.new(0,0,0,180)
 
 Players.PlayerAdded:Connect(function(targetPlayer)
 	targetPlayer.CharacterAdded:Connect(function()
@@ -2710,7 +2670,7 @@ local function createSidebarButton(
 	textLabel.BackgroundTransparency=1
 	textLabel.Text=text
 	textLabel.TextColor3=COLORS.TextDim
-	textLabel.TextSize=15
+	textLabel.TextSize=16.5
 	textLabel.Font=Enum.Font.GothamMedium
 	textLabel.TextXAlignment=Enum.TextXAlignment.Left
 	textLabel.Parent=button
