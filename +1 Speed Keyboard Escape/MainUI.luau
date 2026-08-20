@@ -64,7 +64,9 @@ local OriginalCollision={}
 local function disconnect(name)
 	local connection=Connections[name]
 	if connection then
-		pcall(function() connection:Disconnect() end)
+		pcall(function()
+			connection:Disconnect()
+		end)
 		Connections[name]=nil
 	end
 end
@@ -93,13 +95,17 @@ end
 
 local function getNumber(value,min,max,fallback)
 	value=tonumber(value)
-	if value==nil then return fallback end
+	if value==nil then
+		return fallback
+	end
 	return math.clamp(value,min,max)
 end
 
 local function applyCharacterSettings()
 	local humanoid=getHumanoid()
-	if not humanoid then return end
+	if not humanoid then
+		return
+	end
 
 	pcall(function()
 		humanoid.UseJumpPower=true
@@ -109,7 +115,9 @@ local function applyCharacterSettings()
 end
 
 local function rememberCollision(character)
-	if not character then return end
+	if not character then
+		return
+	end
 
 	for _,object in ipairs(character:GetDescendants()) do
 		if object:IsA("BasePart") and OriginalCollision[object]==nil then
@@ -118,7 +126,7 @@ local function rememberCollision(character)
 	end
 end
 
-local function restoreCollision(character)
+local function restoreCollision()
 	for object,original in pairs(OriginalCollision) do
 		if object and object.Parent then
 			pcall(function()
@@ -147,7 +155,9 @@ local function belongsToStage(part,stageNumber)
 	local current=part
 
 	for _=1,20 do
-		if not current then break end
+		if not current then
+			break
+		end
 
 		if getStageNumberFromName(current.Name)==stageNumber then
 			return true
@@ -161,10 +171,14 @@ end
 
 local function findStructure()
 	local structure=workspace:FindFirstChild("Structure")
-	if structure then return structure end
+	if structure then
+		return structure
+	end
 
 	structure=workspace:FindFirstChild("Structure",true)
-	if structure then return structure end
+	if structure then
+		return structure
+	end
 
 	for _,object in ipairs(workspace:GetDescendants()) do
 		if lower(object.Name)=="structure" then
@@ -183,7 +197,9 @@ local function findStageContainer(stageNumber)
 	end
 
 	local structure=findStructure()
-	if not structure then return nil end
+	if not structure then
+		return nil
+	end
 
 	for _,child in ipairs(structure:GetChildren()) do
 		if getStageNumberFromName(child.Name)==stageNumber then
@@ -238,14 +254,37 @@ local function getNameScore(name)
 		score+=70000
 	end
 
-	if name:find("getwin",1,true) then score+=50000 end
-	if name:find("claimwin",1,true) then score+=50000 end
-	if name:find("winbutton",1,true) then score+=45000 end
-	if name:find("claim",1,true) then score+=30000 end
-	if name:find("finish",1,true) then score+=25000 end
-	if name:find("award",1,true) then score+=25000 end
-	if name:find("button",1,true) then score+=20000 end
-	if name:find("win",1,true) then score+=15000 end
+	if name:find("getwin",1,true) then
+		score+=50000
+	end
+
+	if name:find("claimwin",1,true) then
+		score+=50000
+	end
+
+	if name:find("winbutton",1,true) then
+		score+=45000
+	end
+
+	if name:find("claim",1,true) then
+		score+=30000
+	end
+
+	if name:find("finish",1,true) then
+		score+=25000
+	end
+
+	if name:find("award",1,true) then
+		score+=25000
+	end
+
+	if name:find("button",1,true) then
+		score+=20000
+	end
+
+	if name:find("win",1,true) then
+		score+=15000
+	end
 
 	return score
 end
@@ -259,13 +298,23 @@ local function scoreTarget(part,stageNumber)
 	local parent=part.Parent
 
 	for _=1,6 do
-		if not parent then break end
+		if not parent then
+			break
+		end
 
 		local parentName=lower(parent.Name)
 
-		if parentName:find("win",1,true) then score+=25000 end
-		if parentName:find("button",1,true) then score+=15000 end
-		if parentName:find("claim",1,true) then score+=20000 end
+		if parentName:find("win",1,true) then
+			score+=25000
+		end
+
+		if parentName:find("button",1,true) then
+			score+=15000
+		end
+
+		if parentName:find("claim",1,true) then
+			score+=20000
+		end
 
 		parent=parent.Parent
 	end
@@ -294,7 +343,9 @@ local function scoreTarget(part,stageNumber)
 end
 
 local function findTargetInStage(container,stageNumber)
-	if not container then return nil end
+	if not container then
+		return nil
+	end
 
 	local bestTarget
 	local bestScore=-math.huge
@@ -667,7 +718,7 @@ function Module.SetNoClip(enabled)
 			rememberCollision(character)
 		end
 	else
-		restoreCollision(character)
+		restoreCollision()
 	end
 
 	return true
@@ -766,11 +817,7 @@ function Module.Destroy()
 		Connections[name]=nil
 	end
 
-	local character=getCharacter()
-
-	if character then
-		restoreCollision(character)
-	end
+	restoreCollision()
 
 	table.clear(State.TargetCache)
 	table.clear(State.StageTargetCache)
@@ -791,9 +838,17 @@ local function moduleIsValid(module)
 	end
 
 	local requiredFunctions={
-		"SetWalkSpeed","SetJumpPower","SetFlySpeed","SetFlyHeight",
-		"SetInfiniteJump","SetNoClip","RefreshTargets","GetTarget",
-		"FlyToWin","StopFlying","IsFlying",
+		"SetWalkSpeed",
+		"SetJumpPower",
+		"SetFlySpeed",
+		"SetFlyHeight",
+		"SetInfiniteJump",
+		"SetNoClip",
+		"RefreshTargets",
+		"GetTarget",
+		"FlyToWin",
+		"StopFlying",
+		"IsFlying",
 	}
 
 	for _,name in ipairs(requiredFunctions) do
@@ -962,10 +1017,6 @@ topBarMask.BackgroundColor3=COLORS.Surface
 topBarMask.BorderSizePixel=0
 topBarMask.Parent=topBar
 
---========================================================
--- TITLE
---========================================================
-
 local titleDot=Instance.new("Frame")
 titleDot.Size=UDim2.new(0,8,0,8)
 titleDot.Position=UDim2.new(0,20,0.5,-4)
@@ -1071,10 +1122,6 @@ end
 local minimize=topButton("MinimizeButton",-110,"—",13)
 local maximize=topButton("MaximizeButton",-76,"",0)
 local close=topButton("CloseButton",-40,"×",17)
-
---========================================================
--- MAX ICON
---========================================================
 
 local maxIcon=Instance.new("Frame")
 maxIcon.Size=UDim2.new(0,20,0,20)
@@ -1273,74 +1320,6 @@ local function createPageTitle(parent,text,subtitle)
 	end
 
 	return label
-end
-
---========================================================
--- CARD
---========================================================
-
-local function createCard(parent,yPos,titleText,bodyText,height,accentColor)
-	local card=Instance.new("Frame")
-	card.Size=UDim2.new(1,-56,0,height or 90)
-	card.Position=UDim2.new(0,28,0,yPos)
-	card.BackgroundColor3=COLORS.Card
-	card.BorderSizePixel=0
-	card.Parent=parent
-
-	local corner=Instance.new("UICorner")
-	corner.CornerRadius=UDim.new(0,14)
-	corner.Parent=card
-
-	local stroke=Instance.new("UIStroke")
-	stroke.Color=COLORS.Border
-	stroke.Thickness=1
-	stroke.Transparency=0.15
-	stroke.Parent=card
-
-	local accentBar=Instance.new("Frame")
-	accentBar.Size=UDim2.new(0,4,1,-20)
-	accentBar.Position=UDim2.new(0,0,0.5,0)
-	accentBar.AnchorPoint=Vector2.new(0,0.5)
-	accentBar.BackgroundColor3=accentColor or COLORS.Accent
-	accentBar.BorderSizePixel=0
-	accentBar.Parent=card
-
-	local accentCorner=Instance.new("UICorner")
-	accentCorner.CornerRadius=UDim.new(1,0)
-	accentCorner.Parent=accentBar
-
-	applyGradient(
-		accentBar,
-		accentColor or COLORS.Accent,
-		COLORS.AccentB,
-		90
-	)
-
-	local cardTitle=Instance.new("TextLabel")
-	cardTitle.Size=UDim2.new(1,-40,0,22)
-	cardTitle.Position=UDim2.new(0,18,0,12)
-	cardTitle.BackgroundTransparency=1
-	cardTitle.Text=titleText
-	cardTitle.TextColor3=COLORS.Text
-	cardTitle.TextSize=15
-	cardTitle.Font=Enum.Font.GothamBold
-	cardTitle.TextXAlignment=Enum.TextXAlignment.Left
-	cardTitle.Parent=card
-
-	local cardBody=Instance.new("TextLabel")
-	cardBody.Size=UDim2.new(1,-40,1,-40)
-	cardBody.Position=UDim2.new(0,18,0,36)
-	cardBody.BackgroundTransparency=1
-	cardBody.Text=bodyText
-	cardBody.TextColor3=COLORS.TextDim
-	cardBody.TextSize=13
-	cardBody.Font=Enum.Font.Gotham
-	cardBody.TextXAlignment=Enum.TextXAlignment.Left
-	cardBody.TextYAlignment=Enum.TextYAlignment.Top
-	cardBody.TextWrapped=true
-	cardBody.Parent=card
-
-	return card
 end
 
 --========================================================
@@ -1729,7 +1708,6 @@ local function createNumberControl(parent,titleText,yPos,defaultValue,minValue,m
 	track.InputBegan:Connect(function(input)
 		if input.UserInputType==Enum.UserInputType.MouseButton1
 			or input.UserInputType==Enum.UserInputType.Touch then
-
 			beginDrag(input)
 		end
 	end)
@@ -1737,7 +1715,6 @@ local function createNumberControl(parent,titleText,yPos,defaultValue,minValue,m
 	knob.InputBegan:Connect(function(input)
 		if input.UserInputType==Enum.UserInputType.MouseButton1
 			or input.UserInputType==Enum.UserInputType.Touch then
-
 			beginDrag(input)
 		end
 	end)
@@ -1768,7 +1745,7 @@ local function createNumberControl(parent,titleText,yPos,defaultValue,minValue,m
 end
 
 --========================================================
--- INFORMATION
+-- INFORMATION PAGE
 --========================================================
 
 createPageTitle(
@@ -1778,22 +1755,15 @@ createPageTitle(
 )
 
 local informationContainer=Instance.new("Frame")
-informationContainer.Name="InformationContainer"
 informationContainer.Size=UDim2.new(1,-56,0,430)
 informationContainer.Position=UDim2.new(0,28,0,95)
 informationContainer.BackgroundTransparency=1
 informationContainer.Parent=informationPage
 
---========================================================
--- MAIN INFORMATION CARD
---========================================================
-
 local informationCard=Instance.new("Frame")
-informationCard.Name="InformationCard"
 informationCard.Size=UDim2.new(1,0,0,350)
 informationCard.Position=UDim2.new(0,0,0,0)
 informationCard.BackgroundColor3=Color3.fromRGB(26,25,31)
-informationCard.BackgroundTransparency=0
 informationCard.BorderSizePixel=0
 informationCard.Parent=informationContainer
 
@@ -1807,37 +1777,20 @@ informationStroke.Transparency=0.9
 informationStroke.Thickness=1
 informationStroke.Parent=informationCard
 
-local informationPadding=Instance.new("UIPadding")
-informationPadding.PaddingTop=UDim.new(0,40)
-informationPadding.PaddingLeft=UDim.new(0,24)
-informationPadding.PaddingRight=UDim.new(0,24)
-informationPadding.PaddingBottom=UDim.new(0,20)
-informationPadding.Parent=informationCard
-
---========================================================
--- OWNER BADGE
---========================================================
-
 local ownerText=Instance.new("TextLabel")
-ownerText.Name="OwnerText"
 ownerText.Size=UDim2.new(0,100,0,20)
-ownerText.Position=UDim2.new(0,-9,0,-27)
+ownerText.Position=UDim2.new(0,15,0,15)
 ownerText.BackgroundTransparency=1
 ownerText.Text="OWNER"
 ownerText.Font=Enum.Font.GothamBold
 ownerText.TextSize=25
-ownerText.TextColor3=Color3.fromRGB(200, 200, 200)
+ownerText.TextColor3=Color3.fromRGB(200,200,200)
 ownerText.TextXAlignment=Enum.TextXAlignment.Left
-ownerText.ZIndex=2
 ownerText.Parent=informationCard
 
---========================================================
--- INFORMATION LIST
---========================================================
-
 local informationList=Instance.new("Frame")
-informationList.Name="InformationList"
-informationList.Size=UDim2.new(1,0,1,0)
+informationList.Size=UDim2.new(1,-48,1,-75)
+informationList.Position=UDim2.new(0,24,0,60)
 informationList.BackgroundTransparency=1
 informationList.Parent=informationCard
 
@@ -1847,22 +1800,15 @@ informationLayout.Padding=UDim.new(0,16)
 informationLayout.SortOrder=Enum.SortOrder.LayoutOrder
 informationLayout.Parent=informationList
 
---========================================================
--- INFORMATION ROW
---========================================================
-
 local function createInformationRow(order,labelText,valueText,valueColor)
 	local row=Instance.new("Frame")
-	row.Name=labelText.."Row"
 	row.Size=UDim2.new(1,0,0,44)
 	row.BackgroundTransparency=1
 	row.LayoutOrder=order
 	row.Parent=informationList
 
 	local label=Instance.new("TextLabel")
-	label.Name="Label"
 	label.Size=UDim2.new(1,0,0,16)
-	label.Position=UDim2.new(0,0,0,0)
 	label.BackgroundTransparency=1
 	label.Text=labelText
 	label.Font=Enum.Font.Gotham
@@ -1872,7 +1818,6 @@ local function createInformationRow(order,labelText,valueText,valueColor)
 	label.Parent=row
 
 	local value=Instance.new("TextLabel")
-	value.Name="Value"
 	value.Size=UDim2.new(1,0,0,22)
 	value.Position=UDim2.new(0,0,0,20)
 	value.BackgroundTransparency=1
@@ -1883,74 +1828,23 @@ local function createInformationRow(order,labelText,valueText,valueColor)
 	value.TextXAlignment=Enum.TextXAlignment.Left
 	value.Parent=row
 
-	local divider=Instance.new("Frame")
-	divider.Name="Divider"
-	divider.Size=UDim2.new(1,0,0,1)
-	divider.Position=UDim2.new(0,0,1,6)
-	divider.BackgroundColor3=Color3.fromRGB(255,255,255)
-	divider.BackgroundTransparency=0.9
-	divider.BorderSizePixel=0
-	divider.Parent=row
-
 	return row,value
 end
 
---========================================================
--- INFORMATION DATA
---========================================================
-
-local hoTenValue="Lý Phúc Thiện"
-local ngaySinhValue="18/3"
-local tuoiValue="15"
-local trangThaiValue="Online"
-
-createInformationRow(
-	1,
-	"Họ và Tên",
-	hoTenValue
-)
-
-createInformationRow(
-	2,
-	"Ngày sinh",
-	ngaySinhValue
-)
-
-createInformationRow(
-	3,
-	"Tuổi",
-	tuoiValue
-)
-
-local statusColor=Color3.fromRGB(240,240,240)
-
-if trangThaiValue=="Online" then
-	statusColor=Color3.fromRGB(80,220,120)
-elseif trangThaiValue=="Update Script" then
-	statusColor=Color3.fromRGB(255,196,0)
-elseif trangThaiValue=="Sleep" then
-	statusColor=Color3.fromRGB(170,170,180)
-elseif trangThaiValue=="Offline" then
-	statusColor=Color3.fromRGB(150,148,155)
-end
-
+createInformationRow(1,"Họ và Tên","Lý Phúc Thiện")
+createInformationRow(2,"Ngày sinh","18/3")
+createInformationRow(3,"Tuổi","15")
 createInformationRow(
 	4,
 	"Trạng Thái",
-	trangThaiValue,
-	statusColor
+	"Online",
+	Color3.fromRGB(80,220,120)
 )
 
---========================================================
--- GAME CARD
---========================================================
-
 local gameCard=Instance.new("Frame")
-gameCard.Name="GameCard"
 gameCard.Size=UDim2.new(1,0,0,60)
 gameCard.Position=UDim2.new(0,0,0,370)
 gameCard.BackgroundColor3=Color3.fromRGB(30,28,35)
-gameCard.BackgroundTransparency=0.05
 gameCard.BorderSizePixel=0
 gameCard.Parent=informationContainer
 
@@ -1958,20 +1852,9 @@ local gameCorner=Instance.new("UICorner")
 gameCorner.CornerRadius=UDim.new(0,20)
 gameCorner.Parent=gameCard
 
-local gameStroke=Instance.new("UIStroke")
-gameStroke.Color=Color3.fromRGB(255,255,255)
-gameStroke.Transparency=0.9
-gameStroke.Thickness=1
-gameStroke.Parent=gameCard
-
-local gamePadding=Instance.new("UIPadding")
-gamePadding.PaddingLeft=UDim.new(0,24)
-gamePadding.PaddingRight=UDim.new(0,24)
-gamePadding.Parent=gameCard
-
 local gameRow=Instance.new("TextLabel")
-gameRow.Name="GameNameRow"
-gameRow.Size=UDim2.new(1,0,1,0)
+gameRow.Size=UDim2.new(1,-48,1,0)
+gameRow.Position=UDim2.new(0,24,0,0)
 gameRow.BackgroundTransparency=1
 gameRow.Font=Enum.Font.GothamMedium
 gameRow.TextSize=18
@@ -1999,7 +1882,7 @@ gameRow.Text=string.format(
 informationPage.CanvasSize=UDim2.new(0,0,0,540)
 
 --========================================================
--- AUTO WIN
+-- AUTO WIN PAGE
 --========================================================
 
 createPageTitle(
@@ -2009,7 +1892,6 @@ createPageTitle(
 )
 
 local refreshTargets=Instance.new("TextButton")
-refreshTargets.Name="RefreshTargets"
 refreshTargets.Size=UDim2.new(0,125,0,32)
 refreshTargets.Position=UDim2.new(1,-153,0,23)
 refreshTargets.BackgroundColor3=COLORS.PageServer
@@ -2024,36 +1906,6 @@ refreshTargets.Parent=autoWinPage
 local refreshCorner=Instance.new("UICorner")
 refreshCorner.CornerRadius=UDim.new(0,9)
 refreshCorner.Parent=refreshTargets
-
-local refreshStroke=Instance.new("UIStroke")
-refreshStroke.Color=COLORS.Border
-refreshStroke.Thickness=1
-refreshStroke.Transparency=0.2
-refreshStroke.Parent=refreshTargets
-
-refreshTargets.MouseEnter:Connect(function()
-	tween(
-		refreshTargets,
-		{BackgroundColor3=Color3.fromRGB(120,180,255)},
-		0.15
-	)
-end)
-
-refreshTargets.MouseLeave:Connect(function()
-	tween(
-		refreshTargets,
-		{BackgroundColor3=COLORS.PageServer},
-		0.15
-	)
-end)
-
-refreshTargets.MouseButton1Click:Connect(function()
-	local module=loadMovementModule()
-
-	if module and module.RefreshTargets then
-		module.RefreshTargets()
-	end
-end)
 
 local WIN_STAGES={
 	{stage=1,value=1,text="Stage 1 (+1 Win)"},
@@ -2073,6 +1925,22 @@ local WIN_STAGES={
 	{stage=15,value=150000,text="Stage 15 (+150K Wins)"},
 }
 
+refreshTargets.MouseEnter:Connect(function()
+	tween(refreshTargets,{BackgroundColor3=Color3.fromRGB(120,180,255)},0.15)
+end)
+
+refreshTargets.MouseLeave:Connect(function()
+	tween(refreshTargets,{BackgroundColor3=COLORS.PageServer},0.15)
+end)
+
+refreshTargets.MouseButton1Click:Connect(function()
+	local module=loadMovementModule()
+
+	if module and module.RefreshTargets then
+		module.RefreshTargets()
+	end
+end)
+
 local WIN_TARGET_ROW_HEIGHT=56
 local WIN_TARGET_ROW_GAP=10
 local WIN_TARGET_START_Y=95
@@ -2080,52 +1948,46 @@ local winTargetRows={}
 local selectedWinTarget=nil
 
 for index,stageData in ipairs(WIN_STAGES) do
-	local rowY=
-		WIN_TARGET_START_Y
-		+(index-1)*(WIN_TARGET_ROW_HEIGHT+WIN_TARGET_ROW_GAP)
+	local rowY=WIN_TARGET_START_Y+(index-1)*(WIN_TARGET_ROW_HEIGHT+WIN_TARGET_ROW_GAP)
 
-	local _,_,setStageState=
-		createSliderToggle(
-			autoWinPage,
-			stageData.text,
-			rowY,
-			COLORS.PageServer,
-			function(isEnabled)
-				if isEnabled then
-					selectedWinTarget=stageData.value
+	local _,_,setStageState=createSliderToggle(
+		autoWinPage,
+		stageData.text,
+		rowY,
+		COLORS.PageServer,
+		function(isEnabled)
+			if isEnabled then
+				selectedWinTarget=stageData.value
 
-					for _,entry in ipairs(winTargetRows) do
-						if entry.index~=index then
-							entry.setState(false,false)
-						end
-					end
-
-					local module=loadMovementModule()
-
-					if module and module.RefreshTargets then
-						module.RefreshTargets()
-					end
-				elseif selectedWinTarget==stageData.value then
-					selectedWinTarget=nil
-
-					local module=loadMovementModule()
-
-					if module and module.StopFlying then
-						module.StopFlying()
+				for _,entry in ipairs(winTargetRows) do
+					if entry.index~=index then
+						entry.setState(false,false)
 					end
 				end
-			end
-		)
 
-	table.insert(
-		winTargetRows,
-		{
-			index=index,
-			stage=stageData.stage,
-			value=stageData.value,
-			setState=setStageState
-		}
+				local module=loadMovementModule()
+
+				if module and module.RefreshTargets then
+					module.RefreshTargets()
+				end
+			elseif selectedWinTarget==stageData.value then
+				selectedWinTarget=nil
+
+				local module=loadMovementModule()
+
+				if module and module.StopFlying then
+					module.StopFlying()
+				end
+			end
+		end
 	)
+
+	table.insert(winTargetRows,{
+		index=index,
+		stage=stageData.stage,
+		value=stageData.value,
+		setState=setStageState
+	})
 end
 
 local winTargetsBottom=
@@ -2133,8 +1995,7 @@ local winTargetsBottom=
 	+(#WIN_STAGES*WIN_TARGET_ROW_HEIGHT)
 	+((#WIN_STAGES-1)*WIN_TARGET_ROW_GAP)
 
-autoWinPage.CanvasSize=
-	UDim2.new(0,0,0,winTargetsBottom+25)
+autoWinPage.CanvasSize=UDim2.new(0,0,0,winTargetsBottom+25)
 
 --========================================================
 -- ESP PAGE
@@ -2143,8 +2004,12 @@ autoWinPage.CanvasSize=
 createPageTitle(
 	espPage,
 	"ESP",
-	"Hiển thị tên người chơi và khoảng cách."
+	"Hiển thị người chơi và các nút Win trong map."
 )
+
+--========================================================
+-- PLAYER ESP
+--========================================================
 
 local ESPState={
 	Enabled=false,
@@ -2194,10 +2059,6 @@ local function createESP(targetPlayer)
 		return
 	end
 
-	--====================================================
-	-- HIGHLIGHT
-	--====================================================
-
 	local highlight=Instance.new("Highlight")
 	highlight.Name="LPTHubESP"
 	highlight.Adornee=character
@@ -2208,10 +2069,6 @@ local function createESP(targetPlayer)
 	highlight.OutlineTransparency=0
 	highlight.Enabled=true
 	highlight.Parent=character
-
-	--====================================================
-	-- BILLBOARD
-	--====================================================
 
 	local billboard=Instance.new("BillboardGui")
 	billboard.Name="LPTHubESPInfo"
@@ -2224,26 +2081,18 @@ local function createESP(targetPlayer)
 	billboard.MaxDistance=math.huge
 	billboard.Parent=screenGui
 
-	--====================================================
-	-- PLAYER LABEL
-	--====================================================
-
 	local label=Instance.new("TextLabel")
 	label.Name="PlayerInfo"
 	label.Size=UDim2.new(1,0,1,0)
 	label.BackgroundTransparency=1
-	label.Text=""
 	label.TextColor3=Color3.fromRGB(255,255,255)
 	label.TextStrokeColor3=Color3.fromRGB(0,0,0)
 	label.TextStrokeTransparency=0
-	label.TextTransparency=0
 	label.TextSize=14
 	label.Font=Enum.Font.GothamBold
 	label.TextXAlignment=Enum.TextXAlignment.Center
 	label.TextYAlignment=Enum.TextYAlignment.Center
 	label.TextWrapped=true
-	label.Visible=true
-	label.ZIndex=10
 	label.Parent=billboard
 
 	ESPState.Objects[targetPlayer]={
@@ -2259,8 +2108,8 @@ local function updateESP()
 		return
 	end
 
-	local localCharacter=player.Character
-	local localRoot=localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
+	local character=player.Character
+	local localRoot=character and character:FindFirstChild("HumanoidRootPart")
 
 	if not localRoot then
 		return
@@ -2268,11 +2117,11 @@ local function updateESP()
 
 	for _,targetPlayer in ipairs(Players:GetPlayers()) do
 		if targetPlayer~=player then
-			local character=targetPlayer.Character
-			local root=character and character:FindFirstChild("HumanoidRootPart")
+			local targetCharacter=targetPlayer.Character
+			local root=targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
 			local data=ESPState.Objects[targetPlayer]
 
-			if character and root then
+			if targetCharacter and root then
 				if not data
 					or not data.billboard
 					or not data.billboard.Parent
@@ -2300,10 +2149,8 @@ local function updateESP()
 						.."\n"
 						.."["..distanceText.."]"
 				end
-			else
-				if data then
-					removeESP(targetPlayer)
-				end
+			elseif data then
+				removeESP(targetPlayer)
 			end
 		end
 	end
@@ -2328,7 +2175,235 @@ local function refreshESP()
 end
 
 --========================================================
--- Công Tắt ESP
+-- WIN ESP
+--========================================================
+
+local WinESPState={
+	Enabled=false,
+	Objects={},
+}
+
+local WIN_ESP_SCAN_INTERVAL=1
+local lastWinESPScan=0
+
+local function removeWinESP(stageNumber)
+	local data=WinESPState.Objects[stageNumber]
+
+	if not data then
+		return
+	end
+
+	if data.highlight then
+		pcall(function()
+			data.highlight:Destroy()
+		end)
+	end
+
+	if data.billboard then
+		pcall(function()
+			data.billboard:Destroy()
+		end)
+	end
+
+	WinESPState.Objects[stageNumber]=nil
+end
+
+local function createWinESP(stageNumber,target,stageData)
+	if not WinESPState.Enabled then
+		return
+	end
+
+	if not target
+		or not target:IsA("BasePart")
+		or not target.Parent then
+
+		removeWinESP(stageNumber)
+		return
+	end
+
+	removeWinESP(stageNumber)
+
+	local highlight=Instance.new("Highlight")
+	highlight.Name="LPTHubWinESP"
+	highlight.Adornee=target
+	highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.FillColor=COLORS.PageFarm
+	highlight.FillTransparency=0.78
+	highlight.OutlineColor=COLORS.PageServer
+	highlight.OutlineTransparency=0
+	highlight.Enabled=true
+	highlight.Parent=target
+
+	local billboard=Instance.new("BillboardGui")
+	billboard.Name="LPTHubWinESPInfo"
+	billboard.Adornee=target
+	billboard.Size=UDim2.new(0,180,0,48)
+	billboard.StudsOffset=Vector3.new(0,4,0)
+	billboard.AlwaysOnTop=true
+	billboard.Enabled=true
+	billboard.ResetOnSpawn=false
+	billboard.MaxDistance=math.huge
+	billboard.Parent=screenGui
+
+	local label=Instance.new("TextLabel")
+	label.Name="WinInfo"
+	label.Size=UDim2.new(1,0,1,0)
+	label.BackgroundTransparency=1
+	label.TextColor3=Color3.fromRGB(255,255,255)
+	label.TextStrokeColor3=Color3.fromRGB(0,0,0)
+	label.TextStrokeTransparency=0
+	label.TextSize=14
+	label.Font=Enum.Font.GothamBold
+	label.TextXAlignment=Enum.TextXAlignment.Center
+	label.TextYAlignment=Enum.TextYAlignment.Center
+	label.TextWrapped=true
+	label.ZIndex=10
+	label.Parent=billboard
+
+	WinESPState.Objects[stageNumber]={
+		target=target,
+		highlight=highlight,
+		billboard=billboard,
+		label=label,
+	}
+end
+
+local function getWinESPTarget(module,stageData)
+	if not module then
+		return nil
+	end
+
+	if module.GetStageTarget then
+		local target=module.GetStageTarget(stageData.stage)
+
+		if target and target:IsA("BasePart") and target.Parent then
+			return target
+		end
+	end
+
+	if module.GetTarget then
+		local target=module.GetTarget(stageData.value)
+
+		if target and target:IsA("BasePart") and target.Parent then
+			return target
+		end
+	end
+
+	return nil
+end
+
+local function refreshWinESP()
+	for stageNumber in pairs(WinESPState.Objects) do
+		removeWinESP(stageNumber)
+	end
+
+	if not WinESPState.Enabled then
+		return
+	end
+
+	local module=loadMovementModule()
+
+	if not module then
+		return
+	end
+
+	if module.RefreshTargets then
+		module.RefreshTargets()
+	end
+
+	for _,stageData in ipairs(WIN_STAGES) do
+		local target=getWinESPTarget(module,stageData)
+
+		if target then
+			createWinESP(
+				stageData.stage,
+				target,
+				stageData
+			)
+		end
+	end
+
+	lastWinESPScan=os.clock()
+end
+
+local function updateWinESP()
+	if not WinESPState.Enabled then
+		return
+	end
+
+	local module=Movement
+
+	if not module then
+		return
+	end
+
+	local character=player.Character
+	local localRoot=character and character:FindFirstChild("HumanoidRootPart")
+
+	if not localRoot then
+		return
+	end
+
+	local now=os.clock()
+
+	if now-lastWinESPScan>=WIN_ESP_SCAN_INTERVAL then
+		lastWinESPScan=now
+
+		if module.RefreshTargets then
+			module.RefreshTargets()
+		end
+	end
+
+	for _,stageData in ipairs(WIN_STAGES) do
+		local target=getWinESPTarget(module,stageData)
+		local data=WinESPState.Objects[stageData.stage]
+
+		if target then
+			if not data
+				or not data.target
+				or data.target~=target
+				or not data.highlight
+				or not data.highlight.Parent
+				or not data.billboard
+				or not data.billboard.Parent
+				or not data.label
+				or not data.label.Parent then
+
+				createWinESP(
+					stageData.stage,
+					target,
+					stageData
+				)
+
+				data=WinESPState.Objects[stageData.stage]
+			end
+
+			if data then
+				local distance=(target.Position-localRoot.Position).Magnitude
+				local distanceText=("%dm"):format(
+					math.floor(distance+0.5)
+				)
+
+				data.target=target
+				data.highlight.Adornee=target
+				data.billboard.Adornee=target
+				data.billboard.Enabled=true
+				data.label.Visible=true
+
+				data.label.Text=
+					"Stage "
+					..tostring(stageData.stage)
+					.."\n"
+					.."["..distanceText.."]"
+			end
+		elseif data then
+			removeWinESP(stageData.stage)
+		end
+	end
+end
+
+--========================================================
+-- ESP TOGGLES
 --========================================================
 
 createCheckbox(
@@ -2338,16 +2413,33 @@ createCheckbox(
 	COLORS.PageServer,
 	function(enabled)
 		ESPState.Enabled=enabled
+		refreshESP()
+	end
+)
+
+createCheckbox(
+	espPage,
+	"Win ESP",
+	163,
+	COLORS.PageFarm,
+	function(enabled)
+		WinESPState.Enabled=enabled
 
 		if enabled then
-			refreshESP()
+			refreshWinESP()
 		else
-			refreshESP()
+			for stageNumber in pairs(WinESPState.Objects) do
+				removeWinESP(stageNumber)
+			end
 		end
 	end
 )
 
-espPage.CanvasSize=UDim2.new(0,0,0,180)
+espPage.CanvasSize=UDim2.new(0,0,0,240)
+
+--========================================================
+-- PLAYER EVENTS
+--========================================================
 
 Players.PlayerAdded:Connect(function(targetPlayer)
 	targetPlayer.CharacterAdded:Connect(function()
@@ -2381,6 +2473,10 @@ task.spawn(function()
 
 		if ESPState.Enabled then
 			updateESP()
+		end
+
+		if WinESPState.Enabled then
+			updateWinESP()
 		end
 	end
 end)
@@ -2444,21 +2540,10 @@ end
 
 local Loaded=loadSavedSettings()
 
-local speedValue=
-	tonumber(Loaded.WalkSpeed)
-	or 16
-
-local jumpValue=
-	tonumber(Loaded.JumpPower)
-	or 50
-
-local flySpeedValue=
-	tonumber(Loaded.FlySpeed)
-	or 90
-
-local flyHeightValue=
-	tonumber(Loaded.FlyHeight)
-	or 5
+local speedValue=tonumber(Loaded.WalkSpeed) or 16
+local jumpValue=tonumber(Loaded.JumpPower) or 50
+local flySpeedValue=tonumber(Loaded.FlySpeed) or 90
+local flyHeightValue=tonumber(Loaded.FlyHeight) or 5
 
 local infiniteJumpEnabled
 local noClipEnabled
@@ -2613,8 +2698,7 @@ local _,_,setNoClipUI,getNoClipState=
 
 noClipEnabled=getNoClipState
 
-settingsPage.CanvasSize=
-	UDim2.new(0,0,0,610)
+settingsPage.CanvasSize=UDim2.new(0,0,0,610)
 
 --========================================================
 -- APPLY SAVED SETTINGS
@@ -2696,25 +2780,13 @@ end)
 local currentPage=nil
 local buttons={}
 
-local function createSidebarButton(
-	text,
-	order,
-	pageName,
-	accentColor
-)
-	accentColor=COLORS.PageServer
+local function createSidebarButton(text,order,pageName,accentColor)
+	accentColor=accentColor or COLORS.PageServer
 
 	local button=Instance.new("TextButton")
 	button.Name=pageName.."Button"
 	button.Size=UDim2.new(1,-24,0,48)
-	button.Position=
-		UDim2.new(
-			0,
-			12,
-			0,
-			16+(order-1)*54
-		)
-
+	button.Position=UDim2.new(0,12,0,16+(order-1)*54)
 	button.BackgroundColor3=COLORS.SurfaceLight
 	button.BackgroundTransparency=1
 	button.BorderSizePixel=0
@@ -2741,7 +2813,7 @@ local function createSidebarButton(
 	indicator.Name="Indicator"
 	indicator.Size=UDim2.new(0,4,0,28)
 	indicator.Position=UDim2.new(0,0,0.5,-14)
-	indicator.BackgroundColor3=COLORS.PageServer
+	indicator.BackgroundColor3=accentColor
 	indicator.BorderSizePixel=0
 	indicator.Visible=false
 	indicator.Parent=button
@@ -2752,41 +2824,15 @@ local function createSidebarButton(
 
 	button.MouseEnter:Connect(function()
 		if currentPage~=pageName then
-			tween(
-				button,
-				{
-					BackgroundTransparency=0.72
-				},
-				0.16
-			)
-
-			tween(
-				textLabel,
-				{
-					TextColor3=Color3.fromRGB(205,210,220)
-				},
-				0.16
-			)
+			tween(button,{BackgroundTransparency=0.72},0.16)
+			tween(textLabel,{TextColor3=Color3.fromRGB(205,210,220)},0.16)
 		end
 	end)
 
 	button.MouseLeave:Connect(function()
 		if currentPage~=pageName then
-			tween(
-				button,
-				{
-					BackgroundTransparency=1
-				},
-				0.16
-			)
-
-			tween(
-				textLabel,
-				{
-					TextColor3=COLORS.TextDim
-				},
-				0.16
-			)
+			tween(button,{BackgroundTransparency=1},0.16)
+			tween(textLabel,{TextColor3=COLORS.TextDim},0.16)
 		end
 	end)
 
@@ -2799,21 +2845,8 @@ local function createSidebarButton(
 		local newButtonData=buttons[pageName]
 
 		if oldButtonData then
-			tween(
-				oldButtonData.button,
-				{
-					BackgroundTransparency=1
-				},
-				0.16
-			)
-
-			tween(
-				oldButtonData.label,
-				{
-					TextColor3=COLORS.TextDim
-				},
-				0.16
-			)
+			tween(oldButtonData.button,{BackgroundTransparency=1},0.16)
+			tween(oldButtonData.label,{TextColor3=COLORS.TextDim},0.16)
 		end
 
 		for _,page in pairs(pages) do
@@ -2823,50 +2856,22 @@ local function createSidebarButton(
 		currentPage=pageName
 
 		if newButtonData then
-			tween(
-				newButtonData.button,
-				{
-					BackgroundTransparency=0.12
-				},
-				0.18
-			)
-
-			tween(
-				newButtonData.label,
-				{
-					TextColor3=COLORS.Text
-				},
-				0.18
-			)
+			tween(newButtonData.button,{BackgroundTransparency=0.12},0.18)
+			tween(newButtonData.label,{TextColor3=COLORS.Text},0.18)
 		end
 
 		if oldButtonData and newButtonData then
 			local oldY=oldButtonData.button.Position.Y.Offset
 			local newY=newButtonData.button.Position.Y.Offset
-
 			local indicatorProxy=oldButtonData.indicator
 
 			indicatorProxy.Parent=sidebar
 			indicatorProxy.Visible=true
-			indicatorProxy.Position=
-				UDim2.new(
-					0,
-					12,
-					0,
-					oldY+10
-				)
+			indicatorProxy.Position=UDim2.new(0,12,0,oldY+10)
 
 			tween(
 				indicatorProxy,
-				{
-					Position=
-						UDim2.new(
-							0,
-							12,
-							0,
-							newY+10
-						)
-				},
+				{Position=UDim2.new(0,12,0,newY+10)},
 				0.28,
 				Enum.EasingStyle.Quint
 			)
@@ -2883,8 +2888,7 @@ local function createSidebarButton(
 		end
 
 		newButtonData.indicator.Visible=true
-		newButtonData.indicator.BackgroundColor3=COLORS.PageServer
-
+		newButtonData.indicator.BackgroundColor3=accentColor
 		pages[pageName].Visible=true
 	end)
 
@@ -2892,39 +2896,16 @@ local function createSidebarButton(
 		button=button,
 		indicator=indicator,
 		label=textLabel,
-		accent=COLORS.PageServer
+		accent=accentColor
 	}
 
 	return button
 end
 
-createSidebarButton(
-	"Information",
-	1,
-	"Information",
-	COLORS.Accent
-)
-
-createSidebarButton(
-	"Auto Win",
-	2,
-	"AutoWin",
-	COLORS.PageServer
-)
-
-createSidebarButton(
-	"ESP",
-	3,
-	"ESP",
-	COLORS.PageServer
-)
-
-createSidebarButton(
-	"Settings",
-	4,
-	"Settings",
-	COLORS.PageFarm
-)
+createSidebarButton("Information",1,"Information",COLORS.Accent)
+createSidebarButton("Auto Win",2,"AutoWin",COLORS.PageServer)
+createSidebarButton("ESP",3,"ESP",COLORS.PageFarm)
+createSidebarButton("Settings",4,"Settings",COLORS.PageFarm)
 
 currentPage="Information"
 
@@ -2935,7 +2916,7 @@ settingsPage.Visible=false
 
 buttons["Information"].button.BackgroundTransparency=0.12
 buttons["Information"].indicator.Visible=true
-buttons["Information"].indicator.BackgroundColor3=COLORS.PageServer
+buttons["Information"].indicator.BackgroundColor3=COLORS.Accent
 buttons["Information"].label.TextColor3=COLORS.Text
 
 --========================================================
@@ -2961,6 +2942,16 @@ close.MouseButton1Click:Connect(function()
 		if module.SetNoClip then
 			module.SetNoClip(false)
 		end
+	end
+
+	WinESPState.Enabled=false
+
+	for stageNumber in pairs(WinESPState.Objects) do
+		removeWinESP(stageNumber)
+	end
+
+	for targetPlayer in pairs(ESPState.Objects) do
+		removeESP(targetPlayer)
 	end
 
 	tween(
@@ -3000,10 +2991,6 @@ local dragging=false
 local dragStart=nil
 local startPos=nil
 
---========================================================
--- UPDATE MINIMIZED BUTTONS
---========================================================
-
 local function updateMinimizedButtons(animated)
 	local duration=animated and 0.15 or 0
 
@@ -3034,18 +3021,12 @@ local function updateMinimizedButtons(animated)
 		return
 	end
 
-	--====================================================
-	-- MINIMIZED
-	--====================================================
-
-	-- Không bao giờ hiện nút minimize / maximize
 	minimize.Visible=false
 	maximize.Visible=false
 
 	minimize.Active=false
 	maximize.Active=false
 
-	-- Chỉ hiện × khi hover
 	close.Visible=true
 	close.Active=minimizedHover
 
@@ -3054,7 +3035,10 @@ local function updateMinimizedButtons(animated)
 	if duration>0 then
 		tween(
 			close,
-			{BackgroundTransparency=transparency,TextTransparency=transparency},
+			{
+				BackgroundTransparency=transparency,
+				TextTransparency=transparency
+			},
 			duration
 		)
 
@@ -3069,15 +3053,10 @@ local function updateMinimizedButtons(animated)
 		normalStroke.Transparency=minimizedHover and 0.1 or 1
 	end
 
-	-- Ẩn toàn bộ icon maximize
 	normalIcon.Visible=false
 	restoreBack.Visible=false
 	restoreFront.Visible=false
 end
-
---========================================================
--- RESTORE FROM MINIMIZED
---========================================================
 
 local function restoreFromMinimized()
 	if not minimized then
@@ -3115,10 +3094,6 @@ local function restoreFromMinimized()
 		Enum.EasingStyle.Quint
 	)
 end
-
---========================================================
--- MAXIMIZE
---========================================================
 
 maximize.MouseButton1Click:Connect(function()
 	if minimized then
@@ -3161,10 +3136,6 @@ maximize.MouseButton1Click:Connect(function()
 	updateMinimizedButtons(false)
 end)
 
---========================================================
--- MINIMIZE
---========================================================
-
 minimize.MouseButton1Click:Connect(function()
 	if minimized then
 		restoreFromMinimized()
@@ -3194,10 +3165,6 @@ minimize.MouseButton1Click:Connect(function()
 	)
 end)
 
---========================================================
--- MINIMIZED HOVER
---========================================================
-
 topBar.MouseEnter:Connect(function()
 	if not minimized then
 		return
@@ -3215,10 +3182,6 @@ topBar.MouseLeave:Connect(function()
 	minimizedHover=false
 	updateMinimizedButtons(true)
 end)
-
---========================================================
--- CLICK MINIMIZED BAR TO RESTORE
---========================================================
 
 topBar.InputBegan:Connect(function(input)
 	if input.UserInputType~=Enum.UserInputType.MouseButton1 then
@@ -3240,10 +3203,6 @@ topBar.InputEnded:Connect(function(input)
 		dragging=false
 	end
 end)
-
---========================================================
--- DRAG WINDOW
---========================================================
 
 UserInputService.InputChanged:Connect(function(input)
 	if not dragging or minimized then
