@@ -1826,7 +1826,7 @@ ownerText.BackgroundTransparency=1
 ownerText.Text="OWNER"
 ownerText.Font=Enum.Font.GothamBold
 ownerText.TextSize=25
-ownerText.TextColor3=Color3.fromRGB(255,196,0)
+ownerText.TextColor3=Color3.fromRGB(200, 200, 200)
 ownerText.TextXAlignment=Enum.TextXAlignment.Left
 ownerText.ZIndex=2
 ownerText.Parent=informationCard
@@ -1974,7 +1974,7 @@ gameRow.Name="GameNameRow"
 gameRow.Size=UDim2.new(1,0,1,0)
 gameRow.BackgroundTransparency=1
 gameRow.Font=Enum.Font.GothamMedium
-gameRow.TextSize=16
+gameRow.TextSize=18
 gameRow.TextXAlignment=Enum.TextXAlignment.Left
 gameRow.TextYAlignment=Enum.TextYAlignment.Center
 gameRow.TextColor3=Color3.fromRGB(240,240,240)
@@ -2680,7 +2680,7 @@ local function createSidebarButton(
 	pageName,
 	accentColor
 )
-	accentColor=accentColor or COLORS.Accent
+	accentColor=COLORS.PageServer
 
 	local button=Instance.new("TextButton")
 	button.Name=pageName.."Button"
@@ -2701,7 +2701,7 @@ local function createSidebarButton(
 	button.Parent=sidebar
 
 	local corner=Instance.new("UICorner")
-	corner.CornerRadius=UDim.new(0,12)
+	corner.CornerRadius=UDim.new(0,7)
 	corner.Parent=button
 
 	local textLabel=Instance.new("TextLabel")
@@ -2710,15 +2710,16 @@ local function createSidebarButton(
 	textLabel.BackgroundTransparency=1
 	textLabel.Text=text
 	textLabel.TextColor3=COLORS.TextDim
-	textLabel.TextSize=14
+	textLabel.TextSize=15
 	textLabel.Font=Enum.Font.GothamMedium
 	textLabel.TextXAlignment=Enum.TextXAlignment.Left
 	textLabel.Parent=button
 
 	local indicator=Instance.new("Frame")
+	indicator.Name="Indicator"
 	indicator.Size=UDim2.new(0,4,0,28)
 	indicator.Position=UDim2.new(0,0,0.5,-14)
-	indicator.BackgroundColor3=accentColor
+	indicator.BackgroundColor3=COLORS.PageServer
 	indicator.BorderSizePixel=0
 	indicator.Visible=false
 	indicator.Parent=button
@@ -2731,7 +2732,18 @@ local function createSidebarButton(
 		if currentPage~=pageName then
 			tween(
 				button,
-				{BackgroundTransparency=0.7}
+				{
+					BackgroundTransparency=0.72
+				},
+				0.16
+			)
+
+			tween(
+				textLabel,
+				{
+					TextColor3=Color3.fromRGB(205,210,220)
+				},
+				0.16
 			)
 		end
 	end)
@@ -2740,23 +2752,45 @@ local function createSidebarButton(
 		if currentPage~=pageName then
 			tween(
 				button,
-				{BackgroundTransparency=1}
+				{
+					BackgroundTransparency=1
+				},
+				0.16
+			)
+
+			tween(
+				textLabel,
+				{
+					TextColor3=COLORS.TextDim
+				},
+				0.16
 			)
 		end
 	end)
 
 	button.MouseButton1Click:Connect(function()
-		for _,data in pairs(buttons) do
+		if currentPage==pageName then
+			return
+		end
+
+		local oldButtonData=buttons[currentPage]
+		local newButtonData=buttons[pageName]
+
+		if oldButtonData then
 			tween(
-				data.button,
-				{BackgroundTransparency=1}
+				oldButtonData.button,
+				{
+					BackgroundTransparency=1
+				},
+				0.16
 			)
 
-			data.indicator.Visible=false
-
 			tween(
-				data.label,
-				{TextColor3=COLORS.TextDim}
+				oldButtonData.label,
+				{
+					TextColor3=COLORS.TextDim
+				},
+				0.16
 			)
 		end
 
@@ -2766,17 +2800,68 @@ local function createSidebarButton(
 
 		currentPage=pageName
 
-		tween(
-			button,
-			{BackgroundTransparency=0.1}
-		)
+		if newButtonData then
+			tween(
+				newButtonData.button,
+				{
+					BackgroundTransparency=0.12
+				},
+				0.18
+			)
 
-		indicator.Visible=true
+			tween(
+				newButtonData.label,
+				{
+					TextColor3=COLORS.Text
+				},
+				0.18
+			)
+		end
 
-		tween(
-			textLabel,
-			{TextColor3=COLORS.Text}
-		)
+		if oldButtonData and newButtonData then
+			local oldY=oldButtonData.button.Position.Y.Offset
+			local newY=newButtonData.button.Position.Y.Offset
+
+			local indicatorProxy=oldButtonData.indicator
+
+			indicatorProxy.Parent=sidebar
+			indicatorProxy.Visible=true
+			indicatorProxy.Position=
+				UDim2.new(
+					0,
+					12,
+					0,
+					oldY+10
+				)
+
+			tween(
+				indicatorProxy,
+				{
+					Position=
+						UDim2.new(
+							0,
+							12,
+							0,
+							newY+10
+						)
+				},
+				0.28,
+				Enum.EasingStyle.Quint
+			)
+
+			for _,data in pairs(buttons) do
+				if data.indicator~=indicatorProxy then
+					data.indicator.Visible=false
+				end
+			end
+
+			newButtonData.indicator=indicatorProxy
+		else
+			newButtonData.indicator.Visible=true
+		end
+
+		newButtonData.indicator.Visible=true
+		newButtonData.indicator.BackgroundColor3=COLORS.PageServer
 
 		pages[pageName].Visible=true
 	end)
@@ -2785,7 +2870,7 @@ local function createSidebarButton(
 		button=button,
 		indicator=indicator,
 		label=textLabel,
-		accent=accentColor
+		accent=COLORS.PageServer
 	}
 
 	return button
@@ -2826,8 +2911,9 @@ autoWinPage.Visible=false
 espPage.Visible=false
 settingsPage.Visible=false
 
-buttons["Information"].button.BackgroundTransparency=0.1
+buttons["Information"].button.BackgroundTransparency=0.12
 buttons["Information"].indicator.Visible=true
+buttons["Information"].indicator.BackgroundColor3=COLORS.PageServer
 buttons["Information"].label.TextColor3=COLORS.Text
 
 --========================================================
