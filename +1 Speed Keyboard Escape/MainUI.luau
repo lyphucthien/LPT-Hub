@@ -2991,7 +2991,7 @@ local maximizedSize=UDim2.new(1,-40,1,-40)
 local maximizedPosition=UDim2.new(0,20,0,20)
 
 local minimizedSize=UDim2.new(0,300,0,38)
-local minimizedPosition=UDim2.new(0.5,-150,0,15)
+local minimizedPosition=UDim2.new(0.5,-150,-0.060,15)
 
 local minimizedHover=false
 local dragging=false
@@ -3024,63 +3024,41 @@ local function updateMinimizedButtons(animated)
 		return
 	end
 
-	minimize.Visible=false
-	maximize.Visible=true
-	close.Visible=true
+	--====================================================
+	-- MINIMIZED:
+	--====================================================
 
-	maximize.Active=minimizedHover
+	minimize.Visible=false
+	maximize.Visible=false
+	close.Visible=minimizedHover
+
+	minimize.Active=false
+	maximize.Active=false
 	close.Active=minimizedHover
 
 	local transparency=minimizedHover and 0 or 1
 
 	if duration>0 then
 		tween(
-			maximize,
-			{
-				BackgroundTransparency=transparency
-			},
-			duration
-		)
-
-		tween(
 			close,
-			{
-				BackgroundTransparency=transparency
-			},
+			{BackgroundTransparency=transparency,TextTransparency=transparency},
 			duration
 		)
 
 		tween(
 			normalStroke,
-			{
-				Transparency=transparency
-			},
-			duration
-		)
-
-		tween(
-			restoreBackStroke,
-			{
-				Transparency=transparency
-			},
-			duration
-		)
-
-		tween(
-			restoreFrontStroke,
-			{
-				Transparency=transparency
-			},
+			{Transparency=minimizedHover and 0.1 or 1},
 			duration
 		)
 	else
-		maximize.BackgroundTransparency=transparency
 		close.BackgroundTransparency=transparency
-
-		normalStroke.Transparency=transparency
-		restoreBackStroke.Transparency=transparency
-		restoreFrontStroke.Transparency=transparency
+		close.TextTransparency=transparency
+		normalStroke.Transparency=minimizedHover and 0.1 or 1
 	end
+
+	normalIcon.Visible=false
+	restoreBack.Visible=false
+	restoreFront.Visible=false
 end
 
 --========================================================
