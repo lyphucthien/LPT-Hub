@@ -3,6 +3,7 @@ local UserInputService=game:GetService("UserInputService")
 local TweenService=game:GetService("TweenService")
 local HttpService=game:GetService("HttpService")
 local RunService=game:GetService("RunService")
+local MarketplaceService=game:GetService("MarketplaceService")
 
 local player=Players.LocalPlayer
 local playerGui=player:WaitForChild("PlayerGui")
@@ -99,6 +100,7 @@ end
 local function applyCharacterSettings()
 	local humanoid=getHumanoid()
 	if not humanoid then return end
+
 	pcall(function()
 		humanoid.UseJumpPower=true
 		humanoid.WalkSpeed=State.WalkSpeed
@@ -108,6 +110,7 @@ end
 
 local function rememberCollision(character)
 	if not character then return end
+
 	for _,object in ipairs(character:GetDescendants()) do
 		if object:IsA("BasePart") and OriginalCollision[object]==nil then
 			OriginalCollision[object]=object.CanCollide
@@ -118,42 +121,66 @@ end
 local function restoreCollision(character)
 	for object,original in pairs(OriginalCollision) do
 		if object and object.Parent then
-			pcall(function() object.CanCollide=original end)
+			pcall(function()
+				object.CanCollide=original
+			end)
 		end
 	end
+
 	table.clear(OriginalCollision)
 end
 
 local function getStageNumberFromName(name)
 	name=lower(name)
-	local number=name:match("^stage(%d+)$") or name:match("^stage%-(%d+)$") or name:match("^stage_(%d+)$") or name:match("^stage%s+(%d+)$") or name:match("^(%d+)stage$")
+
+	local number=
+		name:match("^stage(%d+)$")
+		or name:match("^stage%-(%d+)$")
+		or name:match("^stage_(%d+)$")
+		or name:match("^stage%s+(%d+)$")
+		or name:match("^(%d+)stage$")
+
 	return number and tonumber(number) or nil
 end
 
 local function belongsToStage(part,stageNumber)
 	local current=part
+
 	for _=1,20 do
 		if not current then break end
-		if getStageNumberFromName(current.Name)==stageNumber then return true end
+
+		if getStageNumberFromName(current.Name)==stageNumber then
+			return true
+		end
+
 		current=current.Parent
 	end
+
 	return false
 end
 
 local function findStructure()
 	local structure=workspace:FindFirstChild("Structure")
 	if structure then return structure end
+
 	structure=workspace:FindFirstChild("Structure",true)
 	if structure then return structure end
+
 	for _,object in ipairs(workspace:GetDescendants()) do
-		if lower(object.Name)=="structure" then return object end
+		if lower(object.Name)=="structure" then
+			return object
+		end
 	end
+
 	return nil
 end
 
 local function findStageContainer(stageNumber)
 	local cached=State.StageContainerCache[stageNumber]
-	if cached and cached.Parent then return cached end
+
+	if cached and cached.Parent then
+		return cached
+	end
 
 	local structure=findStructure()
 	if not structure then return nil end
@@ -176,17 +203,27 @@ local function findStageContainer(stageNumber)
 end
 
 local function hasInteractiveObject(part)
-	return part:FindFirstChild("TouchInterest") or part:FindFirstChildOfClass("ProximityPrompt") or part:FindFirstChildOfClass("ClickDetector")
+	return part:FindFirstChild("TouchInterest")
+		or part:FindFirstChildOfClass("ProximityPrompt")
+		or part:FindFirstChildOfClass("ClickDetector")
 end
 
 local function isBadName(name)
 	name=lower(name)
-	return name:find("npc",1,true) or name:find("enemy",1,true) or name:find("dummy",1,true) or name:find("ballerina",1,true) or name:find("chocolita",1,true) or name=="character"
+
+	return name:find("npc",1,true)
+		or name:find("enemy",1,true)
+		or name:find("dummy",1,true)
+		or name:find("ballerina",1,true)
+		or name:find("chocolita",1,true)
+		or name=="character"
 end
 
 local function getNameScore(name)
 	name=lower(name)
+
 	local score=0
+
 	if name=="getwinbutton" or name=="claimwinbutton" then
 		score+=100000
 	elseif name=="winbutton" then
@@ -200,6 +237,7 @@ local function getNameScore(name)
 	elseif name=="win" then
 		score+=70000
 	end
+
 	if name:find("getwin",1,true) then score+=50000 end
 	if name:find("claimwin",1,true) then score+=50000 end
 	if name:find("winbutton",1,true) then score+=45000 end
@@ -208,29 +246,42 @@ local function getNameScore(name)
 	if name:find("award",1,true) then score+=25000 end
 	if name:find("button",1,true) then score+=20000 end
 	if name:find("win",1,true) then score+=15000 end
+
 	return score
 end
 
 local function scoreTarget(part,stageNumber)
-	if not isBasePart(part) then return -math.huge end
+	if not isBasePart(part) then
+		return -math.huge
+	end
 
 	local score=getNameScore(part.Name)
 	local parent=part.Parent
 
 	for _=1,6 do
 		if not parent then break end
+
 		local parentName=lower(parent.Name)
+
 		if parentName:find("win",1,true) then score+=25000 end
 		if parentName:find("button",1,true) then score+=15000 end
 		if parentName:find("claim",1,true) then score+=20000 end
+
 		parent=parent.Parent
 	end
 
 	score+=belongsToStage(part,stageNumber) and 30000 or -30000
-	if hasInteractiveObject(part) then score+=30000 end
-	if isBadName(part.Name) then score-=100000 end
+
+	if hasInteractiveObject(part) then
+		score+=30000
+	end
+
+	if isBadName(part.Name) then
+		score-=100000
+	end
 
 	local name=lower(part.Name)
+
 	if name=="hitbox" or name:find("hitbox",1,true) then
 		score-=hasInteractiveObject(part) and 5000 or 50000
 	end
@@ -251,6 +302,7 @@ local function findTargetInStage(container,stageNumber)
 	for _,object in ipairs(container:GetDescendants()) do
 		if object:IsA("BasePart") then
 			local score=scoreTarget(object,stageNumber)
+
 			if score>bestScore then
 				bestScore=score
 				bestTarget=object
@@ -260,6 +312,7 @@ local function findTargetInStage(container,stageNumber)
 
 	if container:IsA("BasePart") then
 		local score=scoreTarget(container,stageNumber)
+
 		if score>bestScore then
 			bestScore=score
 			bestTarget=container
@@ -270,7 +323,10 @@ local function findTargetInStage(container,stageNumber)
 end
 
 function Module.RefreshTargets()
-	if State.Scanning then return State.TargetCache end
+	if State.Scanning then
+		return State.TargetCache
+	end
+
 	State.Scanning=true
 
 	table.clear(State.TargetCache)
@@ -279,28 +335,39 @@ function Module.RefreshTargets()
 
 	for _,info in ipairs(WIN_STAGES) do
 		local container=findStageContainer(info.stage)
+
 		if container then
 			local target=findTargetInStage(container,info.stage)
+
 			if isBasePart(target) then
 				State.StageTargetCache[info.stage]=target
 				State.TargetCache[info.value]=target
 			end
 		end
+
 		task.wait()
 	end
 
 	State.Scanning=false
+
 	return State.TargetCache
 end
 
 function Module.GetTarget(value)
 	value=tonumber(value)
-	if not value then return nil end
+
+	if not value then
+		return nil
+	end
 
 	local target=State.TargetCache[value]
-	if isBasePart(target) then return target end
+
+	if isBasePart(target) then
+		return target
+	end
 
 	Module.RefreshTargets()
+
 	return State.TargetCache[value]
 end
 
@@ -311,22 +378,35 @@ end
 
 function Module.GetStageTarget(stageNumber)
 	stageNumber=tonumber(stageNumber)
-	if not stageNumber then return nil end
+
+	if not stageNumber then
+		return nil
+	end
 
 	local target=State.StageTargetCache[stageNumber]
-	if isBasePart(target) then return target end
+
+	if isBasePart(target) then
+		return target
+	end
 
 	Module.RefreshTargets()
+
 	return State.StageTargetCache[stageNumber]
 end
 
 function Module.GetStage(stageNumber)
 	stageNumber=tonumber(stageNumber)
-	if not stageNumber then return nil end
+
+	if not stageNumber then
+		return nil
+	end
 
 	for _,info in ipairs(WIN_STAGES) do
-		if info.stage==stageNumber then return info end
+		if info.stage==stageNumber then
+			return info
+		end
 	end
+
 	return nil
 end
 
@@ -335,8 +415,15 @@ function Module.GetStages()
 end
 
 local function getTargetPosition(part)
-	if not isBasePart(part) then return nil end
-	return Vector3.new(part.Position.X,part.Position.Y+part.Size.Y/2+2+State.FlyHeight,part.Position.Z)
+	if not isBasePart(part) then
+		return nil
+	end
+
+	return Vector3.new(
+		part.Position.X,
+		part.Position.Y+part.Size.Y/2+2+State.FlyHeight,
+		part.Position.Z
+	)
 end
 
 function Module.StopFlying()
@@ -350,12 +437,20 @@ function Module.IsFlying()
 end
 
 function Module.FlyToPart(part,stageNumber)
-	if not isBasePart(part) then return false,"Invalid target" end
-	if State.Flying then return false,"Already flying" end
+	if not isBasePart(part) then
+		return false,"Invalid target"
+	end
+
+	if State.Flying then
+		return false,"Already flying"
+	end
 
 	local root=getRoot()
 	local humanoid=getHumanoid()
-	if not root or not humanoid then return false,"Character not ready" end
+
+	if not root or not humanoid then
+		return false,"Character not ready"
+	end
 
 	State.Flying=true
 	State.CurrentTarget=part
@@ -370,9 +465,16 @@ function Module.FlyToPart(part,stageNumber)
 	local started=os.clock()
 	local reached=false
 
-	while State.Flying and root.Parent and part.Parent and os.clock()-started<45 do
+	while State.Flying
+		and root.Parent
+		and part.Parent
+		and os.clock()-started<45 do
+
 		local destination=getTargetPosition(part)
-		if not destination then break end
+
+		if not destination then
+			break
+		end
 
 		local difference=destination-root.Position
 		local distance=difference.Magnitude
@@ -383,7 +485,10 @@ function Module.FlyToPart(part,stageNumber)
 		end
 
 		local dt=RunService.Heartbeat:Wait()
-		if not State.Flying then break end
+
+		if not State.Flying then
+			break
+		end
 
 		local speed=math.max(10,State.FlySpeed)
 		local step=math.min(distance,speed*dt)
@@ -391,21 +496,32 @@ function Module.FlyToPart(part,stageNumber)
 		root.AssemblyLinearVelocity=Vector3.zero
 		root.AssemblyAngularVelocity=Vector3.zero
 		root.CFrame=CFrame.new(root.Position+difference.Unit*step)
+
 		humanoid.PlatformStand=true
 		humanoid.AutoRotate=false
 	end
 
 	if reached and State.Flying and root.Parent and part.Parent then
 		local destination=getTargetPosition(part)
+
 		if destination then
 			root.AssemblyLinearVelocity=Vector3.zero
 			root.AssemblyAngularVelocity=Vector3.zero
 			root.CFrame=CFrame.new(destination)
 
 			local holdStart=os.clock()
-			while State.Flying and root.Parent and part.Parent and os.clock()-holdStart<0.8 do
+
+			while State.Flying
+				and root.Parent
+				and part.Parent
+				and os.clock()-holdStart<0.8 do
+
 				local finalPosition=getTargetPosition(part)
-				if finalPosition then root.CFrame=CFrame.new(finalPosition) end
+
+				if finalPosition then
+					root.CFrame=CFrame.new(finalPosition)
+				end
+
 				RunService.Heartbeat:Wait()
 			end
 		end
@@ -425,17 +541,28 @@ function Module.FlyToPart(part,stageNumber)
 	State.CurrentTarget=nil
 	State.CurrentStage=nil
 
-	if reached then return true end
-	if stopped then return false,"Stopped" end
+	if reached then
+		return true
+	end
+
+	if stopped then
+		return false,"Stopped"
+	end
+
 	return false,"Could not reach target"
 end
 
 function Module.FlyToStage(stageNumber)
 	stageNumber=tonumber(stageNumber)
+
 	local info=Module.GetStage(stageNumber)
-	if not info then return false,"Invalid stage" end
+
+	if not info then
+		return false,"Invalid stage"
+	end
 
 	local target=State.StageTargetCache[stageNumber]
+
 	if not isBasePart(target) then
 		Module.RefreshTargets()
 		target=State.StageTargetCache[stageNumber]
@@ -450,7 +577,10 @@ end
 
 function Module.FlyToWin(winAmount)
 	winAmount=tonumber(winAmount)
-	if not winAmount then return false,"Invalid Win amount" end
+
+	if not winAmount then
+		return false,"Invalid Win amount"
+	end
 
 	for _,info in ipairs(WIN_STAGES) do
 		if info.value==winAmount then
@@ -501,12 +631,17 @@ end
 
 function Module.SetInfiniteJump(enabled)
 	State.InfiniteJump=enabled==true
+
 	disconnect("InfiniteJump")
 
 	if State.InfiniteJump then
 		Connections.InfiniteJump=UserInputService.JumpRequest:Connect(function()
-			if not State.InfiniteJump then return end
+			if not State.InfiniteJump then
+				return
+			end
+
 			local humanoid=getHumanoid()
+
 			if humanoid then
 				pcall(function()
 					humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
@@ -528,7 +663,9 @@ function Module.SetNoClip(enabled)
 	local character=getCharacter()
 
 	if State.NoClip then
-		if character then rememberCollision(character) end
+		if character then
+			rememberCollision(character)
+		end
 	else
 		restoreCollision(character)
 	end
@@ -541,16 +678,23 @@ function Module.GetNoClip()
 end
 
 Connections.NoClip=RunService.Stepped:Connect(function()
-	if not State.NoClip then return end
+	if not State.NoClip then
+		return
+	end
 
 	local character=getCharacter()
-	if not character then return end
+
+	if not character then
+		return
+	end
 
 	rememberCollision(character)
 
 	for _,object in ipairs(character:GetDescendants()) do
 		if object:IsA("BasePart") then
-			pcall(function() object.CanCollide=false end)
+			pcall(function()
+				object.CanCollide=false
+			end)
 		end
 	end
 end)
@@ -571,7 +715,9 @@ Connections.CharacterAdded=LocalPlayer.CharacterAdded:Connect(function(character
 		task.wait(0.15)
 		applyCharacterSettings()
 
-		if State.NoClip then rememberCollision(character) end
+		if State.NoClip then
+			rememberCollision(character)
+		end
 	end
 end)
 
@@ -612,13 +758,19 @@ function Module.Destroy()
 
 	for name,connection in pairs(Connections) do
 		if connection then
-			pcall(function() connection:Disconnect() end)
+			pcall(function()
+				connection:Disconnect()
+			end)
 		end
+
 		Connections[name]=nil
 	end
 
 	local character=getCharacter()
-	if character then restoreCollision(character) end
+
+	if character then
+		restoreCollision(character)
+	end
 
 	table.clear(State.TargetCache)
 	table.clear(State.StageTargetCache)
@@ -634,7 +786,9 @@ return Module
 --========================================================
 
 local function moduleIsValid(module)
-	if type(module)~="table" then return false end
+	if type(module)~="table" then
+		return false
+	end
 
 	local requiredFunctions={
 		"SetWalkSpeed","SetJumpPower","SetFlySpeed","SetFlyHeight",
@@ -643,14 +797,18 @@ local function moduleIsValid(module)
 	}
 
 	for _,name in ipairs(requiredFunctions) do
-		if type(module[name])~="function" then return false end
+		if type(module[name])~="function" then
+			return false
+		end
 	end
 
 	return true
 end
 
 local function loadMovementModule()
-	if Movement and moduleIsValid(Movement) then return Movement end
+	if Movement and moduleIsValid(Movement) then
+		return Movement
+	end
 
 	local remoteOK,remoteResult=pcall(function()
 		return loadstring(game:HttpGet(MOVEMENT_MODULE_URL))()
@@ -661,7 +819,9 @@ local function loadMovementModule()
 		return Movement
 	end
 
-	movementLoadError=remoteOK and "Remote movement module is missing required functions." or tostring(remoteResult)
+	movementLoadError=remoteOK
+		and "Remote movement module is missing required functions."
+		or tostring(remoteResult)
 
 	local fallbackOK,fallbackResult=pcall(function()
 		return loadstring(LOCAL_MOVEMENT_SOURCE)()
@@ -698,8 +858,17 @@ local COLORS={
 }
 
 local function tween(obj,props,time,style)
-	local tweenObject=TweenService:Create(obj,TweenInfo.new(time or 0.18,style or Enum.EasingStyle.Quad),props)
+	local tweenObject=TweenService:Create(
+		obj,
+		TweenInfo.new(
+			time or 0.18,
+			style or Enum.EasingStyle.Quad
+		),
+		props
+	)
+
 	tweenObject:Play()
+
 	return tweenObject
 end
 
@@ -708,6 +877,7 @@ local function applyGradient(guiObject,colorA,colorB,rotation)
 	gradient.Color=ColorSequence.new(colorA,colorB)
 	gradient.Rotation=rotation or 45
 	gradient.Parent=guiObject
+
 	return gradient
 end
 
@@ -729,13 +899,20 @@ else
 	local placedInCoreGui=pcall(function()
 		screenGui.Parent=game:GetService("CoreGui")
 	end)
-	if not placedInCoreGui then screenGui.Parent=playerGui end
+
+	if not placedInCoreGui then
+		screenGui.Parent=playerGui
+	end
 end
 
 if protect_gui then
-	pcall(function() protect_gui(screenGui) end)
+	pcall(function()
+		protect_gui(screenGui)
+	end)
 elseif syn and syn.protect_gui then
-	pcall(function() syn.protect_gui(screenGui) end)
+	pcall(function()
+		syn.protect_gui(screenGui)
+	end)
 end
 
 --========================================================
@@ -819,7 +996,17 @@ task.spawn(function()
 		titleDotPulse.Size=UDim2.new(0,8,0,8)
 		titleDotPulse.Position=UDim2.new(0.5,-4,0.5,-4)
 		titleDotPulse.BackgroundTransparency=0.3
-		tween(titleDotPulse,{Size=UDim2.new(0,22,0,22),Position=UDim2.new(0.5,-11,0.5,-11),BackgroundTransparency=1},1.1)
+
+		tween(
+			titleDotPulse,
+			{
+				Size=UDim2.new(0,22,0,22),
+				Position=UDim2.new(0.5,-11,0.5,-11),
+				BackgroundTransparency=1
+			},
+			1.1
+		)
+
 		task.wait(1.1)
 	end
 end)
@@ -877,6 +1064,7 @@ local function topButton(name,xOffset,text,textSize)
 	local corner=Instance.new("UICorner")
 	corner.CornerRadius=UDim.new(0,10)
 	corner.Parent=button
+
 	return button
 end
 
@@ -949,12 +1137,21 @@ restoreFrontStroke.Parent=restoreFront
 
 local function setupTopButton(button,hoverColor,hoverBg)
 	button.MouseEnter:Connect(function()
-		tween(button,{TextColor3=hoverColor,BackgroundTransparency=0})
-		tween(button,{BackgroundColor3=hoverBg or COLORS.SurfaceLight})
+		tween(button,{
+			TextColor3=hoverColor,
+			BackgroundTransparency=0
+		})
+
+		tween(button,{
+			BackgroundColor3=hoverBg or COLORS.SurfaceLight
+		})
 	end)
 
 	button.MouseLeave:Connect(function()
-		tween(button,{TextColor3=COLORS.TextDim,BackgroundTransparency=1})
+		tween(button,{
+			TextColor3=COLORS.TextDim,
+			BackgroundTransparency=1
+		})
 	end)
 end
 
@@ -1035,7 +1232,9 @@ local function createPage(name)
 	page.CanvasSize=UDim2.new(0,0,0,0)
 	page.Visible=false
 	page.Parent=content
+
 	pages[name]=page
+
 	return page
 end
 
@@ -1110,7 +1309,12 @@ local function createCard(parent,yPos,titleText,bodyText,height,accentColor)
 	accentCorner.CornerRadius=UDim.new(1,0)
 	accentCorner.Parent=accentBar
 
-	applyGradient(accentBar,accentColor or COLORS.Accent,COLORS.AccentB,90)
+	applyGradient(
+		accentBar,
+		accentColor or COLORS.Accent,
+		COLORS.AccentB,
+		90
+	)
 
 	local cardTitle=Instance.new("TextLabel")
 	cardTitle.Size=UDim2.new(1,-40,0,22)
@@ -1209,9 +1413,16 @@ local function createSliderToggle(parent,text,yPos,accentColor,onChanged)
 	local enabled=false
 
 	local function updateVisual()
-		local bgColor=enabled and Color3.fromRGB(90,190,245) or Color3.fromRGB(120,120,125)
+		local bgColor=enabled
+			and Color3.fromRGB(90,190,245)
+			or Color3.fromRGB(120,120,125)
+
 		local bgTransparency=enabled and 0 or 0.35
-		local knobColor=enabled and Color3.fromRGB(15,15,20) or Color3.fromRGB(230,230,230)
+
+		local knobColor=enabled
+			and Color3.fromRGB(15,15,20)
+			or Color3.fromRGB(230,230,230)
+
 		local knobPos=enabled
 			and UDim2.new(0,26,0.5,-11)
 			or UDim2.new(0,3,0.5,-11)
@@ -1229,6 +1440,7 @@ local function createSliderToggle(parent,text,yPos,accentColor,onChanged)
 
 	local function setState(state,fireCallback)
 		enabled=state==true
+
 		updateVisual()
 
 		if fireCallback~=false and onChanged then
@@ -1315,9 +1527,16 @@ local function createCheckbox(parent,text,yPos,accentColor,onChanged)
 	local checked=false
 
 	local function updateVisual()
-		local bgColor=checked and Color3.fromRGB(90,190,245) or Color3.fromRGB(120,120,125)
+		local bgColor=checked
+			and Color3.fromRGB(90,190,245)
+			or Color3.fromRGB(120,120,125)
+
 		local bgTransparency=checked and 0 or 0.35
-		local knobColor=checked and Color3.fromRGB(15,15,20) or Color3.fromRGB(230,230,230)
+
+		local knobColor=checked
+			and Color3.fromRGB(15,15,20)
+			or Color3.fromRGB(230,230,230)
+
 		local knobPos=checked
 			and UDim2.new(0,26,0.5,-11)
 			or UDim2.new(0,3,0.5,-11)
@@ -1335,6 +1554,7 @@ local function createCheckbox(parent,text,yPos,accentColor,onChanged)
 
 	local function setState(state,fireCallback)
 		checked=state==true
+
 		updateVisual()
 
 		if fireCallback~=false and onChanged then
@@ -1451,27 +1671,54 @@ local function createNumberControl(parent,titleText,yPos,defaultValue,minValue,m
 	knobStroke.Parent=knob
 
 	local function updateVisual(value)
-		local fraction=math.clamp((value-minValue)/(maxValue-minValue),0,1)
+		local fraction=math.clamp(
+			(value-minValue)/(maxValue-minValue),
+			0,
+			1
+		)
+
 		fill.Size=UDim2.new(fraction,0,1,0)
 		knob.Position=UDim2.new(fraction,0,0.5,0)
 		valueLabel.Text=tostring(value)
 	end
 
 	local function setValue(value,fireCallback)
-		value=math.clamp(math.floor(value+0.5),minValue,maxValue)
+		value=math.clamp(
+			math.floor(value+0.5),
+			minValue,
+			maxValue
+		)
+
 		updateVisual(value)
-		if fireCallback~=false and onChanged then onChanged(value) end
+
+		if fireCallback~=false and onChanged then
+			onChanged(value)
+		end
+
 		return value
 	end
 
-	updateVisual(math.clamp(defaultValue,minValue,maxValue))
+	updateVisual(
+		math.clamp(
+			defaultValue,
+			minValue,
+			maxValue
+		)
+	)
 
 	local dragging=false
 
 	local function updateFromInputPosition(inputPosition)
 		local relativeX=inputPosition.X-track.AbsolutePosition.X
-		local fraction=math.clamp(relativeX/track.AbsoluteSize.X,0,1)
-		setValue(minValue+fraction*(maxValue-minValue))
+		local fraction=math.clamp(
+			relativeX/track.AbsoluteSize.X,
+			0,
+			1
+		)
+
+		setValue(
+			minValue+fraction*(maxValue-minValue)
+		)
 	end
 
 	local function beginDrag(input)
@@ -1480,25 +1727,39 @@ local function createNumberControl(parent,titleText,yPos,defaultValue,minValue,m
 	end
 
 	track.InputBegan:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+		if input.UserInputType==Enum.UserInputType.MouseButton1
+			or input.UserInputType==Enum.UserInputType.Touch then
+
 			beginDrag(input)
 		end
 	end)
 
 	knob.InputBegan:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+		if input.UserInputType==Enum.UserInputType.MouseButton1
+			or input.UserInputType==Enum.UserInputType.Touch then
+
 			beginDrag(input)
 		end
 	end)
 
 	UserInputService.InputChanged:Connect(function(input)
-		if dragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then
+		if dragging
+			and (
+				input.UserInputType==Enum.UserInputType.MouseMovement
+				or input.UserInputType==Enum.UserInputType.Touch
+			) then
+
 			updateFromInputPosition(input.Position)
 		end
 	end)
 
 	UserInputService.InputEnded:Connect(function(input)
-		if dragging and (input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch) then
+		if dragging
+			and (
+				input.UserInputType==Enum.UserInputType.MouseButton1
+				or input.UserInputType==Enum.UserInputType.Touch
+			) then
+
 			dragging=false
 		end
 	end)
@@ -1510,50 +1771,189 @@ end
 -- INFORMATION
 --========================================================
 
-createPageTitle(informationPage,"Thông Tin","Thông tin Owner, Tên Game, Chức năng và trạng thái.")
-
-createCard(
+createPageTitle(
 	informationPage,
-	95,
-	"LPT Hub",
-	"Hub hỗ trợ Auto Win, ESP, Settings và các tiện ích.",
-	90,
-	COLORS.Accent
+	"Thông Tin",
+	"Thông tin Owner, Tên Game, Chức năng và trạng thái."
 )
 
-createCard(
-	informationPage,
-	195,
-	"Author",
-	"Ly Phuc Thien\nLPT Hub",
-	80,
-	COLORS.PageFarm
+local informationContainer=Instance.new("Frame")
+informationContainer.Name="InformationContainer"
+informationContainer.Size=UDim2.new(1,-56,0,430)
+informationContainer.Position=UDim2.new(0,28,0,95)
+informationContainer.BackgroundTransparency=1
+informationContainer.Parent=informationPage
+
+--========================================================
+-- MAIN INFORMATION CARD
+--========================================================
+
+local informationCard=Instance.new("Frame")
+informationCard.Name="InformationCard"
+informationCard.Size=UDim2.new(1,0,0,350)
+informationCard.Position=UDim2.new(0,0,0,0)
+informationCard.BackgroundColor3=Color3.fromRGB(30,28,35)
+informationCard.BackgroundTransparency=0.05
+informationCard.BorderSizePixel=0
+informationCard.Parent=informationContainer
+
+local informationCorner=Instance.new("UICorner")
+informationCorner.CornerRadius=UDim.new(0,20)
+informationCorner.Parent=informationCard
+
+local informationStroke=Instance.new("UIStroke")
+informationStroke.Color=Color3.fromRGB(255,255,255)
+informationStroke.Transparency=0.9
+informationStroke.Thickness=1
+informationStroke.Parent=informationCard
+
+local informationPadding=Instance.new("UIPadding")
+informationPadding.PaddingTop=UDim.new(0,20)
+informationPadding.PaddingLeft=UDim.new(0,24)
+informationPadding.PaddingRight=UDim.new(0,24)
+informationPadding.PaddingBottom=UDim.new(0,20)
+informationPadding.Parent=informationCard
+
+local informationList=Instance.new("Frame")
+informationList.Name="InformationList"
+informationList.Size=UDim2.new(1,0,1,0)
+informationList.BackgroundTransparency=1
+informationList.Parent=informationCard
+
+local informationLayout=Instance.new("UIListLayout")
+informationLayout.FillDirection=Enum.FillDirection.Vertical
+informationLayout.Padding=UDim.new(0,16)
+informationLayout.SortOrder=Enum.SortOrder.LayoutOrder
+informationLayout.Parent=informationList
+
+local function createInformationRow(order,labelText,valueText)
+	local row=Instance.new("Frame")
+	row.Name=labelText.."Row"
+	row.Size=UDim2.new(1,0,0,44)
+	row.BackgroundTransparency=1
+	row.LayoutOrder=order
+	row.Parent=informationList
+
+	local label=Instance.new("TextLabel")
+	label.Name="Label"
+	label.Size=UDim2.new(1,0,0,18)
+	label.Position=UDim2.new(0,0,0,0)
+	label.BackgroundTransparency=1
+	label.Text=labelText
+	label.Font=Enum.Font.Gotham
+	label.TextSize=13
+	label.TextColor3=Color3.fromRGB(160,158,165)
+	label.TextXAlignment=Enum.TextXAlignment.Left
+	label.Parent=row
+
+	local value=Instance.new("TextLabel")
+	value.Name="Value"
+	value.Size=UDim2.new(1,0,0,22)
+	value.Position=UDim2.new(0,0,0,20)
+	value.BackgroundTransparency=1
+	value.Text=valueText
+	value.Font=Enum.Font.GothamMedium
+	value.TextSize=16
+	value.TextColor3=Color3.fromRGB(240,240,240)
+	value.TextXAlignment=Enum.TextXAlignment.Left
+	value.Parent=row
+
+	local divider=Instance.new("Frame")
+	divider.Name="Divider"
+	divider.Size=UDim2.new(1,0,0,1)
+	divider.Position=UDim2.new(0,0,1,6)
+	divider.BackgroundColor3=Color3.fromRGB(255,255,255)
+	divider.BackgroundTransparency=0.93
+	divider.BorderSizePixel=0
+	divider.Parent=row
+
+	return row
+end
+
+createInformationRow(
+	1,
+	"Tên người dùng",
+	player.Name
 )
 
-createCard(
-	informationPage,
-	285,
-	"Features",
-	"• Auto Win — chọn Stage để tự động bay tới target.\n• ESP — hiển thị người chơi và khoảng cách nút.\n• Settings — Walk Speed, Jump Power, Fly Speed, Fly Height.\n• Infinite Jump — nhảy không giới hạn.\n• No Clip — đi xuyên vật thể.",
-	105,
-	COLORS.PageServer
+createInformationRow(
+	2,
+	"Vai trò",
+	"Thành viên"
 )
 
-createCard(
-	informationPage,
-	400,
-	"Status",
-	"Movement module: Loaded\nAuto Win: Ready\nUI: Active",
-	90,
-	COLORS.Online
+createInformationRow(
+	3,
+	"Trạng thái",
+	"Đang hoạt động"
 )
 
-informationPage.CanvasSize=UDim2.new(0,0,0,520)
+--========================================================
+-- GAME CARD
+--========================================================
+
+local gameCard=Instance.new("Frame")
+gameCard.Name="GameCard"
+gameCard.Size=UDim2.new(1,0,0,60)
+gameCard.Position=UDim2.new(0,0,0,370)
+gameCard.BackgroundColor3=Color3.fromRGB(30,28,35)
+gameCard.BackgroundTransparency=0.05
+gameCard.BorderSizePixel=0
+gameCard.Parent=informationContainer
+
+local gameCorner=Instance.new("UICorner")
+gameCorner.CornerRadius=UDim.new(0,20)
+gameCorner.Parent=gameCard
+
+local gameStroke=Instance.new("UIStroke")
+gameStroke.Color=Color3.fromRGB(255,255,255)
+gameStroke.Transparency=0.9
+gameStroke.Thickness=1
+gameStroke.Parent=gameCard
+
+local gamePadding=Instance.new("UIPadding")
+gamePadding.PaddingLeft=UDim.new(0,24)
+gamePadding.PaddingRight=UDim.new(0,24)
+gamePadding.Parent=gameCard
+
+local gameRow=Instance.new("TextLabel")
+gameRow.Name="GameNameRow"
+gameRow.Size=UDim2.new(1,0,1,0)
+gameRow.BackgroundTransparency=1
+gameRow.Font=Enum.Font.GothamMedium
+gameRow.TextSize=16
+gameRow.TextXAlignment=Enum.TextXAlignment.Left
+gameRow.TextYAlignment=Enum.TextYAlignment.Center
+gameRow.TextColor3=Color3.fromRGB(240,240,240)
+gameRow.RichText=true
+gameRow.Parent=gameCard
+
+local gameNameValue="Unknown Game"
+
+local gameInfoOK,gameInfo=pcall(function()
+	return MarketplaceService:GetProductInfo(game.PlaceId)
+end)
+
+if gameInfoOK and type(gameInfo)=="table" and gameInfo.Name then
+	gameNameValue=tostring(gameInfo.Name)
+end
+
+gameRow.Text=string.format(
+	'<font color="rgb(160,158,165)" size="14">Tên Game: </font><font color="rgb(240,240,240)">%s</font>',
+	gameNameValue
+)
+
+informationPage.CanvasSize=UDim2.new(0,0,0,540)
+
 --========================================================
 -- AUTO WIN
 --========================================================
 
-createPageTitle(autoWinPage,"Auto Win","Chọn Stage để tự động bay tới nút Win tương ứng.")
+createPageTitle(
+	autoWinPage,
+	"Auto Win",
+	"Chọn Stage để tự động bay tới nút Win tương ứng."
+)
 
 local refreshTargets=Instance.new("TextButton")
 refreshTargets.Name="RefreshTargets"
@@ -1579,16 +1979,27 @@ refreshStroke.Transparency=0.2
 refreshStroke.Parent=refreshTargets
 
 refreshTargets.MouseEnter:Connect(function()
-	tween(refreshTargets,{BackgroundColor3=Color3.fromRGB(120,180,255)},0.15)
+	tween(
+		refreshTargets,
+		{BackgroundColor3=Color3.fromRGB(120,180,255)},
+		0.15
+	)
 end)
 
 refreshTargets.MouseLeave:Connect(function()
-	tween(refreshTargets,{BackgroundColor3=COLORS.PageServer},0.15)
+	tween(
+		refreshTargets,
+		{BackgroundColor3=COLORS.PageServer},
+		0.15
+	)
 end)
 
 refreshTargets.MouseButton1Click:Connect(function()
 	local module=loadMovementModule()
-	if module and module.RefreshTargets then module.RefreshTargets() end
+
+	if module and module.RefreshTargets then
+		module.RefreshTargets()
+	end
 end)
 
 local WIN_STAGES={
@@ -1616,37 +2027,71 @@ local winTargetRows={}
 local selectedWinTarget=nil
 
 for index,stageData in ipairs(WIN_STAGES) do
-	local rowY=WIN_TARGET_START_Y+(index-1)*(WIN_TARGET_ROW_HEIGHT+WIN_TARGET_ROW_GAP)
+	local rowY=
+		WIN_TARGET_START_Y
+		+(index-1)*(WIN_TARGET_ROW_HEIGHT+WIN_TARGET_ROW_GAP)
 
-	local _,_,setStageState=createSliderToggle(autoWinPage,stageData.text,rowY,COLORS.PageServer,function(isEnabled)
-		if isEnabled then
-			selectedWinTarget=stageData.value
+	local _,_,setStageState=
+		createSliderToggle(
+			autoWinPage,
+			stageData.text,
+			rowY,
+			COLORS.PageServer,
+			function(isEnabled)
+				if isEnabled then
+					selectedWinTarget=stageData.value
 
-			for _,entry in ipairs(winTargetRows) do
-				if entry.index~=index then entry.setState(false,false) end
+					for _,entry in ipairs(winTargetRows) do
+						if entry.index~=index then
+							entry.setState(false,false)
+						end
+					end
+
+					local module=loadMovementModule()
+
+					if module and module.RefreshTargets then
+						module.RefreshTargets()
+					end
+				elseif selectedWinTarget==stageData.value then
+					selectedWinTarget=nil
+
+					local module=loadMovementModule()
+
+					if module and module.StopFlying then
+						module.StopFlying()
+					end
+				end
 			end
+		)
 
-			local module=loadMovementModule()
-			if module and module.RefreshTargets then module.RefreshTargets() end
-		elseif selectedWinTarget==stageData.value then
-			selectedWinTarget=nil
-
-			local module=loadMovementModule()
-			if module and module.StopFlying then module.StopFlying() end
-		end
-	end)
-
-	table.insert(winTargetRows,{index=index,stage=stageData.stage,value=stageData.value,setState=setStageState})
+	table.insert(
+		winTargetRows,
+		{
+			index=index,
+			stage=stageData.stage,
+			value=stageData.value,
+			setState=setStageState
+		}
+	)
 end
 
-local winTargetsBottom=WIN_TARGET_START_Y+(#WIN_STAGES*WIN_TARGET_ROW_HEIGHT)+((#WIN_STAGES-1)*WIN_TARGET_ROW_GAP)
-autoWinPage.CanvasSize=UDim2.new(0,0,0,winTargetsBottom+25)
+local winTargetsBottom=
+	WIN_TARGET_START_Y
+	+(#WIN_STAGES*WIN_TARGET_ROW_HEIGHT)
+	+((#WIN_STAGES-1)*WIN_TARGET_ROW_GAP)
+
+autoWinPage.CanvasSize=
+	UDim2.new(0,0,0,winTargetsBottom+25)
 
 --========================================================
 -- ESP PAGE
 --========================================================
 
-createPageTitle(espPage,"ESP","Hiển thị người chơi với tên và khoảng cách.")
+createPageTitle(
+	espPage,
+	"ESP",
+	"Hiển thị người chơi với tên và khoảng cách."
+)
 
 local ESPState={
 	Enabled=false,
@@ -1657,20 +2102,35 @@ local ESPState={
 
 local function removeESP(targetPlayer)
 	local data=ESPState.Objects[targetPlayer]
-	if not data then return end
-	if data.highlight then data.highlight:Destroy() end
-	if data.billboard then data.billboard:Destroy() end
+
+	if not data then
+		return
+	end
+
+	if data.highlight then
+		data.highlight:Destroy()
+	end
+
+	if data.billboard then
+		data.billboard:Destroy()
+	end
+
 	ESPState.Objects[targetPlayer]=nil
 end
 
 local function createESP(targetPlayer)
-	if targetPlayer==LocalPlayer or not ESPState.Enabled then return end
+	if targetPlayer==LocalPlayer or not ESPState.Enabled then
+		return
+	end
 
 	removeESP(targetPlayer)
 
 	local character=targetPlayer.Character
 	local root=character and character:FindFirstChild("HumanoidRootPart")
-	if not character or not root then return end
+
+	if not character or not root then
+		return
+	end
 
 	local highlight=Instance.new("Highlight")
 	highlight.Name="LPTHubESP"
@@ -1710,7 +2170,9 @@ local function createESP(targetPlayer)
 end
 
 local function updateESP()
-	if not ESPState.Enabled then return end
+	if not ESPState.Enabled then
+		return
+	end
 
 	local localCharacter=LocalPlayer.Character
 	local localRoot=localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
@@ -1736,9 +2198,16 @@ local function updateESP()
 		end
 
 		if ESPState.ShowDistance and localRoot then
-			local distance=(root.Position-localRoot.Position).Magnitude
-			local distanceText=("%dm"):format(math.floor(distance+0.5))
-			text=text~="" and (text.."  ["..distanceText.."]") or distanceText
+			local distance=
+				(root.Position-localRoot.Position).Magnitude
+
+			local distanceText=
+				("%dm"):format(math.floor(distance+0.5))
+
+			text=
+				text~=""
+				and (text.."  ["..distanceText.."]")
+				or distanceText
 		end
 
 		data.label.Text=text
@@ -1750,6 +2219,7 @@ local function refreshESP()
 		for targetPlayer in pairs(ESPState.Objects) do
 			removeESP(targetPlayer)
 		end
+
 		return
 	end
 
@@ -1760,20 +2230,41 @@ local function refreshESP()
 	end
 end
 
-local _,_,setESPUI=createCheckbox(espPage,"Player ESP",95,COLORS.Accent,function(enabled)
-	ESPState.Enabled=enabled
-	refreshESP()
-end)
+local _,_,setESPUI=
+	createCheckbox(
+		espPage,
+		"Player ESP",
+		95,
+		COLORS.Accent,
+		function(enabled)
+			ESPState.Enabled=enabled
+			refreshESP()
+		end
+	)
 
-local _,_,setESPNameUI=createCheckbox(espPage,"Show Player Name",163,COLORS.PageFarm,function(enabled)
-	ESPState.ShowName=enabled
-	updateESP()
-end)
+local _,_,setESPNameUI=
+	createCheckbox(
+		espPage,
+		"Show Player Name",
+		163,
+		COLORS.PageFarm,
+		function(enabled)
+			ESPState.ShowName=enabled
+			updateESP()
+		end
+	)
 
-local _,_,setESPDistanceUI=createCheckbox(espPage,"Show Distance",231,COLORS.PageServer,function(enabled)
-	ESPState.ShowDistance=enabled
-	updateESP()
-end)
+local _,_,setESPDistanceUI=
+	createCheckbox(
+		espPage,
+		"Show Distance",
+		231,
+		COLORS.PageServer,
+		function(enabled)
+			ESPState.ShowDistance=enabled
+			updateESP()
+		end
+	)
 
 createCard(
 	espPage,
@@ -1789,6 +2280,7 @@ espPage.CanvasSize=UDim2.new(0,0,0,415)
 Players.PlayerAdded:Connect(function(targetPlayer)
 	targetPlayer.CharacterAdded:Connect(function()
 		task.wait(0.25)
+
 		if ESPState.Enabled then
 			createESP(targetPlayer)
 		end
@@ -1803,6 +2295,7 @@ for _,targetPlayer in ipairs(Players:GetPlayers()) do
 	if targetPlayer~=LocalPlayer then
 		targetPlayer.CharacterAdded:Connect(function()
 			task.wait(0.25)
+
 			if ESPState.Enabled then
 				createESP(targetPlayer)
 			end
@@ -1821,7 +2314,11 @@ end)
 -- SETTINGS PAGE
 --========================================================
 
-createPageTitle(settingsPage,"Settings","Điều Chỉnh Theo Ý Muốn Của Bạn.")
+createPageTitle(
+	settingsPage,
+	"Settings",
+	"Điều Chỉnh Theo Ý Muốn Của Bạn."
+)
 
 local SETTINGS_FILE="LPT_Hub_Settings.json"
 
@@ -1836,20 +2333,34 @@ local DEFAULT_SETTINGS={
 
 local function loadSavedSettings()
 	local settings={}
-	for key,value in pairs(DEFAULT_SETTINGS) do settings[key]=value end
 
-	if not (isfile and readfile) then return settings end
+	for key,value in pairs(DEFAULT_SETTINGS) do
+		settings[key]=value
+	end
 
-	local ok,exists=pcall(function() return isfile(SETTINGS_FILE) end)
-	if not ok or not exists then return settings end
+	if not (isfile and readfile) then
+		return settings
+	end
+
+	local ok,exists=pcall(function()
+		return isfile(SETTINGS_FILE)
+	end)
+
+	if not ok or not exists then
+		return settings
+	end
 
 	local success,result=pcall(function()
-		return HttpService:JSONDecode(readfile(SETTINGS_FILE))
+		return HttpService:JSONDecode(
+			readfile(SETTINGS_FILE)
+		)
 	end)
 
 	if success and type(result)=="table" then
 		for key in pairs(DEFAULT_SETTINGS) do
-			if result[key]~=nil then settings[key]=result[key] end
+			if result[key]~=nil then
+				settings[key]=result[key]
+			end
 		end
 	end
 
@@ -1857,75 +2368,178 @@ local function loadSavedSettings()
 end
 
 local Loaded=loadSavedSettings()
-local speedValue=tonumber(Loaded.WalkSpeed) or 16
-local jumpValue=tonumber(Loaded.JumpPower) or 50
-local flySpeedValue=tonumber(Loaded.FlySpeed) or 90
-local flyHeightValue=tonumber(Loaded.FlyHeight) or 5
+
+local speedValue=
+	tonumber(Loaded.WalkSpeed)
+	or 16
+
+local jumpValue=
+	tonumber(Loaded.JumpPower)
+	or 50
+
+local flySpeedValue=
+	tonumber(Loaded.FlySpeed)
+	or 90
+
+local flyHeightValue=
+	tonumber(Loaded.FlyHeight)
+	or 5
 
 local infiniteJumpEnabled
 local noClipEnabled
 
 local function saveSettings()
-	if not (writefile and HttpService) then return end
+	if not (writefile and HttpService) then
+		return
+	end
 
 	local settings={
 		WalkSpeed=speedValue,
 		JumpPower=jumpValue,
 		FlySpeed=flySpeedValue,
 		FlyHeight=flyHeightValue,
-		InfiniteJump=infiniteJumpEnabled and infiniteJumpEnabled() or false,
-		NoClip=noClipEnabled and noClipEnabled() or false,
+		InfiniteJump=
+			infiniteJumpEnabled
+			and infiniteJumpEnabled()
+			or false,
+		NoClip=
+			noClipEnabled
+			and noClipEnabled()
+			or false,
 	}
 
 	pcall(function()
-		writefile(SETTINGS_FILE,HttpService:JSONEncode(settings))
+		writefile(
+			SETTINGS_FILE,
+			HttpService:JSONEncode(settings)
+		)
 	end)
 end
 
-createNumberControl(settingsPage,"Walk Speed",95,speedValue,0,500,COLORS.PageFarm,function(value)
-	speedValue=value
-	local module=loadMovementModule()
-	if module and module.SetWalkSpeed then module.SetWalkSpeed(value) end
-	task.defer(saveSettings)
-end)
+createNumberControl(
+	settingsPage,
+	"Walk Speed",
+	95,
+	speedValue,
+	0,
+	500,
+	COLORS.PageFarm,
+	function(value)
+		speedValue=value
 
-createNumberControl(settingsPage,"Jump Power",183,jumpValue,0,500,COLORS.PageFarm,function(value)
-	jumpValue=value
-	local module=loadMovementModule()
-	if module and module.SetJumpPower then module.SetJumpPower(value) end
-	task.defer(saveSettings)
-end)
+		local module=loadMovementModule()
 
-createNumberControl(settingsPage,"Auto-Fly Speed",271,flySpeedValue,10,500,COLORS.PageServer,function(value)
-	flySpeedValue=value
-	local module=loadMovementModule()
-	if module and module.SetFlySpeed then module.SetFlySpeed(value) end
-	task.defer(saveSettings)
-end)
+		if module and module.SetWalkSpeed then
+			module.SetWalkSpeed(value)
+		end
 
-createNumberControl(settingsPage,"Fly Height Offset",359,flyHeightValue,0,100,COLORS.PageServer,function(value)
-	flyHeightValue=value
-	local module=loadMovementModule()
-	if module and module.SetFlyHeight then module.SetFlyHeight(value) end
-	task.defer(saveSettings)
-end)
+		task.defer(saveSettings)
+	end
+)
 
-local _,_,setInfiniteJumpUI,getInfiniteJumpState=createCheckbox(settingsPage,"Infinite Jump",447,COLORS.PageFarm,function(enabled)
-	local module=loadMovementModule()
-	if module and module.SetInfiniteJump then module.SetInfiniteJump(enabled) end
-	task.defer(saveSettings)
-end)
+createNumberControl(
+	settingsPage,
+	"Jump Power",
+	183,
+	jumpValue,
+	0,
+	500,
+	COLORS.PageFarm,
+	function(value)
+		jumpValue=value
+
+		local module=loadMovementModule()
+
+		if module and module.SetJumpPower then
+			module.SetJumpPower(value)
+		end
+
+		task.defer(saveSettings)
+	end
+)
+
+createNumberControl(
+	settingsPage,
+	"Auto-Fly Speed",
+	271,
+	flySpeedValue,
+	10,
+	500,
+	COLORS.PageServer,
+	function(value)
+		flySpeedValue=value
+
+		local module=loadMovementModule()
+
+		if module and module.SetFlySpeed then
+			module.SetFlySpeed(value)
+		end
+
+		task.defer(saveSettings)
+	end
+)
+
+createNumberControl(
+	settingsPage,
+	"Fly Height Offset",
+	359,
+	flyHeightValue,
+	0,
+	100,
+	COLORS.PageServer,
+	function(value)
+		flyHeightValue=value
+
+		local module=loadMovementModule()
+
+		if module and module.SetFlyHeight then
+			module.SetFlyHeight(value)
+		end
+
+		task.defer(saveSettings)
+	end
+)
+
+local _,_,setInfiniteJumpUI,getInfiniteJumpState=
+	createCheckbox(
+		settingsPage,
+		"Infinite Jump",
+		447,
+		COLORS.PageFarm,
+		function(enabled)
+			local module=loadMovementModule()
+
+			if module and module.SetInfiniteJump then
+				module.SetInfiniteJump(enabled)
+			end
+
+			task.defer(saveSettings)
+		end
+	)
 
 infiniteJumpEnabled=getInfiniteJumpState
 
-local _,_,setNoClipUI,getNoClipState=createCheckbox(settingsPage,"No Clip",515,COLORS.PageFarm,function(enabled)
-	local module=loadMovementModule()
-	if module and module.SetNoClip then module.SetNoClip(enabled) end
-	task.defer(saveSettings)
-end)
+local _,_,setNoClipUI,getNoClipState=
+	createCheckbox(
+		settingsPage,
+		"No Clip",
+		515,
+		COLORS.PageFarm,
+		function(enabled)
+			local module=loadMovementModule()
+
+			if module and module.SetNoClip then
+				module.SetNoClip(enabled)
+			end
+
+			task.defer(saveSettings)
+		end
+	)
 
 noClipEnabled=getNoClipState
-settingsPage.CanvasSize=UDim2.new(0,0,0,610)
+
+settingsPage.CanvasSize=
+	UDim2.new(0,0,0,610)
 
 --========================================================
 -- APPLY SAVED SETTINGS
@@ -1935,14 +2549,30 @@ task.defer(function()
 	local module=loadMovementModule()
 
 	if module then
-		if module.SetWalkSpeed then module.SetWalkSpeed(speedValue) end
-		if module.SetJumpPower then module.SetJumpPower(jumpValue) end
-		if module.SetFlySpeed then module.SetFlySpeed(flySpeedValue) end
-		if module.SetFlyHeight then module.SetFlyHeight(flyHeightValue) end
+		if module.SetWalkSpeed then
+			module.SetWalkSpeed(speedValue)
+		end
+
+		if module.SetJumpPower then
+			module.SetJumpPower(jumpValue)
+		end
+
+		if module.SetFlySpeed then
+			module.SetFlySpeed(flySpeedValue)
+		end
+
+		if module.SetFlyHeight then
+			module.SetFlyHeight(flyHeightValue)
+		end
 	end
 
-	if Loaded.InfiniteJump==true then setInfiniteJumpUI(true,true) end
-	if Loaded.NoClip==true then setNoClipUI(true,true) end
+	if Loaded.InfiniteJump==true then
+		setInfiniteJumpUI(true,true)
+	end
+
+	if Loaded.NoClip==true then
+		setNoClipUI(true,true)
+	end
 end)
 
 --========================================================
@@ -1954,20 +2584,32 @@ task.spawn(function()
 		task.wait(0.1)
 
 		local module=Movement
-		if not module then continue end
+
+		if not module then
+			continue
+		end
 
 		if selectedWinTarget then
-			local target=module.GetTarget and module.GetTarget(selectedWinTarget)
+			local target=
+				module.GetTarget
+				and module.GetTarget(selectedWinTarget)
 
 			if not target and module.RefreshTargets then
 				module.RefreshTargets()
 			end
 
-			if module.IsFlying and module.FlyToWin and not module.IsFlying() then
+			if module.IsFlying
+				and module.FlyToWin
+				and not module.IsFlying() then
+
 				module.FlyToWin(selectedWinTarget)
 			end
-		elseif module.IsFlying and module.IsFlying() then
-			if module.StopFlying then module.StopFlying() end
+		elseif module.IsFlying
+			and module.IsFlying() then
+
+			if module.StopFlying then
+				module.StopFlying()
+			end
 		end
 	end
 end)
@@ -1979,13 +2621,25 @@ end)
 local currentPage=nil
 local buttons={}
 
-local function createSidebarButton(text,order,pageName,accentColor)
+local function createSidebarButton(
+	text,
+	order,
+	pageName,
+	accentColor
+)
 	accentColor=accentColor or COLORS.Accent
 
 	local button=Instance.new("TextButton")
 	button.Name=pageName.."Button"
 	button.Size=UDim2.new(1,-24,0,48)
-	button.Position=UDim2.new(0,12,0,16+(order-1)*54)
+	button.Position=
+		UDim2.new(
+			0,
+			12,
+			0,
+			16+(order-1)*54
+		)
+
 	button.BackgroundColor3=COLORS.SurfaceLight
 	button.BackgroundTransparency=1
 	button.BorderSizePixel=0
@@ -2021,39 +2675,99 @@ local function createSidebarButton(text,order,pageName,accentColor)
 	indicatorCorner.Parent=indicator
 
 	button.MouseEnter:Connect(function()
-		if currentPage~=pageName then tween(button,{BackgroundTransparency=0.7}) end
+		if currentPage~=pageName then
+			tween(
+				button,
+				{BackgroundTransparency=0.7}
+			)
+		end
 	end)
 
 	button.MouseLeave:Connect(function()
-		if currentPage~=pageName then tween(button,{BackgroundTransparency=1}) end
+		if currentPage~=pageName then
+			tween(
+				button,
+				{BackgroundTransparency=1}
+			)
+		end
 	end)
 
 	button.MouseButton1Click:Connect(function()
 		for _,data in pairs(buttons) do
-			tween(data.button,{BackgroundTransparency=1})
+			tween(
+				data.button,
+				{BackgroundTransparency=1}
+			)
+
 			data.indicator.Visible=false
-			tween(data.label,{TextColor3=COLORS.TextDim})
+
+			tween(
+				data.label,
+				{TextColor3=COLORS.TextDim}
+			)
 		end
 
-		for _,page in pairs(pages) do page.Visible=false end
+		for _,page in pairs(pages) do
+			page.Visible=false
+		end
 
 		currentPage=pageName
-		tween(button,{BackgroundTransparency=0.1})
+
+		tween(
+			button,
+			{BackgroundTransparency=0.1}
+		)
+
 		indicator.Visible=true
-		tween(textLabel,{TextColor3=COLORS.Text})
+
+		tween(
+			textLabel,
+			{TextColor3=COLORS.Text}
+		)
+
 		pages[pageName].Visible=true
 	end)
 
-	buttons[pageName]={button=button,indicator=indicator,label=textLabel,accent=accentColor}
+	buttons[pageName]={
+		button=button,
+		indicator=indicator,
+		label=textLabel,
+		accent=accentColor
+	}
+
 	return button
 end
 
-createSidebarButton("Information",1,"Information",COLORS.Accent)
-createSidebarButton("Auto Win",2,"AutoWin",COLORS.PageServer)
-createSidebarButton("ESP",3,"ESP",COLORS.PageServer)
-createSidebarButton("Settings",4,"Settings",COLORS.PageFarm)
+createSidebarButton(
+	"Information",
+	1,
+	"Information",
+	COLORS.Accent
+)
+
+createSidebarButton(
+	"Auto Win",
+	2,
+	"AutoWin",
+	COLORS.PageServer
+)
+
+createSidebarButton(
+	"ESP",
+	3,
+	"ESP",
+	COLORS.PageServer
+)
+
+createSidebarButton(
+	"Settings",
+	4,
+	"Settings",
+	COLORS.PageFarm
+)
 
 currentPage="Information"
+
 informationPage.Visible=true
 autoWinPage.Visible=false
 espPage.Visible=false
@@ -2069,20 +2783,36 @@ buttons["Information"].label.TextColor3=COLORS.Text
 
 close.MouseButton1Click:Connect(function()
 	saveSettings()
+
 	selectedWinTarget=nil
 
 	local module=loadMovementModule()
 
 	if module then
-		if module.StopFlying then module.StopFlying() end
-		if module.SetInfiniteJump then module.SetInfiniteJump(false) end
-		if module.SetNoClip then module.SetNoClip(false) end
+		if module.StopFlying then
+			module.StopFlying()
+		end
+
+		if module.SetInfiniteJump then
+			module.SetInfiniteJump(false)
+		end
+
+		if module.SetNoClip then
+			module.SetNoClip(false)
+		end
 	end
 
-	tween(main,{BackgroundTransparency=1},0.15)
+	tween(
+		main,
+		{BackgroundTransparency=1},
+		0.15
+	)
+
 	task.wait(0.15)
 
-	if screenGui.Parent then screenGui:Destroy() end
+	if screenGui.Parent then
+		screenGui:Destroy()
+	end
 end)
 
 --========================================================
@@ -2091,8 +2821,12 @@ end)
 
 local maximized=false
 local minimized=false
-local normalSize=UDim2.new(0,780,0,500)
-local normalPosition=UDim2.new(0.5,-390,0.5,-250)
+
+local normalSize=
+	UDim2.new(0,780,0,500)
+
+local normalPosition=
+	UDim2.new(0.5,-390,0.5,-250)
 
 maximize.MouseButton1Click:Connect(function()
 	if minimized then
@@ -2104,12 +2838,28 @@ maximize.MouseButton1Click:Connect(function()
 	maximized=not maximized
 
 	if maximized then
-		tween(main,{Size=UDim2.new(1,-40,1,-40),Position=UDim2.new(0,20,0,20)},0.25)
+		tween(
+			main,
+			{
+				Size=UDim2.new(1,-40,1,-40),
+				Position=UDim2.new(0,20,0,20)
+			},
+			0.25
+		)
+
 		normalIcon.Visible=false
 		restoreBack.Visible=true
 		restoreFront.Visible=true
 	else
-		tween(main,{Size=normalSize,Position=normalPosition},0.25)
+		tween(
+			main,
+			{
+				Size=normalSize,
+				Position=normalPosition
+			},
+			0.25
+		)
+
 		normalIcon.Visible=true
 		restoreBack.Visible=false
 		restoreFront.Visible=false
@@ -2126,11 +2876,27 @@ minimize.MouseButton1Click:Connect(function()
 	if minimized then
 		sidebar.Visible=false
 		content.Visible=false
-		tween(main,{Size=UDim2.new(0,780,0,38)},0.2)
+
+		tween(
+			main,
+			{
+				Size=UDim2.new(0,780,0,38)
+			},
+			0.2
+		)
 	else
 		sidebar.Visible=true
 		content.Visible=true
-		tween(main,{Size=maximized and UDim2.new(1,-40,1,-40) or normalSize},0.2)
+
+		tween(
+			main,
+			{
+				Size=maximized
+					and UDim2.new(1,-40,1,-40)
+					or normalSize
+			},
+			0.2
+		)
 	end
 end)
 
@@ -2157,8 +2923,17 @@ topBar.InputEnded:Connect(function(input)
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-	if dragging and input.UserInputType==Enum.UserInputType.MouseMovement then
+	if dragging
+		and input.UserInputType==Enum.UserInputType.MouseMovement then
+
 		local delta=input.Position-dragStart
-		main.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+delta.X,startPos.Y.Scale,startPos.Y.Offset+delta.Y)
+
+		main.Position=
+			UDim2.new(
+				startPos.X.Scale,
+				startPos.X.Offset+delta.X,
+				startPos.Y.Scale,
+				startPos.Y.Offset+delta.Y
+			)
 	end
 end)
