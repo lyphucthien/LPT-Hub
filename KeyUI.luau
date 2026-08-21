@@ -536,16 +536,25 @@ getKeyButton.MouseButton1Click:Connect(function()
 		end
 	end
 
+	if not opened then
 		if type(setclipboard)=="function" then
-			pcall(function()
+			local copied=pcall(function()
 				setclipboard(GET_KEY_LINK)
 			end)
 
-			showNotification(
-				"Link Copied",
-				"Executor không hỗ trợ mở Web. Link đã được copy.",
-				"warning"
-			)
+			if copied then
+				showNotification(
+					"Link Copied",
+					"Không thể mở Web tự động. Link đã được copy.",
+					"warning"
+				)
+			else
+				showNotification(
+					"Copy Failed",
+					"Không thể mở Web hoặc copy link.",
+					"error"
+				)
+			end
 		else
 			showNotification(
 				"Open Failed",
