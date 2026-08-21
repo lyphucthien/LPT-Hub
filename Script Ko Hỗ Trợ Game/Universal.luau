@@ -2,9 +2,14 @@ local Players=game:GetService("Players")
 local UserInputService=game:GetService("UserInputService")
 local RunService=game:GetService("RunService")
 local TweenService=game:GetService("TweenService")
+local MarketplaceService=game:GetService("MarketplaceService")
 
 local player=Players.LocalPlayer
 local playerGui=player:WaitForChild("PlayerGui")
+
+--========================================================
+-- STATE
+--========================================================
 
 local State={
 	WalkSpeed=16,
@@ -17,27 +22,52 @@ local State={
 
 local Connections={}
 local OriginalCollision={}
+local FlyConnection=nil
+
+--========================================================
+-- COLORS
+--========================================================
 
 local COLORS={
 	Background=Color3.fromRGB(10,11,16),
-	Surface=Color3.fromRGB(15,16,23),
-	Card=Color3.fromRGB(31,34,45),
+	Surface=Color3.fromRGB(14,15,21),
+	SurfaceLight=Color3.fromRGB(40,44,58),
+	Card=Color3.fromRGB(34,38,50),
 	CardHover=Color3.fromRGB(40,44,58),
+
 	Accent=Color3.fromRGB(168,105,245),
 	AccentB=Color3.fromRGB(236,72,153),
+
 	Text=Color3.fromRGB(240,241,245),
 	TextDim=Color3.fromRGB(150,157,170),
 	Border=Color3.fromRGB(52,56,70),
+
 	Success=Color3.fromRGB(74,222,128),
 	Danger=Color3.fromRGB(255,92,108),
 	Info=Color3.fromRGB(96,165,250),
 }
 
-local function tween(object,properties,time,style)
-	if not object or not object.Parent then return end
-	local t=TweenService:Create(object,TweenInfo.new(time or .18,style or Enum.EasingStyle.Quad),properties)
+--========================================================
+-- HELPERS
+--========================================================
+
+local function tween(obj,props,time,style)
+	if not obj or not obj.Parent then return end
+	local t=TweenService:Create(
+		obj,
+		TweenInfo.new(time or .18,style or Enum.EasingStyle.Quad),
+		props
+	)
 	t:Play()
 	return t
+end
+
+local function applyGradient(obj,a,b,rotation)
+	local gradient=Instance.new("UIGradient")
+	gradient.Color=ColorSequence.new(a,b)
+	gradient.Rotation=rotation or 45
+	gradient.Parent=obj
+	return gradient
 end
 
 local function getCharacter()
@@ -54,23 +84,17 @@ local function getRoot()
 	return character and character:FindFirstChild("HumanoidRootPart")
 end
 
+--========================================================
+-- MOVEMENT
+--========================================================
+
 local function applyMovement()
 	local humanoid=getHumanoid()
 	if not humanoid then return end
 
-	if State.WalkSpeedEnabled then
-		humanoid.WalkSpeed=State.WalkSpeed
-	else
-		humanoid.WalkSpeed=16
-	end
-
-	if State.JumpPowerEnabled then
-		humanoid.UseJumpPower=true
-		humanoid.JumpPower=State.JumpPower
-	else
-		humanoid.UseJumpPower=true
-		humanoid.JumpPower=50
-	end
+	humanoid.UseJumpPower=true
+	humanoid.WalkSpeed=State.WalkSpeedEnabled and State.WalkSpeed or 16
+	humanoid.JumpPower=State.JumpPowerEnabled and State.JumpPower or 50
 end
 
 --========================================================
@@ -88,10 +112,10 @@ local function rememberCollision(character)
 end
 
 local function restoreCollision()
-	for object,canCollide in pairs(OriginalCollision) do
+	for object,original in pairs(OriginalCollision) do
 		if object and object.Parent then
 			pcall(function()
-				object.CanCollide=canCollide
+				object.CanCollide=original
 			end)
 		end
 	end
@@ -109,7 +133,9 @@ Connections.NoClip=RunService.Stepped:Connect(function()
 
 	for _,object in ipairs(character:GetDescendants()) do
 		if object:IsA("BasePart") then
-			object.CanCollide=false
+			pcall(function()
+				object.CanCollide=false
+			end)
 		end
 	end
 end)
@@ -117,8 +143,6 @@ end)
 --========================================================
 -- FLY
 --========================================================
-
-local FlyConnection=nil
 
 local function stopFly()
 	State.Fly=false
@@ -142,9 +166,7 @@ local function stopFly()
 end
 
 local function startFly()
-	if FlyConnection then
-		FlyConnection:Disconnect()
-	end
+	stopFly()
 
 	State.Fly=true
 
@@ -153,10 +175,9 @@ local function startFly()
 
 		local root=getRoot()
 		local humanoid=getHumanoid()
-		if not root or not humanoid then return end
-
 		local camera=workspace.CurrentCamera
-		if not camera then return end
+
+		if not root or not humanoid or not camera then return end
 
 		humanoid.PlatformStand=true
 
@@ -212,10 +233,14 @@ Connections.CharacterAdded=player.CharacterAdded:Connect(function(character)
 	if State.Fly then
 		stopFly()
 	end
+
+	if State.NoClip then
+		rememberCollision(character)
+	end
 end)
 
 --========================================================
--- GUI
+-- SCREEN GUI
 --========================================================
 
 local oldGui=playerGui:FindFirstChild("LPTHub")
@@ -228,78 +253,310 @@ local screenGui=Instance.new("ScreenGui")
 screenGui.Name="LPTHub"
 screenGui.ResetOnSpawn=false
 screenGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
-screenGui.DisplayOrder=999999
-screenGui.Parent=playerGui
+screenGui.DisplayOrder=2147483647
+
+local hiddenLayer=(gethui and gethui()) or (get_hidden_gui and get_hidden_gui())
+
+if hiddenLayer then
+	screenGui.Parent=hiddenLayer
+else
+	local ok=pcall(function()
+		screenGui.Parent=game:GetService("CoreGui")
+	end)
+
+	if not ok then
+		screenGui.Parent=playerGui
+	end
+end
+
+if protect_gui then
+	pcall(function()
+		protect_gui(screenGui)
+	end)
+elseif syn and syn.protect_gui then
+	pcall(function()
+		syn.protect_gui(screenGui)
+	end)
+end
+
+--========================================================
+-- MAIN WINDOW
+--========================================================
 
 local main=Instance.new("Frame")
-main.Name="Main"
-main.Size=UDim2.fromOffset(650,420)
-main.Position=UDim2.new(.5,-325,.5,-210)
+main.Name="MainWindow"
+main.Size=UDim2.new(0,780,0,500)
+main.Position=UDim2.new(.5,-390,.5,-250)
 main.BackgroundColor3=COLORS.Background
 main.BorderSizePixel=0
 main.ClipsDescendants=true
 main.Parent=screenGui
 
 local mainCorner=Instance.new("UICorner")
-mainCorner.CornerRadius=UDim.new(0,14)
+mainCorner.CornerRadius=UDim.new(0,8)
 mainCorner.Parent=main
 
 local mainStroke=Instance.new("UIStroke")
 mainStroke.Color=COLORS.Border
-mainStroke.Thickness=1.5
+mainStroke.Thickness=2
+mainStroke.Transparency=.1
 mainStroke.Parent=main
 
-local gradient=Instance.new("UIGradient")
-gradient.Color=ColorSequence.new(COLORS.Accent,COLORS.AccentB)
-gradient.Rotation=45
-gradient.Parent=mainStroke
+applyGradient(mainStroke,COLORS.Accent,COLORS.AccentB,45)
 
 --========================================================
 -- TOP BAR
 --========================================================
 
 local topBar=Instance.new("Frame")
-topBar.Size=UDim2.new(1,0,0,46)
+topBar.Name="TopBar"
+topBar.Size=UDim2.new(1,0,0,38)
 topBar.BackgroundColor3=COLORS.Surface
 topBar.BorderSizePixel=0
 topBar.Parent=main
 
+local topBarCorner=Instance.new("UICorner")
+topBarCorner.CornerRadius=UDim.new(0,20)
+topBarCorner.Parent=topBar
+
+local topBarMask=Instance.new("Frame")
+topBarMask.Size=UDim2.new(1,0,0,20)
+topBarMask.Position=UDim2.new(0,0,1,-20)
+topBarMask.BackgroundColor3=COLORS.Surface
+topBarMask.BorderSizePixel=0
+topBarMask.Parent=topBar
+
+local titleDot=Instance.new("Frame")
+titleDot.Size=UDim2.fromOffset(8,8)
+titleDot.Position=UDim2.new(0,20,.5,-4)
+titleDot.BackgroundColor3=COLORS.Success
+titleDot.BorderSizePixel=0
+titleDot.ZIndex=2
+titleDot.Parent=topBar
+
+local titleDotCorner=Instance.new("UICorner")
+titleDotCorner.CornerRadius=UDim.new(1,0)
+titleDotCorner.Parent=titleDot
+
+local titleDotPulse=Instance.new("Frame")
+titleDotPulse.Size=UDim2.fromOffset(8,8)
+titleDotPulse.Position=UDim2.new(.5,-4,.5,-4)
+titleDotPulse.BackgroundColor3=COLORS.Success
+titleDotPulse.BackgroundTransparency=.3
+titleDotPulse.BorderSizePixel=0
+titleDotPulse.Parent=titleDot
+
+local titleDotPulseCorner=Instance.new("UICorner")
+titleDotPulseCorner.CornerRadius=UDim.new(1,0)
+titleDotPulseCorner.Parent=titleDotPulse
+
+task.spawn(function()
+	while titleDotPulse.Parent do
+		titleDotPulse.Size=UDim2.fromOffset(8,8)
+		titleDotPulse.Position=UDim2.new(.5,-4,.5,-4)
+		titleDotPulse.BackgroundTransparency=.3
+
+		tween(
+			titleDotPulse,
+			{
+				Size=UDim2.fromOffset(22,22),
+				Position=UDim2.new(.5,-11,.5,-11),
+				BackgroundTransparency=1
+			},
+			1.1
+		)
+
+		task.wait(1.1)
+	end
+end)
+
 local title=Instance.new("TextLabel")
-title.Size=UDim2.new(1,-30,1,0)
-title.Position=UDim2.fromOffset(18,0)
+title.Size=UDim2.fromOffset(105,38)
+title.Position=UDim2.fromOffset(36,0)
 title.BackgroundTransparency=1
 title.Text="LPT Hub"
 title.TextColor3=COLORS.Text
-title.TextSize=18
+title.TextSize=17
 title.Font=Enum.Font.GothamBold
 title.TextXAlignment=Enum.TextXAlignment.Left
 title.Parent=topBar
 
-local subtitle=Instance.new("TextLabel")
-subtitle.Size=UDim2.new(0,180,1,0)
-subtitle.Position=UDim2.new(1,-195,0,0)
-subtitle.BackgroundTransparency=1
-subtitle.Text="by Ly Phuc Thien"
-subtitle.TextColor3=COLORS.TextDim
-subtitle.TextSize=11
-subtitle.Font=Enum.Font.Gotham
-subtitle.TextXAlignment=Enum.TextXAlignment.Right
-subtitle.Parent=topBar
+applyGradient(title,COLORS.Accent,COLORS.AccentB,0)
+
+local author=Instance.new("TextLabel")
+author.Size=UDim2.fromOffset(170,38)
+author.Position=UDim2.fromOffset(120,0)
+author.BackgroundTransparency=1
+author.Text="by Ly Phuc Thien"
+author.TextColor3=COLORS.TextDim
+author.TextSize=11
+author.Font=Enum.Font.Gotham
+author.TextXAlignment=Enum.TextXAlignment.Left
+author.Parent=topBar
+
+local separator=Instance.new("Frame")
+separator.Size=UDim2.new(1,0,0,1)
+separator.Position=UDim2.new(0,0,1,-1)
+separator.BackgroundColor3=COLORS.Border
+separator.BorderSizePixel=0
+separator.Parent=topBar
 
 --========================================================
--- SIDEBAR
+-- TOP BUTTONS
+--========================================================
+
+local function topButton(name,xOffset,text,textSize)
+	local button=Instance.new("TextButton")
+	button.Name=name
+	button.Size=UDim2.fromOffset(30,26)
+	button.Position=UDim2.new(1,xOffset,.5,-13)
+	button.BackgroundColor3=COLORS.SurfaceLight
+	button.BackgroundTransparency=1
+	button.BorderSizePixel=0
+	button.Text=text
+	button.TextColor3=COLORS.TextDim
+	button.TextSize=textSize
+	button.Font=Enum.Font.GothamMedium
+	button.AutoButtonColor=false
+	button.Parent=topBar
+
+	local corner=Instance.new("UICorner")
+	corner.CornerRadius=UDim.new(0,10)
+	corner.Parent=button
+
+	return button
+end
+
+local minimize=topButton("MinimizeButton",-110,"—",13)
+local maximize=topButton("MaximizeButton",-76,"",0)
+local close=topButton("CloseButton",-40,"×",17)
+
+--========================================================
+-- MAX ICON
+--========================================================
+
+local maxIcon=Instance.new("Frame")
+maxIcon.Size=UDim2.fromOffset(20,20)
+maxIcon.Position=UDim2.new(.5,-10,.5,-10)
+maxIcon.BackgroundTransparency=1
+maxIcon.Parent=maximize
+
+local normalIcon=Instance.new("Frame")
+normalIcon.Size=UDim2.fromOffset(13,13)
+normalIcon.Position=UDim2.new(.5,-6,.5,-6)
+normalIcon.BackgroundTransparency=1
+normalIcon.Parent=maxIcon
+
+local normalCorner=Instance.new("UICorner")
+normalCorner.CornerRadius=UDim.new(0,3)
+normalCorner.Parent=normalIcon
+
+local normalStroke=Instance.new("UIStroke")
+normalStroke.Thickness=1.5
+normalStroke.Color=COLORS.TextDim
+normalStroke.Parent=normalIcon
+
+local restoreBack=Instance.new("Frame")
+restoreBack.Size=UDim2.fromOffset(11,11)
+restoreBack.Position=UDim2.fromOffset(6,2)
+restoreBack.BackgroundTransparency=1
+restoreBack.Visible=false
+restoreBack.Parent=maxIcon
+
+local restoreBackCorner=Instance.new("UICorner")
+restoreBackCorner.CornerRadius=UDim.new(0,2)
+restoreBackCorner.Parent=restoreBack
+
+local restoreBackStroke=Instance.new("UIStroke")
+restoreBackStroke.Thickness=1.5
+restoreBackStroke.Color=COLORS.TextDim
+restoreBackStroke.Parent=restoreBack
+
+local restoreFront=Instance.new("Frame")
+restoreFront.Size=UDim2.fromOffset(11,11)
+restoreFront.Position=UDim2.fromOffset(2,6)
+restoreFront.BackgroundColor3=COLORS.Surface
+restoreFront.BorderSizePixel=0
+restoreFront.Visible=false
+restoreFront.Parent=maxIcon
+
+local restoreFrontCorner=Instance.new("UICorner")
+restoreFrontCorner.CornerRadius=UDim.new(0,2)
+restoreFrontCorner.Parent=restoreFront
+
+local restoreFrontStroke=Instance.new("UIStroke")
+restoreFrontStroke.Thickness=1.5
+restoreFrontStroke.Color=COLORS.TextDim
+restoreFrontStroke.Parent=restoreFront
+
+local function setupTopButton(button,hoverColor,hoverBg)
+	button.MouseEnter:Connect(function()
+		tween(button,{
+			TextColor3=hoverColor,
+			BackgroundTransparency=0,
+			BackgroundColor3=hoverBg or COLORS.SurfaceLight
+		})
+	end)
+
+	button.MouseLeave:Connect(function()
+		tween(button,{
+			TextColor3=COLORS.TextDim,
+			BackgroundTransparency=1
+		})
+	end)
+end
+
+setupTopButton(minimize,COLORS.Text)
+setupTopButton(close,Color3.new(1,1,1),COLORS.Danger)
+
+maximize.MouseEnter:Connect(function()
+	tween(maximize,{BackgroundTransparency=0})
+	tween(normalStroke,{Color=COLORS.Text})
+	tween(restoreBackStroke,{Color=COLORS.Text})
+	tween(restoreFrontStroke,{Color=COLORS.Text})
+end)
+
+maximize.MouseLeave:Connect(function()
+	tween(maximize,{BackgroundTransparency=1})
+	tween(normalStroke,{Color=COLORS.TextDim})
+	tween(restoreBackStroke,{Color=COLORS.TextDim})
+	tween(restoreFrontStroke,{Color=COLORS.TextDim})
+end)
+
+--========================================================
+-- SIDEBAR / CONTENT
 --========================================================
 
 local sidebar=Instance.new("Frame")
-sidebar.Size=UDim2.new(0,165,1,-46)
-sidebar.Position=UDim2.fromOffset(0,46)
+sidebar.Name="Sidebar"
+sidebar.Size=UDim2.new(0,220,1,-38)
+sidebar.Position=UDim2.new(0,0,0,38)
 sidebar.BackgroundColor3=COLORS.Surface
 sidebar.BorderSizePixel=0
 sidebar.Parent=main
 
+local sidebarCorner=Instance.new("UICorner")
+sidebarCorner.CornerRadius=UDim.new(0,20)
+sidebarCorner.Parent=sidebar
+
+local sidebarTopMask=Instance.new("Frame")
+sidebarTopMask.Size=UDim2.new(1,0,0,20)
+sidebarTopMask.BackgroundColor3=COLORS.Surface
+sidebarTopMask.BorderSizePixel=0
+sidebarTopMask.Parent=sidebar
+
+local sideLine=Instance.new("Frame")
+sideLine.Size=UDim2.fromOffset(1,0)
+sideLine.Size=UDim2.new(0,1,1,0)
+sideLine.Position=UDim2.new(1,-1,0,0)
+sideLine.BackgroundColor3=COLORS.Border
+sideLine.BorderSizePixel=0
+sideLine.Parent=sidebar
+
 local content=Instance.new("Frame")
-content.Size=UDim2.new(1,-165,1,-46)
-content.Position=UDim2.fromOffset(165,46)
+content.Name="Content"
+content.Size=UDim2.new(1,-220,1,-38)
+content.Position=UDim2.fromOffset(220,38)
 content.BackgroundTransparency=1
 content.Parent=main
 
@@ -328,33 +585,47 @@ local settingsPage=createPage("Settings")
 -- PAGE TITLE
 --========================================================
 
-local function pageTitle(parent,text,description)
+local function createPageTitle(parent,text,description)
 	local label=Instance.new("TextLabel")
-	label.Size=UDim2.new(1,-40,0,34)
-	label.Position=UDim2.fromOffset(20,18)
+	label.Size=UDim2.new(1,-50,0,38)
+	label.Position=UDim2.fromOffset(28,20)
 	label.BackgroundTransparency=1
 	label.Text=text
 	label.TextColor3=COLORS.Text
-	label.TextSize=25
+	label.TextSize=28
 	label.Font=Enum.Font.GothamBold
 	label.TextXAlignment=Enum.TextXAlignment.Left
 	label.Parent=parent
 
 	local sub=Instance.new("TextLabel")
-	sub.Size=UDim2.new(1,-40,0,22)
-	sub.Position=UDim2.fromOffset(20,53)
+	sub.Size=UDim2.new(1,-50,0,20)
+	sub.Position=UDim2.fromOffset(28,54)
 	sub.BackgroundTransparency=1
 	sub.Text=description
 	sub.TextColor3=COLORS.TextDim
-	sub.TextSize=12
+	sub.TextSize=14
 	sub.Font=Enum.Font.Gotham
 	sub.TextXAlignment=Enum.TextXAlignment.Left
 	sub.Parent=parent
 end
 
-pageTitle(informationPage,"Information","Thông tin về LPT Hub.")
-pageTitle(mainPage,"Main","Điều khiển các chức năng chính.")
-pageTitle(settingsPage,"Settings","Điều chỉnh thông số chuyển động.")
+createPageTitle(
+	informationPage,
+	"Thông Tin",
+	"Thông tin Universal LPT Hub."
+)
+
+createPageTitle(
+	mainPage,
+	"Main",
+	"Điều khiển các chức năng chuyển động."
+)
+
+createPageTitle(
+	settingsPage,
+	"Settings",
+	"Điều chỉnh thông số và tối ưu hiệu năng."
+)
 
 --========================================================
 -- TOGGLE
@@ -362,24 +633,25 @@ pageTitle(settingsPage,"Settings","Điều chỉnh thông số chuyển động.
 
 local function createToggle(parent,text,y,callback)
 	local row=Instance.new("Frame")
-	row.Size=UDim2.new(1,-40,0,52)
-	row.Position=UDim2.fromOffset(20,y)
+	row.Size=UDim2.new(1,-56,0,56)
+	row.Position=UDim2.fromOffset(28,y)
 	row.BackgroundColor3=COLORS.Card
 	row.BorderSizePixel=0
 	row.Parent=parent
 
 	local corner=Instance.new("UICorner")
-	corner.CornerRadius=UDim.new(0,11)
+	corner.CornerRadius=UDim.new(0,14)
 	corner.Parent=row
 
 	local stroke=Instance.new("UIStroke")
 	stroke.Color=COLORS.Border
-	stroke.Transparency=.2
+	stroke.Thickness=1
+	stroke.Transparency=.15
 	stroke.Parent=row
 
 	local label=Instance.new("TextLabel")
-	label.Size=UDim2.new(1,-85,1,0)
-	label.Position=UDim2.fromOffset(16,0)
+	label.Size=UDim2.new(1,-90,1,0)
+	label.Position=UDim2.fromOffset(18,0)
 	label.BackgroundTransparency=1
 	label.Text=text
 	label.TextColor3=COLORS.Text
@@ -389,9 +661,11 @@ local function createToggle(parent,text,y,callback)
 	label.Parent=row
 
 	local button=Instance.new("TextButton")
-	button.Size=UDim2.fromOffset(48,25)
-	button.Position=UDim2.new(1,-64,.5,-12)
-	button.BackgroundColor3=Color3.fromRGB(75,78,88)
+	button.Name="Toggle"
+	button.Size=UDim2.fromOffset(50,26)
+	button.Position=UDim2.new(1,-68,.5,-13)
+	button.BackgroundColor3=Color3.fromRGB(120,120,125)
+	button.BackgroundTransparency=.35
 	button.BorderSizePixel=0
 	button.Text=""
 	button.AutoButtonColor=false
@@ -402,9 +676,9 @@ local function createToggle(parent,text,y,callback)
 	buttonCorner.Parent=button
 
 	local knob=Instance.new("Frame")
-	knob.Size=UDim2.fromOffset(19,19)
-	knob.Position=UDim2.fromOffset(3,3)
-	knob.BackgroundColor3=Color3.fromRGB(235,235,240)
+	knob.Size=UDim2.fromOffset(22,22)
+	knob.Position=UDim2.fromOffset(3,2)
+	knob.BackgroundColor3=Color3.fromRGB(230,230,235)
 	knob.BorderSizePixel=0
 	knob.Parent=button
 
@@ -417,14 +691,23 @@ local function createToggle(parent,text,y,callback)
 	local function setEnabled(value,fire)
 		enabled=value==true
 
-		tween(button,{
-			BackgroundColor3=enabled and COLORS.Success or Color3.fromRGB(75,78,88)
-		},.18)
+		tween(
+			button,
+			{
+				BackgroundColor3=enabled and COLORS.Success or Color3.fromRGB(120,120,125),
+				BackgroundTransparency=enabled and 0 or .35
+			},
+			.2
+		)
 
-		tween(knob,{
-			Position=enabled and UDim2.new(1,-22,0,3) or UDim2.fromOffset(3,3),
-			BackgroundColor3=enabled and Color3.fromRGB(15,20,18) or Color3.fromRGB(235,235,240)
-		},.18)
+		tween(
+			knob,
+			{
+				Position=enabled and UDim2.new(1,-25,0,2) or UDim2.fromOffset(3,2),
+				BackgroundColor3=enabled and Color3.fromRGB(15,20,18) or Color3.fromRGB(230,230,235)
+			},
+			.2
+		)
 
 		if fire~=false and callback then
 			callback(enabled)
@@ -432,7 +715,7 @@ local function createToggle(parent,text,y,callback)
 	end
 
 	button.MouseButton1Click:Connect(function()
-		setEnabled(not enabled)
+		setEnabled(not enabled,true)
 	end)
 
 	row.MouseEnter:Connect(function()
@@ -456,21 +739,27 @@ end
 -- SLIDER
 --========================================================
 
-local function createSlider(parent,text,y,default,min,max,callback)
+local function createSlider(parent,text,y,defaultValue,minValue,maxValue,callback)
 	local row=Instance.new("Frame")
-	row.Size=UDim2.new(1,-40,0,75)
-	row.Position=UDim2.fromOffset(20,y)
+	row.Size=UDim2.new(1,-56,0,78)
+	row.Position=UDim2.fromOffset(28,y)
 	row.BackgroundColor3=COLORS.Card
 	row.BorderSizePixel=0
 	row.Parent=parent
 
 	local corner=Instance.new("UICorner")
-	corner.CornerRadius=UDim.new(0,11)
+	corner.CornerRadius=UDim.new(0,14)
 	corner.Parent=row
 
+	local stroke=Instance.new("UIStroke")
+	stroke.Color=COLORS.Border
+	stroke.Thickness=1
+	stroke.Transparency=.15
+	stroke.Parent=row
+
 	local label=Instance.new("TextLabel")
-	label.Size=UDim2.new(1,-35,0,22)
-	label.Position=UDim2.fromOffset(16,9)
+	label.Size=UDim2.new(1,-36,0,20)
+	label.Position=UDim2.fromOffset(18,10)
 	label.BackgroundTransparency=1
 	label.Text=text
 	label.TextColor3=COLORS.Text
@@ -480,10 +769,10 @@ local function createSlider(parent,text,y,default,min,max,callback)
 	label.Parent=row
 
 	local valueLabel=Instance.new("TextLabel")
-	valueLabel.Size=UDim2.fromOffset(55,22)
-	valueLabel.Position=UDim2.new(1,-72,0,9)
+	valueLabel.Size=UDim2.fromOffset(50,20)
+	valueLabel.Position=UDim2.new(1,-68,0,10)
 	valueLabel.BackgroundTransparency=1
-	valueLabel.Text=tostring(default)
+	valueLabel.Text=tostring(defaultValue)
 	valueLabel.TextColor3=COLORS.Accent
 	valueLabel.TextSize=14
 	valueLabel.Font=Enum.Font.GothamBold
@@ -491,9 +780,9 @@ local function createSlider(parent,text,y,default,min,max,callback)
 	valueLabel.Parent=row
 
 	local track=Instance.new("Frame")
-	track.Size=UDim2.new(1,-32,0,6)
-	track.Position=UDim2.fromOffset(16,49)
-	track.BackgroundColor3=COLORS.Surface
+	track.Size=UDim2.new(1,-36,0,6)
+	track.Position=UDim2.fromOffset(18,50)
+	track.BackgroundColor3=COLORS.SurfaceLight
 	track.BorderSizePixel=0
 	track.Active=true
 	track.Parent=row
@@ -512,7 +801,7 @@ local function createSlider(parent,text,y,default,min,max,callback)
 	fillCorner.Parent=fill
 
 	local knob=Instance.new("Frame")
-	knob.Size=UDim2.fromOffset(15,15)
+	knob.Size=UDim2.fromOffset(16,16)
 	knob.AnchorPoint=Vector2.new(.5,.5)
 	knob.BackgroundColor3=Color3.new(1,1,1)
 	knob.BorderSizePixel=0
@@ -523,12 +812,18 @@ local function createSlider(parent,text,y,default,min,max,callback)
 	knobCorner.CornerRadius=UDim.new(1,0)
 	knobCorner.Parent=knob
 
+	local knobStroke=Instance.new("UIStroke")
+	knobStroke.Color=COLORS.Accent
+	knobStroke.Thickness=2
+	knobStroke.Parent=knob
+
 	local dragging=false
 
 	local function setValue(value,fire)
-		value=math.clamp(math.floor(value+.5),min,max)
+		value=math.clamp(math.floor(value+.5),minValue,maxValue)
 
-		local fraction=(value-min)/(max-min)
+		local fraction=(value-minValue)/(maxValue-minValue)
+
 		fill.Size=UDim2.new(fraction,0,1,0)
 		knob.Position=UDim2.new(fraction,0,.5,0)
 		valueLabel.Text=tostring(value)
@@ -540,32 +835,38 @@ local function createSlider(parent,text,y,default,min,max,callback)
 		return value
 	end
 
-	local function update(input)
+	local function updateFromInput(input)
 		local x=input.Position.X-track.AbsolutePosition.X
 		local fraction=math.clamp(x/track.AbsoluteSize.X,0,1)
-		setValue(min+fraction*(max-min))
+		setValue(minValue+fraction*(maxValue-minValue),true)
+	end
+
+	local function beginDrag(input)
+		dragging=true
+		updateFromInput(input)
 	end
 
 	track.InputBegan:Connect(function(input)
 		if input.UserInputType==Enum.UserInputType.MouseButton1
 			or input.UserInputType==Enum.UserInputType.Touch then
-			dragging=true
-			update(input)
+			beginDrag(input)
 		end
 	end)
 
 	knob.InputBegan:Connect(function(input)
 		if input.UserInputType==Enum.UserInputType.MouseButton1
 			or input.UserInputType==Enum.UserInputType.Touch then
-			dragging=true
-			update(input)
+			beginDrag(input)
 		end
 	end)
 
 	UserInputService.InputChanged:Connect(function(input)
-		if dragging and (input.UserInputType==Enum.UserInputType.MouseMovement
-			or input.UserInputType==Enum.UserInputType.Touch) then
-			update(input)
+		if dragging
+			and (
+				input.UserInputType==Enum.UserInputType.MouseMovement
+				or input.UserInputType==Enum.UserInputType.Touch
+			) then
+			updateFromInput(input)
 		end
 	end)
 
@@ -576,7 +877,7 @@ local function createSlider(parent,text,y,default,min,max,callback)
 		end
 	end)
 
-	setValue(default,false)
+	setValue(defaultValue,false)
 
 	return setValue
 end
@@ -585,47 +886,88 @@ end
 -- INFORMATION
 --========================================================
 
-local infoCard=Instance.new("Frame")
-infoCard.Size=UDim2.new(1,-40,0,220)
-infoCard.Position=UDim2.fromOffset(20,95)
-infoCard.BackgroundColor3=COLORS.Card
-infoCard.BorderSizePixel=0
-infoCard.Parent=informationPage
+local informationCard=Instance.new("Frame")
+informationCard.Size=UDim2.new(1,-56,0,350)
+informationCard.Position=UDim2.fromOffset(28,95)
+informationCard.BackgroundColor3=Color3.fromRGB(26,25,31)
+informationCard.BorderSizePixel=0
+informationCard.Parent=informationPage
 
-local infoCorner=Instance.new("UICorner")
-infoCorner.CornerRadius=UDim.new(0,14)
-infoCorner.Parent=infoCard
+local informationCorner=Instance.new("UICorner")
+informationCorner.CornerRadius=UDim.new(0,20)
+informationCorner.Parent=informationCard
 
-local infoTitle=Instance.new("TextLabel")
-infoTitle.Size=UDim2.new(1,-30,0,30)
-infoTitle.Position=UDim2.fromOffset(15,15)
-infoTitle.BackgroundTransparency=1
-infoTitle.Text="LPT Hub"
-infoTitle.TextColor3=COLORS.Text
-infoTitle.TextSize=21
-infoTitle.Font=Enum.Font.GothamBold
-infoTitle.TextXAlignment=Enum.TextXAlignment.Left
-infoTitle.Parent=infoCard
+local informationStroke=Instance.new("UIStroke")
+informationStroke.Color=Color3.fromRGB(255,255,255)
+informationStroke.Transparency=.9
+informationStroke.Parent=informationCard
 
-local infoText=Instance.new("TextLabel")
-infoText.Size=UDim2.new(1,-30,1,-60)
-infoText.Position=UDim2.fromOffset(15,50)
-infoText.BackgroundTransparency=1
-infoText.Text="LPT Hub\n\nMovement utility với WalkSpeed, JumpPower,\nNo Clip, Fly và công cụ Fix Lag.\n\nCreated by Ly Phuc Thien"
-infoText.TextColor3=COLORS.TextDim
-infoText.TextSize=14
-infoText.Font=Enum.Font.Gotham
-infoText.TextXAlignment=Enum.TextXAlignment.Left
-infoText.TextYAlignment=Enum.TextYAlignment.Top
-infoText.Parent=infoCard
+local ownerText=Instance.new("TextLabel")
+ownerText.Size=UDim2.new(1,-30,0,30)
+ownerText.Position=UDim2.fromOffset(15,15)
+ownerText.BackgroundTransparency=1
+ownerText.Text="LPT HUB"
+ownerText.Font=Enum.Font.GothamBold
+ownerText.TextSize=25
+ownerText.TextColor3=Color3.fromRGB(220,220,225)
+ownerText.TextXAlignment=Enum.TextXAlignment.Left
+ownerText.Parent=informationCard
 
-informationPage.CanvasSize=UDim2.new(0,0,0,340)
+local informationText=Instance.new("TextLabel")
+informationText.Size=UDim2.new(1,-30,1,-65)
+informationText.Position=UDim2.fromOffset(15,55)
+informationText.BackgroundTransparency=1
+informationText.Text=
+	"Universal Mode\n\n"
+	.."WalkSpeed • JumpPower • No Clip • Fly\n"
+	.."Fix Lag và các công cụ chuyển động cơ bản.\n\n"
+	.."Created by Ly Phuc Thien"
+informationText.TextColor3=COLORS.TextDim
+informationText.TextSize=14
+informationText.Font=Enum.Font.Gotham
+informationText.TextXAlignment=Enum.TextXAlignment.Left
+informationText.TextYAlignment=Enum.TextYAlignment.Top
+informationText.Parent=informationCard
+
+local gameCard=Instance.new("Frame")
+gameCard.Size=UDim2.new(1,-30,0,60)
+gameCard.Position=UDim2.new(0,15,1,-75)
+gameCard.BackgroundColor3=Color3.fromRGB(30,28,35)
+gameCard.BorderSizePixel=0
+gameCard.Parent=informationCard
+
+local gameCardCorner=Instance.new("UICorner")
+gameCardCorner.CornerRadius=UDim.new(0,16)
+gameCardCorner.Parent=gameCard
+
+local gameName="Unknown Game"
+
+local ok,info=pcall(function()
+	return MarketplaceService:GetProductInfo(game.PlaceId)
+end)
+
+if ok and type(info)=="table" and info.Name then
+	gameName=tostring(info.Name)
+end
+
+local gameLabel=Instance.new("TextLabel")
+gameLabel.Size=UDim2.new(1,-30,1,0)
+gameLabel.Position=UDim2.fromOffset(15,0)
+gameLabel.BackgroundTransparency=1
+gameLabel.Text="Game: "..gameName
+gameLabel.TextColor3=COLORS.Text
+gameLabel.TextSize=16
+gameLabel.Font=Enum.Font.GothamMedium
+gameLabel.TextXAlignment=Enum.TextXAlignment.Left
+gameLabel.Parent=gameCard
+
+informationPage.CanvasSize=UDim2.new(0,0,0,490)
 
 --========================================================
--- MAIN
+-- MAIN PAGE
 --========================================================
 
-local setWalkSpeedUI,setWalkSpeedState=createToggle(
+local setWalkSpeedUI=createToggle(
 	mainPage,
 	"WalkSpeed",
 	95,
@@ -635,20 +977,20 @@ local setWalkSpeedUI,setWalkSpeedState=createToggle(
 	end
 )
 
-local setJumpPowerUI,setJumpPowerState=createToggle(
+local setJumpPowerUI=createToggle(
 	mainPage,
 	"JumpPower",
-	157,
+	161,
 	function(enabled)
 		State.JumpPowerEnabled=enabled
 		applyMovement()
 	end
 )
 
-local setNoClipUI,setNoClipState=createToggle(
+local setNoClipUI=createToggle(
 	mainPage,
 	"No Clip",
-	219,
+	227,
 	function(enabled)
 		State.NoClip=enabled
 
@@ -660,10 +1002,10 @@ local setNoClipUI,setNoClipState=createToggle(
 	end
 )
 
-local setFlyUI,setFlyState=createToggle(
+local setFlyUI=createToggle(
 	mainPage,
 	"Fly",
-	281,
+	293,
 	function(enabled)
 		if enabled then
 			startFly()
@@ -673,7 +1015,18 @@ local setFlyUI,setFlyState=createToggle(
 	end
 )
 
-mainPage.CanvasSize=UDim2.new(0,0,0,370)
+local flyInfo=Instance.new("TextLabel")
+flyInfo.Size=UDim2.new(1,-56,0,40)
+flyInfo.Position=UDim2.fromOffset(28,360)
+flyInfo.BackgroundTransparency=1
+flyInfo.Text="Fly: W A S D • Space: Lên • LeftControl: Xuống"
+flyInfo.TextColor3=COLORS.TextDim
+flyInfo.TextSize=12
+flyInfo.Font=Enum.Font.Gotham
+flyInfo.TextXAlignment=Enum.TextXAlignment.Left
+flyInfo.Parent=mainPage
+
+mainPage.CanvasSize=UDim2.new(0,0,0,420)
 
 --========================================================
 -- SETTINGS
@@ -681,7 +1034,7 @@ mainPage.CanvasSize=UDim2.new(0,0,0,370)
 
 createSlider(
 	settingsPage,
-	"WalkSpeed",
+	"Walk Speed",
 	95,
 	State.WalkSpeed,
 	1,
@@ -696,8 +1049,8 @@ createSlider(
 
 createSlider(
 	settingsPage,
-	"JumpPower",
-	180,
+	"Jump Power",
+	183,
 	State.JumpPower,
 	1,
 	500,
@@ -714,8 +1067,9 @@ createSlider(
 --========================================================
 
 local fixLag=Instance.new("TextButton")
-fixLag.Size=UDim2.new(1,-40,0,50)
-fixLag.Position=UDim2.fromOffset(20,270)
+fixLag.Name="FixLag"
+fixLag.Size=UDim2.new(1,-56,0,52)
+fixLag.Position=UDim2.fromOffset(28,281)
 fixLag.BackgroundColor3=COLORS.Info
 fixLag.BorderSizePixel=0
 fixLag.Text="FIX LAG"
@@ -726,23 +1080,31 @@ fixLag.AutoButtonColor=false
 fixLag.Parent=settingsPage
 
 local fixCorner=Instance.new("UICorner")
-fixCorner.CornerRadius=UDim.new(0,12)
+fixCorner.CornerRadius=UDim.new(0,14)
 fixCorner.Parent=fixLag
 
 fixLag.MouseEnter:Connect(function()
-	tween(fixLag,{BackgroundColor3=Color3.fromRGB(120,185,255)},.15)
+	tween(
+		fixLag,
+		{BackgroundColor3=Color3.fromRGB(120,185,255)},
+		.15
+	)
 end)
 
 fixLag.MouseLeave:Connect(function()
-	tween(fixLag,{BackgroundColor3=COLORS.Info},.15)
+	tween(
+		fixLag,
+		{BackgroundColor3=COLORS.Info},
+		.15
+	)
 end)
 
 fixLag.MouseButton1Click:Connect(function()
-	local oldText=fixLag.Text
 	fixLag.Text="FIXING..."
 
 	pcall(function()
 		local terrain=workspace:FindFirstChildOfClass("Terrain")
+
 		if terrain then
 			terrain.WaterWaveSize=0
 			terrain.WaterWaveSpeed=0
@@ -778,14 +1140,25 @@ fixLag.MouseButton1Click:Connect(function()
 	task.wait(1)
 
 	if fixLag.Parent then
-		fixLag.Text=oldText
+		fixLag.Text="FIX LAG"
 	end
 end)
 
-settingsPage.CanvasSize=UDim2.new(0,0,0,355)
+local settingsInfo=Instance.new("TextLabel")
+settingsInfo.Size=UDim2.new(1,-56,0,40)
+settingsInfo.Position=UDim2.fromOffset(28,348)
+settingsInfo.BackgroundTransparency=1
+settingsInfo.Text="Fix Lag sẽ tắt một số hiệu ứng hình ảnh để giảm tải."
+settingsInfo.TextColor3=COLORS.TextDim
+settingsInfo.TextSize=12
+settingsInfo.Font=Enum.Font.Gotham
+settingsInfo.TextXAlignment=Enum.TextXAlignment.Left
+settingsInfo.Parent=settingsPage
+
+settingsPage.CanvasSize=UDim2.new(0,0,0,420)
 
 --========================================================
--- SIDEBAR BUTTONS
+-- SIDEBAR
 --========================================================
 
 local currentPage=nil
@@ -804,9 +1177,9 @@ local function selectPage(name)
 		tween(
 			data.button,
 			{
-				BackgroundTransparency=active and .1 or 1
+				BackgroundTransparency=active and .12 or 1
 			},
-			.15
+			.16
 		)
 
 		tween(
@@ -814,7 +1187,7 @@ local function selectPage(name)
 			{
 				TextColor3=active and COLORS.Text or COLORS.TextDim
 			},
-			.15
+			.16
 		)
 
 		data.indicator.Visible=active
@@ -825,9 +1198,10 @@ end
 
 local function createSidebarButton(text,order,pageName)
 	local button=Instance.new("TextButton")
-	button.Size=UDim2.new(1,-20,0,46)
-	button.Position=UDim2.fromOffset(10,15+(order-1)*55)
-	button.BackgroundColor3=COLORS.Card
+	button.Name=pageName.."Button"
+	button.Size=UDim2.new(1,-24,0,48)
+	button.Position=UDim2.fromOffset(12,16+(order-1)*54)
+	button.BackgroundColor3=COLORS.SurfaceLight
 	button.BackgroundTransparency=1
 	button.BorderSizePixel=0
 	button.Text=""
@@ -835,23 +1209,24 @@ local function createSidebarButton(text,order,pageName)
 	button.Parent=sidebar
 
 	local corner=Instance.new("UICorner")
-	corner.CornerRadius=UDim.new(0,9)
+	corner.CornerRadius=UDim.new(0,7)
 	corner.Parent=button
 
 	local label=Instance.new("TextLabel")
-	label.Size=UDim2.new(1,-25,1,0)
-	label.Position=UDim2.fromOffset(16,0)
+	label.Size=UDim2.new(1,-32,1,0)
+	label.Position=UDim2.fromOffset(18,0)
 	label.BackgroundTransparency=1
 	label.Text=text
 	label.TextColor3=COLORS.TextDim
-	label.TextSize=14
+	label.TextSize=16
 	label.Font=Enum.Font.GothamMedium
 	label.TextXAlignment=Enum.TextXAlignment.Left
 	label.Parent=button
 
 	local indicator=Instance.new("Frame")
-	indicator.Size=UDim2.fromOffset(3,25)
-	indicator.Position=UDim2.new(0,0,.5,-12)
+	indicator.Name="Indicator"
+	indicator.Size=UDim2.fromOffset(4,28)
+	indicator.Position=UDim2.new(0,0,.5,-14)
 	indicator.BackgroundColor3=COLORS.Accent
 	indicator.BorderSizePixel=0
 	indicator.Visible=false
@@ -869,13 +1244,15 @@ local function createSidebarButton(text,order,pageName)
 
 	button.MouseEnter:Connect(function()
 		if currentPage~=pageName then
-			tween(button,{BackgroundTransparency=.65},.15)
+			tween(button,{BackgroundTransparency=.72},.15)
+			tween(label,{TextColor3=COLORS.Text},.15)
 		end
 	end)
 
 	button.MouseLeave:Connect(function()
 		if currentPage~=pageName then
 			tween(button,{BackgroundTransparency=1},.15)
+			tween(label,{TextColor3=COLORS.TextDim},.15)
 		end
 	end)
 
@@ -891,44 +1268,267 @@ createSidebarButton("Settings",3,"Settings")
 selectPage("Information")
 
 --========================================================
+-- MAXIMIZE / MINIMIZE
+--========================================================
+
+local maximized=false
+local minimized=false
+
+local savedBeforeMinimizeSize=nil
+local savedBeforeMinimizePosition=nil
+
+local normalSize=UDim2.new(0,780,0,500)
+local normalPosition=UDim2.new(.5,-390,.5,-250)
+
+local maximizedSize=UDim2.new(1,-40,1,-40)
+local maximizedPosition=UDim2.new(0,20,0,20)
+
+local minimizedSize=UDim2.new(0,300,0,38)
+local minimizedPosition=UDim2.new(.5,-150,-.060,15)
+
+local minimizedHover=false
+
+local function updateMinimizedButtons()
+	if not minimized then
+		minimize.Visible=true
+		maximize.Visible=true
+		close.Visible=true
+
+		minimize.Active=true
+		maximize.Active=true
+		close.Active=true
+
+		minimize.BackgroundTransparency=1
+		maximize.BackgroundTransparency=1
+		close.BackgroundTransparency=1
+
+		normalStroke.Transparency=0
+		restoreBackStroke.Transparency=0
+		restoreFrontStroke.Transparency=0
+
+		normalIcon.Visible=not maximized
+		restoreBack.Visible=maximized
+		restoreFront.Visible=maximized
+		return
+	end
+
+	minimize.Visible=false
+	maximize.Visible=false
+	close.Visible=true
+
+	minimize.Active=false
+	maximize.Active=false
+	close.Active=minimizedHover
+
+	local transparency=minimizedHover and 0 or 1
+
+	close.BackgroundTransparency=transparency
+	close.TextTransparency=transparency
+
+	normalStroke.Transparency=minimizedHover and .1 or 1
+
+	normalIcon.Visible=false
+	restoreBack.Visible=false
+	restoreFront.Visible=false
+end
+
+local function restoreFromMinimized()
+	if not minimized then return end
+
+	minimized=false
+	minimizedHover=false
+
+	sidebar.Visible=true
+	content.Visible=true
+	author.Visible=true
+
+	local restoreSize=savedBeforeMinimizeSize
+	local restorePosition=savedBeforeMinimizePosition
+
+	if not restoreSize then
+		restoreSize=maximized and maximizedSize or normalSize
+	end
+
+	if not restorePosition then
+		restorePosition=maximized and maximizedPosition or normalPosition
+	end
+
+	updateMinimizedButtons()
+
+	normalIcon.Visible=not maximized
+	restoreBack.Visible=maximized
+	restoreFront.Visible=maximized
+
+	tween(
+		main,
+		{
+			Size=restoreSize,
+			Position=restorePosition
+		},
+		.28,
+		Enum.EasingStyle.Quint
+	)
+end
+
+maximize.MouseButton1Click:Connect(function()
+	if minimized then
+		restoreFromMinimized()
+		task.wait(.28)
+	end
+
+	maximized=not maximized
+
+	if maximized then
+		tween(
+			main,
+			{
+				Size=maximizedSize,
+				Position=maximizedPosition
+			},
+			.25,
+			Enum.EasingStyle.Quint
+		)
+
+		normalIcon.Visible=false
+		restoreBack.Visible=true
+		restoreFront.Visible=true
+	else
+		tween(
+			main,
+			{
+				Size=normalSize,
+				Position=normalPosition
+			},
+			.25,
+			Enum.EasingStyle.Quint
+		)
+
+		normalIcon.Visible=true
+		restoreBack.Visible=false
+		restoreFront.Visible=false
+	end
+
+	updateMinimizedButtons()
+end)
+
+minimize.MouseButton1Click:Connect(function()
+	if minimized then
+		restoreFromMinimized()
+		return
+	end
+
+	savedBeforeMinimizeSize=main.Size
+	savedBeforeMinimizePosition=main.Position
+
+	minimized=true
+	minimizedHover=false
+
+	sidebar.Visible=false
+	content.Visible=false
+	author.Visible=false
+
+	updateMinimizedButtons()
+
+	tween(
+		main,
+		{
+			Size=minimizedSize,
+			Position=minimizedPosition
+		},
+		.28,
+		Enum.EasingStyle.Quint
+	)
+end)
+
+topBar.MouseEnter:Connect(function()
+	if not minimized then return end
+	minimizedHover=true
+	updateMinimizedButtons()
+end)
+
+topBar.MouseLeave:Connect(function()
+	if not minimized then return end
+	minimizedHover=false
+	updateMinimizedButtons()
+end)
+
+topBar.InputBegan:Connect(function(input)
+	if input.UserInputType~=Enum.UserInputType.MouseButton1 then
+		return
+	end
+
+	if minimized then
+		restoreFromMinimized()
+	end
+end)
+
+--========================================================
 -- DRAG
 --========================================================
 
 local dragging=false
-local dragStart
-local startPosition
+local dragStart=nil
+local startPosition=nil
 
 topBar.InputBegan:Connect(function(input)
+	if input.UserInputType~=Enum.UserInputType.MouseButton1
+		and input.UserInputType~=Enum.UserInputType.Touch then
+		return
+	end
+
+	if minimized then return end
+
+	dragging=true
+	dragStart=input.Position
+	startPosition=main.Position
+end)
+
+topBar.InputEnded:Connect(function(input)
 	if input.UserInputType==Enum.UserInputType.MouseButton1
 		or input.UserInputType==Enum.UserInputType.Touch then
-
-		dragging=true
-		dragStart=input.Position
-		startPosition=main.Position
+		dragging=false
 	end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-	if not dragging then return end
+	if not dragging or minimized then return end
 
-	if input.UserInputType==Enum.UserInputType.MouseMovement
-		or input.UserInputType==Enum.UserInputType.Touch then
-
-		local delta=input.Position-dragStart
-
-		main.Position=UDim2.new(
-			startPosition.X.Scale,
-			startPosition.X.Offset+delta.X,
-			startPosition.Y.Scale,
-			startPosition.Y.Offset+delta.Y
-		)
+	if input.UserInputType~=Enum.UserInputType.MouseMovement
+		and input.UserInputType~=Enum.UserInputType.Touch then
+		return
 	end
+
+	if not dragStart or not startPosition then return end
+
+	local delta=input.Position-dragStart
+
+	main.Position=UDim2.new(
+		startPosition.X.Scale,
+		startPosition.X.Offset+delta.X,
+		startPosition.Y.Scale,
+		startPosition.Y.Offset+delta.Y
+	)
 end)
 
-UserInputService.InputEnded:Connect(function(input)
-	if input.UserInputType==Enum.UserInputType.MouseButton1
-		or input.UserInputType==Enum.UserInputType.Touch then
-		dragging=false
+--========================================================
+-- CLOSE
+--========================================================
+
+close.MouseButton1Click:Connect(function()
+	stopFly()
+	State.NoClip=false
+	restoreCollision()
+
+	if Connections.CharacterAdded then
+		Connections.CharacterAdded:Disconnect()
+	end
+
+	if Connections.NoClip then
+		Connections.NoClip:Disconnect()
+	end
+
+	if screenGui.Parent then
+		screenGui:Destroy()
 	end
 end)
 
