@@ -886,12 +886,23 @@ end
 -- INFORMATION
 --========================================================
 
+createPageTitle(
+	informationPage,
+	"Thông Tin",
+	"Thông tin Owner, Tên Game, Chức năng và trạng thái."
+)
+
+local informationContainer=Instance.new("Frame")
+informationContainer.Size=UDim2.new(1,-56,0,430)
+informationContainer.Position=UDim2.new(0,28,0,95)
+informationContainer.BackgroundTransparency=1
+informationContainer.Parent=informationPage
+
 local informationCard=Instance.new("Frame")
-informationCard.Size=UDim2.new(1,-56,0,350)
-informationCard.Position=UDim2.fromOffset(28,95)
+informationCard.Size=UDim2.new(1,0,0,350)
 informationCard.BackgroundColor3=Color3.fromRGB(26,25,31)
 informationCard.BorderSizePixel=0
-informationCard.Parent=informationPage
+informationCard.Parent=informationContainer
 
 local informationCorner=Instance.new("UICorner")
 informationCorner.CornerRadius=UDim.new(0,20)
@@ -900,45 +911,113 @@ informationCorner.Parent=informationCard
 local informationStroke=Instance.new("UIStroke")
 informationStroke.Color=Color3.fromRGB(255,255,255)
 informationStroke.Transparency=.9
+informationStroke.Thickness=1
 informationStroke.Parent=informationCard
 
 local ownerText=Instance.new("TextLabel")
-ownerText.Size=UDim2.new(1,-30,0,30)
-ownerText.Position=UDim2.fromOffset(15,15)
+ownerText.Size=UDim2.new(0,100,0,20)
+ownerText.Position=UDim2.new(0,15,0,15)
 ownerText.BackgroundTransparency=1
-ownerText.Text="LPT HUB"
+ownerText.Text="OWNER"
 ownerText.Font=Enum.Font.GothamBold
 ownerText.TextSize=25
-ownerText.TextColor3=Color3.fromRGB(220,220,225)
+ownerText.TextColor3=Color3.fromRGB(200,200,200)
 ownerText.TextXAlignment=Enum.TextXAlignment.Left
 ownerText.Parent=informationCard
 
-local informationText=Instance.new("TextLabel")
-informationText.Size=UDim2.new(1,-30,1,-65)
-informationText.Position=UDim2.fromOffset(15,55)
-informationText.BackgroundTransparency=1
-informationText.Text=
-	"Universal Mode\n\n"
-	.."WalkSpeed • JumpPower • No Clip • Fly\n"
-	.."Fix Lag và các công cụ chuyển động cơ bản.\n\n"
-	.."Created by Ly Phuc Thien"
-informationText.TextColor3=COLORS.TextDim
-informationText.TextSize=14
-informationText.Font=Enum.Font.Gotham
-informationText.TextXAlignment=Enum.TextXAlignment.Left
-informationText.TextYAlignment=Enum.TextYAlignment.Top
-informationText.Parent=informationCard
+local informationList=Instance.new("Frame")
+informationList.Size=UDim2.new(1,-48,1,-75)
+informationList.Position=UDim2.new(0,24,0,60)
+informationList.BackgroundTransparency=1
+informationList.Parent=informationCard
+
+local informationLayout=Instance.new("UIListLayout")
+informationLayout.FillDirection=Enum.FillDirection.Vertical
+informationLayout.Padding=UDim.new(0,16)
+informationLayout.SortOrder=Enum.SortOrder.LayoutOrder
+informationLayout.Parent=informationList
+
+local function createInformationRow(
+	order,
+	labelText,
+	valueText,
+	valueColor
+)
+	local row=Instance.new("Frame")
+	row.Size=UDim2.new(1,0,0,44)
+	row.BackgroundTransparency=1
+	row.LayoutOrder=order
+	row.Parent=informationList
+
+	local label=Instance.new("TextLabel")
+	label.Size=UDim2.new(1,0,0,16)
+	label.BackgroundTransparency=1
+	label.Text=labelText
+	label.Font=Enum.Font.Gotham
+	label.TextSize=13
+	label.TextColor3=Color3.fromRGB(150,148,155)
+	label.TextXAlignment=Enum.TextXAlignment.Left
+	label.Parent=row
+
+	local value=Instance.new("TextLabel")
+	value.Size=UDim2.new(1,0,0,22)
+	value.Position=UDim2.new(0,0,0,20)
+	value.BackgroundTransparency=1
+	value.Text=valueText
+	value.Font=Enum.Font.GothamMedium
+	value.TextSize=17
+	value.TextColor3=valueColor or Color3.fromRGB(240,240,240)
+	value.TextXAlignment=Enum.TextXAlignment.Left
+	value.Parent=row
+end
+
+createInformationRow(
+	1,
+	"Họ và Tên",
+	"Lý Phúc Thiện"
+)
+
+createInformationRow(
+	2,
+	"Ngày sinh",
+	"18/3"
+)
+
+createInformationRow(
+	3,
+	"Tuổi",
+	"15"
+)
+
+createInformationRow(
+	4,
+	"Trạng Thái",
+	"Online",
+	Color3.fromRGB(80,220,120)
+)
 
 local gameCard=Instance.new("Frame")
-gameCard.Size=UDim2.new(1,-30,0,60)
-gameCard.Position=UDim2.new(0,15,1,-75)
+gameCard.Size=UDim2.new(1,0,0,60)
+gameCard.Position=UDim2.new(0,0,0,370)
 gameCard.BackgroundColor3=Color3.fromRGB(30,28,35)
 gameCard.BorderSizePixel=0
-gameCard.Parent=informationCard
+gameCard.Parent=informationContainer
 
-local gameCardCorner=Instance.new("UICorner")
-gameCardCorner.CornerRadius=UDim.new(0,16)
-gameCardCorner.Parent=gameCard
+local gameCorner=Instance.new("UICorner")
+gameCorner.CornerRadius=UDim.new(0,20)
+gameCorner.Parent=gameCard
+
+local gameRow=Instance.new("TextLabel")
+gameRow.Size=UDim2.new(1,-48,1,0)
+gameRow.Position=UDim2.new(0,24,0,0)
+gameRow.BackgroundTransparency=1
+gameRow.Font=Enum.Font.GothamMedium
+gameRow.TextSize=18
+gameRow.TextXAlignment=Enum.TextXAlignment.Left
+gameRow.TextYAlignment=Enum.TextYAlignment.Center
+gameRow.TextColor3=Color3.fromRGB(240,240,240)
+gameRow.RichText=true
+gameRow.Parent=gameCard
 
 local gameName="Unknown Game"
 
@@ -950,18 +1029,12 @@ if ok and type(info)=="table" and info.Name then
 	gameName=tostring(info.Name)
 end
 
-local gameLabel=Instance.new("TextLabel")
-gameLabel.Size=UDim2.new(1,-30,1,0)
-gameLabel.Position=UDim2.fromOffset(15,0)
-gameLabel.BackgroundTransparency=1
-gameLabel.Text="Game: "..gameName
-gameLabel.TextColor3=COLORS.Text
-gameLabel.TextSize=16
-gameLabel.Font=Enum.Font.GothamMedium
-gameLabel.TextXAlignment=Enum.TextXAlignment.Left
-gameLabel.Parent=gameCard
+gameRow.Text=string.format(
+	'<font color="rgb(160,158,165)">Tên Game: </font><font color="rgb(240,240,240)">%s</font>',
+	gameName
+)
 
-informationPage.CanvasSize=UDim2.new(0,0,0,490)
+informationPage.CanvasSize=UDim2.new(0,0,0,540)
 
 --========================================================
 -- MAIN PAGE
