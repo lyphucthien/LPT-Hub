@@ -610,12 +610,6 @@ local function createPageTitle(parent,text,description)
 end
 
 createPageTitle(
-	informationPage,
-	"Thông Tin",
-	"Thông tin Universal LPT Hub."
-)
-
-createPageTitle(
 	mainPage,
 	"Main",
 	"Điều khiển các chức năng chuyển động."
@@ -1092,7 +1086,6 @@ local flyInfo=Instance.new("TextLabel")
 flyInfo.Size=UDim2.new(1,-56,0,40)
 flyInfo.Position=UDim2.fromOffset(28,360)
 flyInfo.BackgroundTransparency=1
-flyInfo.Text="Fly: W A S D • Space: Lên • LeftControl: Xuống"
 flyInfo.TextColor3=COLORS.TextDim
 flyInfo.TextSize=12
 flyInfo.Font=Enum.Font.Gotham
@@ -1221,7 +1214,6 @@ local settingsInfo=Instance.new("TextLabel")
 settingsInfo.Size=UDim2.new(1,-56,0,40)
 settingsInfo.Position=UDim2.fromOffset(28,348)
 settingsInfo.BackgroundTransparency=1
-settingsInfo.Text="Fix Lag sẽ tắt một số hiệu ứng hình ảnh để giảm tải."
 settingsInfo.TextColor3=COLORS.TextDim
 settingsInfo.TextSize=12
 settingsInfo.Font=Enum.Font.Gotham
@@ -1236,9 +1228,20 @@ settingsPage.CanvasSize=UDim2.new(0,0,0,420)
 
 local currentPage=nil
 local sidebarButtons={}
+local sidebarIndicator=nil
+
+local SIDEBAR_ACCENT=Color3.fromRGB(96,165,250)
 
 local function selectPage(name)
 	if not pages[name] then return end
+
+	local oldPage=currentPage
+	local oldData=oldPage and sidebarButtons[oldPage]
+	local newData=sidebarButtons[name]
+
+	if oldPage==name then
+		return
+	end
 
 	for pageName,page in pairs(pages) do
 		page.Visible=pageName==name
@@ -1252,7 +1255,8 @@ local function selectPage(name)
 			{
 				BackgroundTransparency=active and .12 or 1
 			},
-			.16
+			.16,
+			Enum.EasingStyle.Quad
 		)
 
 		tween(
@@ -1260,10 +1264,70 @@ local function selectPage(name)
 			{
 				TextColor3=active and COLORS.Text or COLORS.TextDim
 			},
-			.16
+			.16,
+			Enum.EasingStyle.Quad
 		)
+	end
 
-		data.indicator.Visible=active
+	--====================================================
+	-- DI CHUYỂN THANH DỌC
+	--====================================================
+
+	if newData then
+		local targetY=
+			newData.button.Position.Y.Offset+
+			(newData.button.Size.Y.Offset/2)-
+			14
+
+		if sidebarIndicator then
+			sidebarIndicator.Visible=true
+
+			tween(
+				sidebarIndicator,
+				{
+					Position=UDim2.new(
+						0,
+						12,
+						0,
+						targetY
+					)
+				},
+				.28,
+				Enum.EasingStyle.Quint
+			)
+		else
+			sidebarIndicator=
+				Instance.new("Frame")
+
+			sidebarIndicator.Name="ActiveIndicator"
+			sidebarIndicator.Size=UDim2.fromOffset(4,28)
+			sidebarIndicator.Position=UDim2.new(
+				0,
+				12,
+				0,
+				targetY
+			)
+
+			sidebarIndicator.BackgroundColor3=
+				SIDEBAR_ACCENT
+
+			sidebarIndicator.BorderSizePixel=0
+			sidebarIndicator.ZIndex=10
+			sidebarIndicator.Parent=sidebar
+
+			local indicatorCorner=
+				Instance.new("UICorner")
+
+			indicatorCorner.CornerRadius=
+				UDim.new(1,0)
+
+			indicatorCorner.Parent=
+				sidebarIndicator
+		end
+
+		-- Màu giống +1 Speed Keyboard Escape
+		sidebarIndicator.BackgroundColor3=
+			SIDEBAR_ACCENT
 	end
 
 	currentPage=name
@@ -1271,10 +1335,26 @@ end
 
 local function createSidebarButton(text,order,pageName)
 	local button=Instance.new("TextButton")
+
 	button.Name=pageName.."Button"
-	button.Size=UDim2.new(1,-24,0,48)
-	button.Position=UDim2.fromOffset(12,16+(order-1)*54)
-	button.BackgroundColor3=COLORS.SurfaceLight
+
+	button.Size=
+		UDim2.new(
+			1,
+			-24,
+			0,
+			48
+		)
+
+	button.Position=
+		UDim2.fromOffset(
+			12,
+			16+(order-1)*54
+		)
+
+	button.BackgroundColor3=
+		COLORS.SurfaceLight
+
 	button.BackgroundTransparency=1
 	button.BorderSizePixel=0
 	button.Text=""
@@ -1282,50 +1362,87 @@ local function createSidebarButton(text,order,pageName)
 	button.Parent=sidebar
 
 	local corner=Instance.new("UICorner")
-	corner.CornerRadius=UDim.new(0,7)
+	corner.CornerRadius=
+		UDim.new(0,7)
 	corner.Parent=button
 
 	local label=Instance.new("TextLabel")
-	label.Size=UDim2.new(1,-32,1,0)
-	label.Position=UDim2.fromOffset(18,0)
+
+	label.Size=
+		UDim2.new(
+			1,
+			-32,
+			1,
+			0
+		)
+
+	label.Position=
+		UDim2.fromOffset(
+			18,
+			0
+		)
+
 	label.BackgroundTransparency=1
 	label.Text=text
-	label.TextColor3=COLORS.TextDim
+
+	label.TextColor3=
+		COLORS.TextDim
+
 	label.TextSize=16
-	label.Font=Enum.Font.GothamMedium
-	label.TextXAlignment=Enum.TextXAlignment.Left
+	label.Font=
+		Enum.Font.GothamMedium
+
+	label.TextXAlignment=
+		Enum.TextXAlignment.Left
+
 	label.Parent=button
-
-	local indicator=Instance.new("Frame")
-	indicator.Name="Indicator"
-	indicator.Size=UDim2.fromOffset(4,28)
-	indicator.Position=UDim2.new(0,0,.5,-14)
-	indicator.BackgroundColor3=COLORS.Accent
-	indicator.BorderSizePixel=0
-	indicator.Visible=false
-	indicator.Parent=button
-
-	local indicatorCorner=Instance.new("UICorner")
-	indicatorCorner.CornerRadius=UDim.new(1,0)
-	indicatorCorner.Parent=indicator
 
 	sidebarButtons[pageName]={
 		button=button,
 		label=label,
-		indicator=indicator,
 	}
 
 	button.MouseEnter:Connect(function()
 		if currentPage~=pageName then
-			tween(button,{BackgroundTransparency=.72},.15)
-			tween(label,{TextColor3=COLORS.Text},.15)
+			tween(
+				button,
+				{
+					BackgroundTransparency=.72
+				},
+				.15,
+				Enum.EasingStyle.Quad
+			)
+
+			tween(
+				label,
+				{
+					TextColor3=COLORS.Text
+				},
+				.15,
+				Enum.EasingStyle.Quad
+			)
 		end
 	end)
 
 	button.MouseLeave:Connect(function()
 		if currentPage~=pageName then
-			tween(button,{BackgroundTransparency=1},.15)
-			tween(label,{TextColor3=COLORS.TextDim},.15)
+			tween(
+				button,
+				{
+					BackgroundTransparency=1
+				},
+				.15,
+				Enum.EasingStyle.Quad
+			)
+
+			tween(
+				label,
+				{
+					TextColor3=COLORS.TextDim
+				},
+				.15,
+				Enum.EasingStyle.Quad
+			)
 		end
 	end)
 
@@ -1334,9 +1451,23 @@ local function createSidebarButton(text,order,pageName)
 	end)
 end
 
-createSidebarButton("Information",1,"Information")
-createSidebarButton("Main",2,"Main")
-createSidebarButton("Settings",3,"Settings")
+createSidebarButton(
+	"Information",
+	1,
+	"Information"
+)
+
+createSidebarButton(
+	"Main",
+	2,
+	"Main"
+)
+
+createSidebarButton(
+	"Settings",
+	3,
+	"Settings"
+)
 
 selectPage("Information")
 
