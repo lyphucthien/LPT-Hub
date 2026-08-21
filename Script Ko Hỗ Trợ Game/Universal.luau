@@ -255,22 +255,26 @@ local function startFly()
 
 		humanoid.PlatformStand=true
 
+		local cameraCF=camera.CFrame
+		local lookVector=cameraCF.LookVector
+		local rightVector=cameraCF.RightVector
+
 		local direction=Vector3.zero
 
 		if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-			direction+=camera.CFrame.LookVector
+			direction+=lookVector
 		end
 
 		if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-			direction-=camera.CFrame.LookVector
+			direction-=lookVector
 		end
 
 		if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-			direction+=camera.CFrame.RightVector
+			direction+=rightVector
 		end
 
 		if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-			direction-=camera.CFrame.RightVector
+			direction-=rightVector
 		end
 
 		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
@@ -287,6 +291,18 @@ local function startFly()
 
 		root.AssemblyLinearVelocity=direction*90
 		root.AssemblyAngularVelocity=Vector3.zero
+
+		-- Nhân vật luôn quay theo hướng camera
+		local flatLook=Vector3.new(lookVector.X,0,lookVector.Z)
+
+		if flatLook.Magnitude>0.001 then
+			flatLook=flatLook.Unit
+
+			root.CFrame=CFrame.lookAt(
+				root.Position,
+				root.Position+flatLook
+			)
+		end
 	end)
 end
 
@@ -1147,6 +1163,12 @@ end)
 fixLag.MouseButton1Click:Connect(function()
 	fixLag.Text="FIXING..."
 
+	local changedParts=0
+
+	--====================================================
+	-- TERRAIN
+	--====================================================
+
 	pcall(function()
 		local terrain=workspace:FindFirstChildOfClass("Terrain")
 
@@ -1158,26 +1180,157 @@ fixLag.MouseButton1Click:Connect(function()
 		end
 	end)
 
+	--====================================================
+	-- LIGHTING
+	--====================================================
+
 	pcall(function()
 		local lighting=game:GetService("Lighting")
 
 		for _,object in ipairs(lighting:GetChildren()) do
-			if object:IsA("PostEffect") then
-				object.Enabled=false
+			if object:IsA("PostEffect")
+				or object:IsA("Atmosphere")
+				or object:IsA("Sky") then
+
+				if object:IsA("PostEffect") then
+					object.Enabled=false
+				end
+			end
+		end
+
+		lighting.GlobalShadows=false
+		lighting.EnvironmentDiffuseScale=0
+		lighting.EnvironmentSpecularScale=0
+	end)
+
+	--====================================================
+	-- WORKSPACE OBJECTS
+	--====================================================
+
+	pcall(function()
+		for _,object in ipairs(workspace:GetDescendants()) do
+
+			------------------------------------------------
+			-- PART
+			------------------------------------------------
+
+			if object:IsA("BasePart") then
+				changedParts+=1
+
+				pcall(function()
+					-- Giảm hiệu ứng vật liệu
+					object.Material=Enum.Material.SmoothPlastic
+
+					-- Tắt phản xạ
+					object.Reflectance=0
+
+					-- Giữ màu gốc của part
+					-- Không đổi Color để tránh phá màu map
+				end)
+			end
+
+			------------------------------------------------
+			-- TEXTURE / DECAL
+			------------------------------------------------
+
+			if object:IsA("Decal")
+				or object:IsA("Texture") then
+
+				pcall(function()
+					object.Transparency=1
+				end)
+			end
+
+			------------------------------------------------
+			-- SPECIAL MESH
+			------------------------------------------------
+
+			if object:IsA("SpecialMesh") then
+				pcall(function()
+					object.TextureId=""
+				end)
+			end
+
+			------------------------------------------------
+			-- PARTICLE
+			------------------------------------------------
+
+			if object:IsA("ParticleEmitter") then
+				pcall(function()
+					object.Enabled=false
+				end)
+			end
+
+			------------------------------------------------
+			-- TRAIL
+			------------------------------------------------
+
+			if object:IsA("Trail") then
+				pcall(function()
+					object.Enabled=false
+				end)
+			end
+
+			------------------------------------------------
+			-- BEAM
+			------------------------------------------------
+
+			if object:IsA("Beam") then
+				pcall(function()
+					object.Enabled=false
+				end)
+			end
+
+			------------------------------------------------
+			-- SMOKE / FIRE / SPARKLES
+			------------------------------------------------
+
+			if object:IsA("Smoke")
+				or object:IsA("Fire")
+				or object:IsA("Sparkles") then
+
+				pcall(function()
+					object.Enabled=false
+				end)
+			end
+
+			------------------------------------------------
+			-- UI / SURFACE APPEARANCE
+			------------------------------------------------
+
+			if object:IsA("SurfaceAppearance") then
+				pcall(function()
+					object:Destroy()
+				end)
 			end
 		end
 	end)
 
+	--====================================================
+	-- CHARACTER APPEARANCE
+	--====================================================
+
 	pcall(function()
-		for _,object in ipairs(workspace:GetDescendants()) do
-			if object:IsA("ParticleEmitter") or object:IsA("Trail") or object:IsA("Beam") then
-				object.Enabled=false
+		local character=player.Character
+
+		if character then
+			for _,object in ipairs(character:GetDescendants()) do
+				if object:IsA("Decal")
+					or object:IsA("Texture")
+					or object:IsA("SurfaceAppearance") then
+
+					pcall(function()
+						object.Transparency=1
+					end)
+				end
 			end
 		end
 	end)
 
 	task.wait(.35)
+
 	fixLag.Text="FIXED ✓"
+
 	task.wait(1)
 
 	if fixLag.Parent then
