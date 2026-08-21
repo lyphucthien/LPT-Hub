@@ -459,7 +459,7 @@ title.Position=UDim2.fromOffset(36,0)
 title.BackgroundTransparency=1
 title.Text="LPT Hub"
 title.TextColor3=COLORS.Text
-title.TextSize=17
+title.TextSize=18.5
 title.Font=Enum.Font.GothamBold
 title.TextXAlignment=Enum.TextXAlignment.Left
 title.Parent=topBar
@@ -468,7 +468,7 @@ applyGradient(title,COLORS.Accent,COLORS.AccentB,0)
 
 local author=Instance.new("TextLabel")
 author.Size=UDim2.fromOffset(170,38)
-author.Position=UDim2.fromOffset(115,0)
+author.Position=UDim2.fromOffset(113,0)
 author.BackgroundTransparency=1
 author.Text="by Ly Phuc Thien"
 author.TextColor3=COLORS.TextDim
@@ -1093,17 +1093,6 @@ local setFlyUI=createToggle(mainPage,"Fly",293,function(enabled)
 		stopFly()
 	end
 end)
-
-local flyInfo=Instance.new("TextLabel")
-flyInfo.Size=UDim2.new(1,-56,0,40)
-flyInfo.Position=UDim2.fromOffset(28,360)
-flyInfo.BackgroundTransparency=1
-flyInfo.Text="Fly: W A S D • Space: Lên • LeftControl: Xuống"
-flyInfo.TextColor3=COLORS.TextDim
-flyInfo.TextSize=12
-flyInfo.Font=Enum.Font.Gotham
-flyInfo.TextXAlignment=Enum.TextXAlignment.Left
-flyInfo.Parent=mainPage
 
 mainPage.CanvasSize=UDim2.new(0,0,0,420)
 
