@@ -15,6 +15,7 @@ local playerGui=player:WaitForChild("PlayerGui")
 local State={
 	WalkSpeed=16,
 	JumpPower=50,
+	FlySpeed=90,
 	WalkSpeedEnabled=false,
 	JumpPowerEnabled=false,
 	NoClip=false,
@@ -54,6 +55,7 @@ local function loadSettings()
 
 	State.WalkSpeed=tonumber(data.WalkSpeed) or State.WalkSpeed
 	State.JumpPower=tonumber(data.JumpPower) or State.JumpPower
+	State.FlySpeed=tonumber(data.FlySpeed) or State.FlySpeed
 	State.WalkSpeedEnabled=data.WalkSpeedEnabled==true
 	State.JumpPowerEnabled=data.JumpPowerEnabled==true
 	State.NoClip=data.NoClip==true
@@ -68,6 +70,7 @@ local function saveSettings()
 	local data={
 		WalkSpeed=State.WalkSpeed,
 		JumpPower=State.JumpPower,
+		FlySpeed=State.FlySpeed,
 		WalkSpeedEnabled=State.WalkSpeedEnabled,
 		JumpPowerEnabled=State.JumpPowerEnabled,
 		NoClip=State.NoClip,
@@ -293,7 +296,7 @@ local function startFly()
 
 		if direction.Magnitude>0 then
 			direction=direction.Unit
-			root.AssemblyLinearVelocity=direction*90
+			root.AssemblyLinearVelocity=direction.Unit*State.FlySpeed
 
 			if not UserInputService:IsKeyDown(Enum.KeyCode.Space)
 				and not UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
@@ -1140,6 +1143,11 @@ createSlider(settingsPage,"Jump Power",183,State.JumpPower,1,500,function(value)
 	saveSettings()
 end)
 
+createSlider(settingsPage,"Fly Speed",271,State.FlySpeed,1,500,function(value)
+	State.FlySpeed=value
+	saveSettings()
+end)
+
 --========================================================
 -- FIX LAG
 --========================================================
@@ -1147,7 +1155,7 @@ end)
 local fixLag=Instance.new("TextButton")
 fixLag.Name="FixLag"
 fixLag.Size=UDim2.new(1,-56,0,52)
-fixLag.Position=UDim2.fromOffset(28,281)
+fixLag.Position=UDim2.fromOffset(28,363)
 fixLag.BackgroundColor3=COLORS.Info
 fixLag.BorderSizePixel=0
 fixLag.Text="FIX LAG"
@@ -1347,7 +1355,7 @@ fixLag.MouseButton1Click:Connect(function()
 	end
 end)
 
-settingsPage.CanvasSize=UDim2.new(0,0,0,420)
+settingsPage.CanvasSize=UDim2.new(0,0,0,445)
 
 --========================================================
 -- SIDEBAR
