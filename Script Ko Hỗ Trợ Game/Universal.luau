@@ -232,6 +232,7 @@ local function stopFly()
 
 	if humanoid then
 		humanoid.PlatformStand=false
+		humanoid.AutoRotate=true
 	end
 
 	if root then
@@ -244,6 +245,8 @@ local function startFly()
 	stopFly()
 	State.Fly=true
 
+	local idleY=nil
+
 	FlyConnection=RunService.Heartbeat:Connect(function()
 		if not State.Fly then return end
 
@@ -254,11 +257,14 @@ local function startFly()
 		if not root or not humanoid or not camera then return end
 
 		humanoid.PlatformStand=true
+		humanoid.AutoRotate=false
 
-		local cameraCF=camera.CFrame
-		local lookVector=cameraCF.LookVector
-		local rightVector=cameraCF.RightVector
+		if idleY==nil then
+			idleY=root.Position.Y
+		end
 
+		local lookVector=camera.CFrame.LookVector
+		local rightVector=camera.CFrame.RightVector
 		local direction=Vector3.zero
 
 		if UserInputService:IsKeyDown(Enum.KeyCode.W) then
@@ -279,26 +285,35 @@ local function startFly()
 
 		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
 			direction+=Vector3.yAxis
-		end
-
-		if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+			idleY=nil
+		elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
 			direction-=Vector3.yAxis
+			idleY=nil
 		end
 
-		if direction.Magnitude>0 then
+		local moving=direction.Magnitude>0
+
+		if moving then
 			direction=direction.Unit
-		end
-
-		if direction.Magnitude>0 then
-			root.AssemblyLinearVelocity=direction.Unit*90
+			root.AssemblyLinearVelocity=direction*90
 		else
 			root.AssemblyLinearVelocity=Vector3.zero
+
+			root.CFrame=CFrame.new(
+				root.Position.X,
+				idleY,
+				root.Position.Z
+			)*root.CFrame.Rotation
 		end
 
 		root.AssemblyAngularVelocity=Vector3.zero
 
-		-- Nhân vật luôn quay theo hướng camera
-		local flatLook=Vector3.new(lookVector.X,0,lookVector.Z)
+		-- Quay theo hướng camera
+		local flatLook=Vector3.new(
+			lookVector.X,
+			0,
+			lookVector.Z
+		)
 
 		if flatLook.Magnitude>0.001 then
 			flatLook=flatLook.Unit
@@ -307,6 +322,28 @@ local function startFly()
 				root.Position,
 				root.Position+flatLook
 			)
+		end
+
+		if not UserInputService:IsKeyDown(Enum.KeyCode.Space)
+			and not UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+
+			root.AssemblyLinearVelocity=Vector3.new(
+				root.AssemblyLinearVelocity.X,
+				0,
+				root.AssemblyLinearVelocity.Z
+			)
+
+			if not moving then
+				root.CFrame=CFrame.new(
+					root.Position.X,
+					idleY,
+					root.Position.Z
+				)*root.CFrame.Rotation
+			else
+				idleY=root.Position.Y
+			end
+		else
+			idleY=root.Position.Y
 		end
 	end)
 end
