@@ -6,10 +6,6 @@ local TweenService=game:GetService("TweenService")
 local player=Players.LocalPlayer
 local playerGui=player:WaitForChild("PlayerGui")
 
---========================================================
--- CONFIG / STATE
---========================================================
-
 local State={
 	WalkSpeed=16,
 	JumpPower=50,
