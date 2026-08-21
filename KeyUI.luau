@@ -543,13 +543,13 @@ getKeyButton.MouseButton1Click:Connect(function()
 
 			showNotification(
 				"Link Copied",
-				"Executor không hỗ trợ mở trình duyệt tự động. Link đã được copy.",
+				"Executor không hỗ trợ mở Web. Link đã được copy.",
 				"warning"
 			)
 		else
 			showNotification(
 				"Open Failed",
-				"Executor không hỗ trợ mở trình duyệt hoặc copy link.",
+				"Executor không hỗ trợ mở Web hoặc copy link.",
 				"error"
 			)
 		end
