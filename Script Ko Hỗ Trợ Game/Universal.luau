@@ -285,20 +285,23 @@ local function startFly()
 
 		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
 			direction+=Vector3.yAxis
-			idleY=nil
-		elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-			direction-=Vector3.yAxis
-			idleY=nil
 		end
 
-		local moving=direction.Magnitude>0
+		if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+			direction-=Vector3.yAxis
+		end
 
-		if moving then
+		if direction.Magnitude>0 then
 			direction=direction.Unit
 			root.AssemblyLinearVelocity=direction*90
-		else
-			root.AssemblyLinearVelocity=Vector3.zero
 
+			if not UserInputService:IsKeyDown(Enum.KeyCode.Space)
+				and not UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+				idleY=root.Position.Y
+			end
+		else
+
+			root.AssemblyLinearVelocity=Vector3.zero
 			root.CFrame=CFrame.new(
 				root.Position.X,
 				idleY,
@@ -308,7 +311,6 @@ local function startFly()
 
 		root.AssemblyAngularVelocity=Vector3.zero
 
-		-- Quay theo hướng camera
 		local flatLook=Vector3.new(
 			lookVector.X,
 			0,
@@ -316,34 +318,10 @@ local function startFly()
 		)
 
 		if flatLook.Magnitude>0.001 then
-			flatLook=flatLook.Unit
-
 			root.CFrame=CFrame.lookAt(
 				root.Position,
-				root.Position+flatLook
+				root.Position+flatLook.Unit
 			)
-		end
-
-		if not UserInputService:IsKeyDown(Enum.KeyCode.Space)
-			and not UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-
-			root.AssemblyLinearVelocity=Vector3.new(
-				root.AssemblyLinearVelocity.X,
-				0,
-				root.AssemblyLinearVelocity.Z
-			)
-
-			if not moving then
-				root.CFrame=CFrame.new(
-					root.Position.X,
-					idleY,
-					root.Position.Z
-				)*root.CFrame.Rotation
-			else
-				idleY=root.Position.Y
-			end
-		else
-			idleY=root.Position.Y
 		end
 	end)
 end
