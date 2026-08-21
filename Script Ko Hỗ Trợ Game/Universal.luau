@@ -3,6 +3,7 @@ local UserInputService=game:GetService("UserInputService")
 local RunService=game:GetService("RunService")
 local TweenService=game:GetService("TweenService")
 local MarketplaceService=game:GetService("MarketplaceService")
+local HttpService=game:GetService("HttpService")
 
 local player=Players.LocalPlayer
 local playerGui=player:WaitForChild("PlayerGui")
@@ -25,6 +26,62 @@ local OriginalCollision={}
 local FlyConnection=nil
 
 --========================================================
+-- SETTINGS STORAGE
+--========================================================
+
+local SETTINGS_FILE="LPT_Hub_Universal_Settings.json"
+
+local function loadSettings()
+	if type(isfile)~="function" or type(readfile)~="function" then
+		return
+	end
+
+	local ok,exists=pcall(function()
+		return isfile(SETTINGS_FILE)
+	end)
+
+	if not ok or not exists then
+		return
+	end
+
+	local success,data=pcall(function()
+		return HttpService:JSONDecode(readfile(SETTINGS_FILE))
+	end)
+
+	if not success or type(data)~="table" then
+		return
+	end
+
+	State.WalkSpeed=tonumber(data.WalkSpeed) or State.WalkSpeed
+	State.JumpPower=tonumber(data.JumpPower) or State.JumpPower
+	State.WalkSpeedEnabled=data.WalkSpeedEnabled==true
+	State.JumpPowerEnabled=data.JumpPowerEnabled==true
+	State.NoClip=data.NoClip==true
+	State.Fly=false
+end
+
+local function saveSettings()
+	if type(writefile)~="function" then
+		return
+	end
+
+	local data={
+		WalkSpeed=State.WalkSpeed,
+		JumpPower=State.JumpPower,
+		WalkSpeedEnabled=State.WalkSpeedEnabled,
+		JumpPowerEnabled=State.JumpPowerEnabled,
+		NoClip=State.NoClip,
+		Fly=false,
+	}
+
+	pcall(function()
+		writefile(SETTINGS_FILE,HttpService:JSONEncode(data))
+	end)
+end
+
+loadSettings()
+
+--========================================================
 -- COLORS
 --========================================================
 
@@ -34,18 +91,17 @@ local COLORS={
 	SurfaceLight=Color3.fromRGB(40,44,58),
 	Card=Color3.fromRGB(34,38,50),
 	CardHover=Color3.fromRGB(40,44,58),
-
 	Accent=Color3.fromRGB(168,105,245),
 	AccentB=Color3.fromRGB(236,72,153),
-
 	Text=Color3.fromRGB(240,241,245),
 	TextDim=Color3.fromRGB(150,157,170),
 	Border=Color3.fromRGB(52,56,70),
-
 	Success=Color3.fromRGB(74,222,128),
 	Danger=Color3.fromRGB(255,92,108),
 	Info=Color3.fromRGB(96,165,250),
 }
+
+local SIDEBAR_ACCENT=Color3.fromRGB(96,165,250)
 
 --========================================================
 -- HELPERS
@@ -53,11 +109,7 @@ local COLORS={
 
 local function tween(obj,props,time,style)
 	if not obj or not obj.Parent then return end
-	local t=TweenService:Create(
-		obj,
-		TweenInfo.new(time or .18,style or Enum.EasingStyle.Quad),
-		props
-	)
+	local t=TweenService:Create(obj,TweenInfo.new(time or .18,style or Enum.EasingStyle.Quad),props)
 	t:Play()
 	return t
 end
@@ -92,10 +144,33 @@ local function applyMovement()
 	local humanoid=getHumanoid()
 	if not humanoid then return end
 
-	humanoid.UseJumpPower=true
-	humanoid.WalkSpeed=State.WalkSpeedEnabled and State.WalkSpeed or 16
-	humanoid.JumpPower=State.JumpPowerEnabled and State.JumpPower or 50
+	pcall(function()
+		humanoid.UseJumpPower=true
+		humanoid.WalkSpeed=State.WalkSpeedEnabled and State.WalkSpeed or 16
+		humanoid.JumpPower=State.JumpPowerEnabled and State.JumpPower or 50
+	end)
 end
+
+--========================================================
+-- FORCE WALK SPEED / JUMP POWER
+--========================================================
+
+Connections.MovementEnforce=RunService.Heartbeat:Connect(function()
+	local humanoid=getHumanoid()
+	if not humanoid then return end
+
+	if State.WalkSpeedEnabled and humanoid.WalkSpeed~=State.WalkSpeed then
+		pcall(function()
+			humanoid.WalkSpeed=State.WalkSpeed
+		end)
+	end
+
+	if State.JumpPowerEnabled and humanoid.JumpPower~=State.JumpPower then
+		pcall(function()
+			humanoid.JumpPower=State.JumpPower
+		end)
+	end
+end)
 
 --========================================================
 -- NO CLIP
@@ -167,7 +242,6 @@ end
 
 local function startFly()
 	stopFly()
-
 	State.Fly=true
 
 	FlyConnection=RunService.Heartbeat:Connect(function()
@@ -228,14 +302,14 @@ Connections.CharacterAdded=player.CharacterAdded:Connect(function(character)
 	if humanoid then
 		task.wait(.15)
 		applyMovement()
+
+		if State.NoClip then
+			rememberCollision(character)
+		end
 	end
 
 	if State.Fly then
 		stopFly()
-	end
-
-	if State.NoClip then
-		rememberCollision(character)
 	end
 end)
 
@@ -244,10 +318,7 @@ end)
 --========================================================
 
 local oldGui=playerGui:FindFirstChild("LPTHub")
-
-if oldGui then
-	oldGui:Destroy()
-end
+if oldGui then oldGui:Destroy() end
 
 local screenGui=Instance.new("ScreenGui")
 screenGui.Name="LPTHub"
@@ -356,15 +427,11 @@ task.spawn(function()
 		titleDotPulse.Position=UDim2.new(.5,-4,.5,-4)
 		titleDotPulse.BackgroundTransparency=.3
 
-		tween(
-			titleDotPulse,
-			{
-				Size=UDim2.fromOffset(22,22),
-				Position=UDim2.new(.5,-11,.5,-11),
-				BackgroundTransparency=1
-			},
-			1.1
-		)
+		tween(titleDotPulse,{
+			Size=UDim2.fromOffset(22,22),
+			Position=UDim2.new(.5,-11,.5,-11),
+			BackgroundTransparency=1
+		},1.1)
 
 		task.wait(1.1)
 	end
@@ -546,7 +613,6 @@ sidebarTopMask.BorderSizePixel=0
 sidebarTopMask.Parent=sidebar
 
 local sideLine=Instance.new("Frame")
-sideLine.Size=UDim2.fromOffset(1,0)
 sideLine.Size=UDim2.new(0,1,1,0)
 sideLine.Position=UDim2.new(1,-1,0,0)
 sideLine.BackgroundColor3=COLORS.Border
@@ -597,29 +663,23 @@ local function createPageTitle(parent,text,description)
 	label.TextXAlignment=Enum.TextXAlignment.Left
 	label.Parent=parent
 
-	local sub=Instance.new("TextLabel")
-	sub.Size=UDim2.new(1,-50,0,20)
-	sub.Position=UDim2.fromOffset(28,54)
-	sub.BackgroundTransparency=1
-	sub.Text=description
-	sub.TextColor3=COLORS.TextDim
-	sub.TextSize=14
-	sub.Font=Enum.Font.Gotham
-	sub.TextXAlignment=Enum.TextXAlignment.Left
-	sub.Parent=parent
+	if description then
+		local sub=Instance.new("TextLabel")
+		sub.Size=UDim2.new(1,-50,0,20)
+		sub.Position=UDim2.fromOffset(28,54)
+		sub.BackgroundTransparency=1
+		sub.Text=description
+		sub.TextColor3=COLORS.TextDim
+		sub.TextSize=14
+		sub.Font=Enum.Font.Gotham
+		sub.TextXAlignment=Enum.TextXAlignment.Left
+		sub.Parent=parent
+	end
 end
 
-createPageTitle(
-	mainPage,
-	"Main",
-	"Điều khiển các chức năng chuyển động."
-)
-
-createPageTitle(
-	settingsPage,
-	"Settings",
-	"Điều chỉnh thông số và tối ưu hiệu năng."
-)
+createPageTitle(informationPage,"Thông Tin","Thông tin Owner, Tên Game, Chức năng và trạng thái.")
+createPageTitle(mainPage,"Main")
+createPageTitle(settingsPage,"Settings")
 
 --========================================================
 -- TOGGLE
@@ -685,23 +745,15 @@ local function createToggle(parent,text,y,callback)
 	local function setEnabled(value,fire)
 		enabled=value==true
 
-		tween(
-			button,
-			{
-				BackgroundColor3=enabled and COLORS.Success or Color3.fromRGB(120,120,125),
-				BackgroundTransparency=enabled and 0 or .35
-			},
-			.2
-		)
+		tween(button,{
+			BackgroundColor3=enabled and COLORS.Success or Color3.fromRGB(120,120,125),
+			BackgroundTransparency=enabled and 0 or .35
+		},.2)
 
-		tween(
-			knob,
-			{
-				Position=enabled and UDim2.new(1,-25,0,2) or UDim2.fromOffset(3,2),
-				BackgroundColor3=enabled and Color3.fromRGB(15,20,18) or Color3.fromRGB(230,230,235)
-			},
-			.2
-		)
+		tween(knob,{
+			Position=enabled and UDim2.new(1,-25,0,2) or UDim2.fromOffset(3,2),
+			BackgroundColor3=enabled and Color3.fromRGB(15,20,18) or Color3.fromRGB(230,230,235)
+		},.2)
 
 		if fire~=false and callback then
 			callback(enabled)
@@ -817,7 +869,6 @@ local function createSlider(parent,text,y,defaultValue,minValue,maxValue,callbac
 		value=math.clamp(math.floor(value+.5),minValue,maxValue)
 
 		local fraction=(value-minValue)/(maxValue-minValue)
-
 		fill.Size=UDim2.new(fraction,0,1,0)
 		knob.Position=UDim2.new(fraction,0,.5,0)
 		valueLabel.Text=tostring(value)
@@ -841,50 +892,36 @@ local function createSlider(parent,text,y,defaultValue,minValue,maxValue,callbac
 	end
 
 	track.InputBegan:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1
-			or input.UserInputType==Enum.UserInputType.Touch then
+		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 			beginDrag(input)
 		end
 	end)
 
 	knob.InputBegan:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1
-			or input.UserInputType==Enum.UserInputType.Touch then
+		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 			beginDrag(input)
 		end
 	end)
 
 	UserInputService.InputChanged:Connect(function(input)
-		if dragging
-			and (
-				input.UserInputType==Enum.UserInputType.MouseMovement
-				or input.UserInputType==Enum.UserInputType.Touch
-			) then
+		if dragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then
 			updateFromInput(input)
 		end
 	end)
 
 	UserInputService.InputEnded:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1
-			or input.UserInputType==Enum.UserInputType.Touch then
+		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 			dragging=false
 		end
 	end)
 
 	setValue(defaultValue,false)
-
 	return setValue
 end
 
 --========================================================
 -- INFORMATION
 --========================================================
-
-createPageTitle(
-	informationPage,
-	"Thông Tin",
-	"Thông tin Owner, Tên Game, Chức năng và trạng thái."
-)
 
 local informationContainer=Instance.new("Frame")
 informationContainer.Size=UDim2.new(1,-56,0,430)
@@ -931,12 +968,7 @@ informationLayout.Padding=UDim.new(0,16)
 informationLayout.SortOrder=Enum.SortOrder.LayoutOrder
 informationLayout.Parent=informationList
 
-local function createInformationRow(
-	order,
-	labelText,
-	valueText,
-	valueColor
-)
+local function createInformationRow(order,labelText,valueText,valueColor)
 	local row=Instance.new("Frame")
 	row.Size=UDim2.new(1,0,0,44)
 	row.BackgroundTransparency=1
@@ -965,30 +997,10 @@ local function createInformationRow(
 	value.Parent=row
 end
 
-createInformationRow(
-	1,
-	"Họ và Tên",
-	"Lý Phúc Thiện"
-)
-
-createInformationRow(
-	2,
-	"Ngày sinh",
-	"18/3"
-)
-
-createInformationRow(
-	3,
-	"Tuổi",
-	"15"
-)
-
-createInformationRow(
-	4,
-	"Trạng Thái",
-	"Online",
-	Color3.fromRGB(80,220,120)
-)
+createInformationRow(1,"Họ và Tên","Lý Phúc Thiện")
+createInformationRow(2,"Ngày sinh","18/3")
+createInformationRow(3,"Tuổi","15")
+createInformationRow(4,"Trạng Thái","Online",Color3.fromRGB(80,220,120))
 
 local gameCard=Instance.new("Frame")
 gameCard.Size=UDim2.new(1,0,0,60)
@@ -1015,12 +1027,12 @@ gameRow.Parent=gameCard
 
 local gameName="Unknown Game"
 
-local ok,info=pcall(function()
+local gameInfoOK,gameInfo=pcall(function()
 	return MarketplaceService:GetProductInfo(game.PlaceId)
 end)
 
-if ok and type(info)=="table" and info.Name then
-	gameName=tostring(info.Name)
+if gameInfoOK and type(gameInfo)=="table" and gameInfo.Name then
+	gameName=tostring(gameInfo.Name)
 end
 
 gameRow.Text=string.format(
@@ -1034,58 +1046,43 @@ informationPage.CanvasSize=UDim2.new(0,0,0,540)
 -- MAIN PAGE
 --========================================================
 
-local setWalkSpeedUI=createToggle(
-	mainPage,
-	"WalkSpeed",
-	95,
-	function(enabled)
-		State.WalkSpeedEnabled=enabled
-		applyMovement()
-	end
-)
+local setWalkSpeedUI=createToggle(mainPage,"WalkSpeed",95,function(enabled)
+	State.WalkSpeedEnabled=enabled
+	applyMovement()
+	saveSettings()
+end)
 
-local setJumpPowerUI=createToggle(
-	mainPage,
-	"JumpPower",
-	161,
-	function(enabled)
-		State.JumpPowerEnabled=enabled
-		applyMovement()
-	end
-)
+local setJumpPowerUI=createToggle(mainPage,"JumpPower",161,function(enabled)
+	State.JumpPowerEnabled=enabled
+	applyMovement()
+	saveSettings()
+end)
 
-local setNoClipUI=createToggle(
-	mainPage,
-	"No Clip",
-	227,
-	function(enabled)
-		State.NoClip=enabled
+local setNoClipUI=createToggle(mainPage,"No Clip",227,function(enabled)
+	State.NoClip=enabled
 
-		if enabled then
-			rememberCollision(getCharacter())
-		else
-			restoreCollision()
-		end
+	if enabled then
+		rememberCollision(getCharacter())
+	else
+		restoreCollision()
 	end
-)
 
-local setFlyUI=createToggle(
-	mainPage,
-	"Fly",
-	293,
-	function(enabled)
-		if enabled then
-			startFly()
-		else
-			stopFly()
-		end
+	saveSettings()
+end)
+
+local setFlyUI=createToggle(mainPage,"Fly",293,function(enabled)
+	if enabled then
+		startFly()
+	else
+		stopFly()
 	end
-)
+end)
 
 local flyInfo=Instance.new("TextLabel")
 flyInfo.Size=UDim2.new(1,-56,0,40)
 flyInfo.Position=UDim2.fromOffset(28,360)
 flyInfo.BackgroundTransparency=1
+flyInfo.Text="Fly: W A S D • Space: Lên • LeftControl: Xuống"
 flyInfo.TextColor3=COLORS.TextDim
 flyInfo.TextSize=12
 flyInfo.Font=Enum.Font.Gotham
@@ -1098,35 +1095,25 @@ mainPage.CanvasSize=UDim2.new(0,0,0,420)
 -- SETTINGS
 --========================================================
 
-createSlider(
-	settingsPage,
-	"Walk Speed",
-	95,
-	State.WalkSpeed,
-	1,
-	500,
-	function(value)
-		State.WalkSpeed=value
-		if State.WalkSpeedEnabled then
-			applyMovement()
-		end
-	end
-)
+createSlider(settingsPage,"Walk Speed",95,State.WalkSpeed,1,500,function(value)
+	State.WalkSpeed=value
 
-createSlider(
-	settingsPage,
-	"Jump Power",
-	183,
-	State.JumpPower,
-	1,
-	500,
-	function(value)
-		State.JumpPower=value
-		if State.JumpPowerEnabled then
-			applyMovement()
-		end
+	if State.WalkSpeedEnabled then
+		applyMovement()
 	end
-)
+
+	saveSettings()
+end)
+
+createSlider(settingsPage,"Jump Power",183,State.JumpPower,1,500,function(value)
+	State.JumpPower=value
+
+	if State.JumpPowerEnabled then
+		applyMovement()
+	end
+
+	saveSettings()
+end)
 
 --========================================================
 -- FIX LAG
@@ -1150,19 +1137,11 @@ fixCorner.CornerRadius=UDim.new(0,14)
 fixCorner.Parent=fixLag
 
 fixLag.MouseEnter:Connect(function()
-	tween(
-		fixLag,
-		{BackgroundColor3=Color3.fromRGB(120,185,255)},
-		.15
-	)
+	tween(fixLag,{BackgroundColor3=Color3.fromRGB(120,185,255)},.15)
 end)
 
 fixLag.MouseLeave:Connect(function()
-	tween(
-		fixLag,
-		{BackgroundColor3=COLORS.Info},
-		.15
-	)
+	tween(fixLag,{BackgroundColor3=COLORS.Info},.15)
 end)
 
 fixLag.MouseButton1Click:Connect(function()
@@ -1191,18 +1170,14 @@ fixLag.MouseButton1Click:Connect(function()
 
 	pcall(function()
 		for _,object in ipairs(workspace:GetDescendants()) do
-			if object:IsA("ParticleEmitter")
-				or object:IsA("Trail")
-				or object:IsA("Beam") then
+			if object:IsA("ParticleEmitter") or object:IsA("Trail") or object:IsA("Beam") then
 				object.Enabled=false
 			end
 		end
 	end)
 
 	task.wait(.35)
-
 	fixLag.Text="FIXED ✓"
-
 	task.wait(1)
 
 	if fixLag.Parent then
@@ -1214,6 +1189,7 @@ local settingsInfo=Instance.new("TextLabel")
 settingsInfo.Size=UDim2.new(1,-56,0,40)
 settingsInfo.Position=UDim2.fromOffset(28,348)
 settingsInfo.BackgroundTransparency=1
+settingsInfo.Text="Fix Lag sẽ tắt một số hiệu ứng hình ảnh để giảm tải."
 settingsInfo.TextColor3=COLORS.TextDim
 settingsInfo.TextSize=12
 settingsInfo.Font=Enum.Font.Gotham
@@ -1230,18 +1206,11 @@ local currentPage=nil
 local sidebarButtons={}
 local sidebarIndicator=nil
 
-local SIDEBAR_ACCENT=Color3.fromRGB(96,165,250)
-
 local function selectPage(name)
 	if not pages[name] then return end
+	if currentPage==name then return end
 
-	local oldPage=currentPage
-	local oldData=oldPage and sidebarButtons[oldPage]
 	local newData=sidebarButtons[name]
-
-	if oldPage==name then
-		return
-	end
 
 	for pageName,page in pairs(pages) do
 		page.Visible=pageName==name
@@ -1250,84 +1219,39 @@ local function selectPage(name)
 	for pageName,data in pairs(sidebarButtons) do
 		local active=pageName==name
 
-		tween(
-			data.button,
-			{
-				BackgroundTransparency=active and .12 or 1
-			},
-			.16,
-			Enum.EasingStyle.Quad
-		)
+		tween(data.button,{
+			BackgroundTransparency=active and .12 or 1
+		},.16,Enum.EasingStyle.Quad)
 
-		tween(
-			data.label,
-			{
-				TextColor3=active and COLORS.Text or COLORS.TextDim
-			},
-			.16,
-			Enum.EasingStyle.Quad
-		)
+		tween(data.label,{
+			TextColor3=active and COLORS.Text or COLORS.TextDim
+		},.16,Enum.EasingStyle.Quad)
 	end
 
-	--====================================================
-	-- DI CHUYỂN THANH DỌC
-	--====================================================
-
 	if newData then
-		local targetY=
-			newData.button.Position.Y.Offset+
-			(newData.button.Size.Y.Offset/2)-
-			14
+		local targetY=newData.button.Position.Y.Offset+(newData.button.Size.Y.Offset/2)-14
 
 		if sidebarIndicator then
 			sidebarIndicator.Visible=true
-
-			tween(
-				sidebarIndicator,
-				{
-					Position=UDim2.new(
-						0,
-						12,
-						0,
-						targetY
-					)
-				},
-				.28,
-				Enum.EasingStyle.Quint
-			)
+			tween(sidebarIndicator,{
+				Position=UDim2.new(0,12,0,targetY)
+			},.28,Enum.EasingStyle.Quint)
 		else
-			sidebarIndicator=
-				Instance.new("Frame")
-
+			sidebarIndicator=Instance.new("Frame")
 			sidebarIndicator.Name="ActiveIndicator"
 			sidebarIndicator.Size=UDim2.fromOffset(4,28)
-			sidebarIndicator.Position=UDim2.new(
-				0,
-				12,
-				0,
-				targetY
-			)
-
-			sidebarIndicator.BackgroundColor3=
-				SIDEBAR_ACCENT
-
+			sidebarIndicator.Position=UDim2.new(0,12,0,targetY)
+			sidebarIndicator.BackgroundColor3=SIDEBAR_ACCENT
 			sidebarIndicator.BorderSizePixel=0
 			sidebarIndicator.ZIndex=10
 			sidebarIndicator.Parent=sidebar
 
-			local indicatorCorner=
-				Instance.new("UICorner")
-
-			indicatorCorner.CornerRadius=
-				UDim.new(1,0)
-
-			indicatorCorner.Parent=
-				sidebarIndicator
+			local indicatorCorner=Instance.new("UICorner")
+			indicatorCorner.CornerRadius=UDim.new(1,0)
+			indicatorCorner.Parent=sidebarIndicator
 		end
 
-		-- Màu giống +1 Speed Keyboard Escape
-		sidebarIndicator.BackgroundColor3=
-			SIDEBAR_ACCENT
+		sidebarIndicator.BackgroundColor3=SIDEBAR_ACCENT
 	end
 
 	currentPage=name
@@ -1335,26 +1259,10 @@ end
 
 local function createSidebarButton(text,order,pageName)
 	local button=Instance.new("TextButton")
-
 	button.Name=pageName.."Button"
-
-	button.Size=
-		UDim2.new(
-			1,
-			-24,
-			0,
-			48
-		)
-
-	button.Position=
-		UDim2.fromOffset(
-			12,
-			16+(order-1)*54
-		)
-
-	button.BackgroundColor3=
-		COLORS.SurfaceLight
-
+	button.Size=UDim2.new(1,-24,0,48)
+	button.Position=UDim2.fromOffset(12,16+(order-1)*54)
+	button.BackgroundColor3=COLORS.SurfaceLight
 	button.BackgroundTransparency=1
 	button.BorderSizePixel=0
 	button.Text=""
@@ -1362,39 +1270,18 @@ local function createSidebarButton(text,order,pageName)
 	button.Parent=sidebar
 
 	local corner=Instance.new("UICorner")
-	corner.CornerRadius=
-		UDim.new(0,7)
+	corner.CornerRadius=UDim.new(0,7)
 	corner.Parent=button
 
 	local label=Instance.new("TextLabel")
-
-	label.Size=
-		UDim2.new(
-			1,
-			-32,
-			1,
-			0
-		)
-
-	label.Position=
-		UDim2.fromOffset(
-			18,
-			0
-		)
-
+	label.Size=UDim2.new(1,-32,1,0)
+	label.Position=UDim2.fromOffset(18,0)
 	label.BackgroundTransparency=1
 	label.Text=text
-
-	label.TextColor3=
-		COLORS.TextDim
-
+	label.TextColor3=COLORS.TextDim
 	label.TextSize=16
-	label.Font=
-		Enum.Font.GothamMedium
-
-	label.TextXAlignment=
-		Enum.TextXAlignment.Left
-
+	label.Font=Enum.Font.GothamMedium
+	label.TextXAlignment=Enum.TextXAlignment.Left
 	label.Parent=button
 
 	sidebarButtons[pageName]={
@@ -1404,45 +1291,15 @@ local function createSidebarButton(text,order,pageName)
 
 	button.MouseEnter:Connect(function()
 		if currentPage~=pageName then
-			tween(
-				button,
-				{
-					BackgroundTransparency=.72
-				},
-				.15,
-				Enum.EasingStyle.Quad
-			)
-
-			tween(
-				label,
-				{
-					TextColor3=COLORS.Text
-				},
-				.15,
-				Enum.EasingStyle.Quad
-			)
+			tween(button,{BackgroundTransparency=.72},.15)
+			tween(label,{TextColor3=COLORS.Text},.15)
 		end
 	end)
 
 	button.MouseLeave:Connect(function()
 		if currentPage~=pageName then
-			tween(
-				button,
-				{
-					BackgroundTransparency=1
-				},
-				.15,
-				Enum.EasingStyle.Quad
-			)
-
-			tween(
-				label,
-				{
-					TextColor3=COLORS.TextDim
-				},
-				.15,
-				Enum.EasingStyle.Quad
-			)
+			tween(button,{BackgroundTransparency=1},.15)
+			tween(label,{TextColor3=COLORS.TextDim},.15)
 		end
 	end)
 
@@ -1451,25 +1308,29 @@ local function createSidebarButton(text,order,pageName)
 	end)
 end
 
-createSidebarButton(
-	"Information",
-	1,
-	"Information"
-)
-
-createSidebarButton(
-	"Main",
-	2,
-	"Main"
-)
-
-createSidebarButton(
-	"Settings",
-	3,
-	"Settings"
-)
+createSidebarButton("Information",1,"Information")
+createSidebarButton("Main",2,"Main")
+createSidebarButton("Settings",3,"Settings")
 
 selectPage("Information")
+
+--========================================================
+-- RESTORE SAVED STATE
+--========================================================
+
+task.defer(function()
+	applyMovement()
+
+	setWalkSpeedUI(State.WalkSpeedEnabled,false)
+	setJumpPowerUI(State.JumpPowerEnabled,false)
+	setNoClipUI(State.NoClip,false)
+
+	if State.NoClip then
+		rememberCollision(getCharacter())
+	end
+
+	applyMovement()
+end)
 
 --========================================================
 -- MAXIMIZE / MINIMIZE
@@ -1477,19 +1338,15 @@ selectPage("Information")
 
 local maximized=false
 local minimized=false
-
 local savedBeforeMinimizeSize=nil
 local savedBeforeMinimizePosition=nil
 
 local normalSize=UDim2.new(0,780,0,500)
 local normalPosition=UDim2.new(.5,-390,.5,-250)
-
 local maximizedSize=UDim2.new(1,-40,1,-40)
 local maximizedPosition=UDim2.new(0,20,0,20)
-
 local minimizedSize=UDim2.new(0,300,0,38)
 local minimizedPosition=UDim2.new(.5,-150,-.060,15)
-
 local minimizedHover=false
 
 local function updateMinimizedButtons()
@@ -1528,7 +1385,6 @@ local function updateMinimizedButtons()
 
 	close.BackgroundTransparency=transparency
 	close.TextTransparency=transparency
-
 	normalStroke.Transparency=minimizedHover and .1 or 1
 
 	normalIcon.Visible=false
@@ -1546,16 +1402,8 @@ local function restoreFromMinimized()
 	content.Visible=true
 	author.Visible=true
 
-	local restoreSize=savedBeforeMinimizeSize
-	local restorePosition=savedBeforeMinimizePosition
-
-	if not restoreSize then
-		restoreSize=maximized and maximizedSize or normalSize
-	end
-
-	if not restorePosition then
-		restorePosition=maximized and maximizedPosition or normalPosition
-	end
+	local restoreSize=savedBeforeMinimizeSize or (maximized and maximizedSize or normalSize)
+	local restorePosition=savedBeforeMinimizePosition or (maximized and maximizedPosition or normalPosition)
 
 	updateMinimizedButtons()
 
@@ -1563,15 +1411,7 @@ local function restoreFromMinimized()
 	restoreBack.Visible=maximized
 	restoreFront.Visible=maximized
 
-	tween(
-		main,
-		{
-			Size=restoreSize,
-			Position=restorePosition
-		},
-		.28,
-		Enum.EasingStyle.Quint
-	)
+	tween(main,{Size=restoreSize,Position=restorePosition},.28,Enum.EasingStyle.Quint)
 end
 
 maximize.MouseButton1Click:Connect(function()
@@ -1583,30 +1423,12 @@ maximize.MouseButton1Click:Connect(function()
 	maximized=not maximized
 
 	if maximized then
-		tween(
-			main,
-			{
-				Size=maximizedSize,
-				Position=maximizedPosition
-			},
-			.25,
-			Enum.EasingStyle.Quint
-		)
-
+		tween(main,{Size=maximizedSize,Position=maximizedPosition},.25,Enum.EasingStyle.Quint)
 		normalIcon.Visible=false
 		restoreBack.Visible=true
 		restoreFront.Visible=true
 	else
-		tween(
-			main,
-			{
-				Size=normalSize,
-				Position=normalPosition
-			},
-			.25,
-			Enum.EasingStyle.Quint
-		)
-
+		tween(main,{Size=normalSize,Position=normalPosition},.25,Enum.EasingStyle.Quint)
 		normalIcon.Visible=true
 		restoreBack.Visible=false
 		restoreFront.Visible=false
@@ -1633,15 +1455,10 @@ minimize.MouseButton1Click:Connect(function()
 
 	updateMinimizedButtons()
 
-	tween(
-		main,
-		{
-			Size=minimizedSize,
-			Position=minimizedPosition
-		},
-		.28,
-		Enum.EasingStyle.Quint
-	)
+	tween(main,{
+		Size=minimizedSize,
+		Position=minimizedPosition
+	},.28,Enum.EasingStyle.Quint)
 end)
 
 topBar.MouseEnter:Connect(function()
@@ -1657,13 +1474,8 @@ topBar.MouseLeave:Connect(function()
 end)
 
 topBar.InputBegan:Connect(function(input)
-	if input.UserInputType~=Enum.UserInputType.MouseButton1 then
-		return
-	end
-
-	if minimized then
-		restoreFromMinimized()
-	end
+	if input.UserInputType~=Enum.UserInputType.MouseButton1 then return end
+	if minimized then restoreFromMinimized() end
 end)
 
 --========================================================
@@ -1675,8 +1487,7 @@ local dragStart=nil
 local startPosition=nil
 
 topBar.InputBegan:Connect(function(input)
-	if input.UserInputType~=Enum.UserInputType.MouseButton1
-		and input.UserInputType~=Enum.UserInputType.Touch then
+	if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then
 		return
 	end
 
@@ -1688,20 +1499,14 @@ topBar.InputBegan:Connect(function(input)
 end)
 
 topBar.InputEnded:Connect(function(input)
-	if input.UserInputType==Enum.UserInputType.MouseButton1
-		or input.UserInputType==Enum.UserInputType.Touch then
+	if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 		dragging=false
 	end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
 	if not dragging or minimized then return end
-
-	if input.UserInputType~=Enum.UserInputType.MouseMovement
-		and input.UserInputType~=Enum.UserInputType.Touch then
-		return
-	end
-
+	if input.UserInputType~=Enum.UserInputType.MouseMovement and input.UserInputType~=Enum.UserInputType.Touch then return end
 	if not dragStart or not startPosition then return end
 
 	local delta=input.Position-dragStart
@@ -1719,16 +1524,19 @@ end)
 --========================================================
 
 close.MouseButton1Click:Connect(function()
+	saveSettings()
 	stopFly()
+
 	State.NoClip=false
 	restoreCollision()
 
-	if Connections.CharacterAdded then
-		Connections.CharacterAdded:Disconnect()
-	end
-
-	if Connections.NoClip then
-		Connections.NoClip:Disconnect()
+	for name,connection in pairs(Connections) do
+		if connection then
+			pcall(function()
+				connection:Disconnect()
+			end)
+		end
+		Connections[name]=nil
 	end
 
 	if screenGui.Parent then
