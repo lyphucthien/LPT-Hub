@@ -468,7 +468,7 @@ applyGradient(title,COLORS.Accent,COLORS.AccentB,0)
 
 local author=Instance.new("TextLabel")
 author.Size=UDim2.fromOffset(170,38)
-author.Position=UDim2.fromOffset(120,0)
+author.Position=UDim2.fromOffset(115,0)
 author.BackgroundTransparency=1
 author.Text="by Ly Phuc Thien"
 author.TextColor3=COLORS.TextDim
@@ -1098,6 +1098,7 @@ local flyInfo=Instance.new("TextLabel")
 flyInfo.Size=UDim2.new(1,-56,0,40)
 flyInfo.Position=UDim2.fromOffset(28,360)
 flyInfo.BackgroundTransparency=1
+flyInfo.Text="Fly: W A S D • Space: Lên • LeftControl: Xuống"
 flyInfo.TextColor3=COLORS.TextDim
 flyInfo.TextSize=12
 flyInfo.Font=Enum.Font.Gotham
@@ -1336,16 +1337,6 @@ fixLag.MouseButton1Click:Connect(function()
 		fixLag.Text="FIX LAG"
 	end
 end)
-
-local settingsInfo=Instance.new("TextLabel")
-settingsInfo.Size=UDim2.new(1,-56,0,40)
-settingsInfo.Position=UDim2.fromOffset(28,348)
-settingsInfo.BackgroundTransparency=1
-settingsInfo.TextColor3=COLORS.TextDim
-settingsInfo.TextSize=12
-settingsInfo.Font=Enum.Font.Gotham
-settingsInfo.TextXAlignment=Enum.TextXAlignment.Left
-settingsInfo.Parent=settingsPage
 
 settingsPage.CanvasSize=UDim2.new(0,0,0,420)
 
