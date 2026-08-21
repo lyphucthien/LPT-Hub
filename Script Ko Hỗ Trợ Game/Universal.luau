@@ -289,7 +289,12 @@ local function startFly()
 			direction=direction.Unit
 		end
 
-		root.AssemblyLinearVelocity=direction*90
+		if direction.Magnitude>0 then
+			root.AssemblyLinearVelocity=direction.Unit*90
+		else
+			root.AssemblyLinearVelocity=Vector3.zero
+		end
+
 		root.AssemblyAngularVelocity=Vector3.zero
 
 		-- Nhân vật luôn quay theo hướng camera
