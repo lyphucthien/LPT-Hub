@@ -5,12 +5,19 @@ local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
+--============================================================
+-- CONFIG
+--============================================================
+
 local GET_KEY_LINK = "https://link4sub.com/owycAYxKdu"
+
 local KEY_FILE = "LPT_Hub_Key.txt"
 
 local VALID_KEYS = {
 	["LPT-HUB"] = true,
 }
+
+local SCRIPT_UNSUPPORTED = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Universal/Universal.luau"
 
 local GAME_HO_TRO = {
 	["+1 Speed Keyboard Escape"] = {
@@ -21,10 +28,6 @@ local GAME_HO_TRO = {
 		MainUI = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/%2B1%20Speed%20Keyboard%20Escape/MainUI.luau",
 	},
 }
-
---============================================================
--- STATE
---============================================================
 
 local State = {
 	KeyValid = false,
@@ -39,7 +42,7 @@ local State = {
 }
 
 --============================================================
--- Màu
+-- COLORS
 --============================================================
 
 local COLORS = {
@@ -63,7 +66,16 @@ local COLORS = {
 
 local function tween(obj, props, time, style)
 	if not obj or not obj.Parent then return end
-	local t = TweenService:Create(obj, TweenInfo.new(time or .18, style or Enum.EasingStyle.Quad), props)
+
+	local t = TweenService:Create(
+		obj,
+		TweenInfo.new(
+			time or .18,
+			style or Enum.EasingStyle.Quad
+		),
+		props
+	)
+
 	t:Play()
 	return t
 end
@@ -77,24 +89,39 @@ local function applyGradient(obj, a, b, rotation)
 end
 
 --============================================================
--- Nơi Lưu KEY
+-- KEY FILE
 --============================================================
 
 local function getSavedKey()
-	if type(isfile) ~= "function" then return nil end
+	if type(isfile) ~= "function" then
+		return nil
+	end
 
 	local ok, result = pcall(function()
-		if not isfile(KEY_FILE) then return nil end
+		if not isfile(KEY_FILE) then
+			return nil
+		end
+
 		local data = readfile(KEY_FILE)
-		return data and data ~= "" and tostring(data) or nil
+
+		if data and data ~= "" then
+			return tostring(data)
+		end
+
+		return nil
 	end)
 
 	return ok and result or nil
 end
 
 local function saveKey(key)
-	if type(writefile) ~= "function" then return end
-	pcall(function() writefile(KEY_FILE, tostring(key)) end)
+	if type(writefile) ~= "function" then
+		return
+	end
+
+	pcall(function()
+		writefile(KEY_FILE, tostring(key))
+	end)
 end
 
 local function checkKey(key)
@@ -106,7 +133,10 @@ end
 --============================================================
 
 local oldGui = playerGui:FindFirstChild("LPTKeyUI")
-if oldGui then oldGui:Destroy() end
+
+if oldGui then
+	oldGui:Destroy()
+end
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "LPTKeyUI"
@@ -117,7 +147,7 @@ screenGui.DisplayOrder = 999999
 screenGui.Parent = playerGui
 
 --============================================================
--- Thông Báo Góc Phải
+-- NOTIFICATION
 --============================================================
 
 local notificationHolder = Instance.new("Frame")
@@ -129,37 +159,66 @@ notificationHolder.ZIndex = 101
 notificationHolder.Parent = screenGui
 
 local activeNotifications = {}
-local NOTIFICATION_WIDTH, NOTIFICATION_HEIGHT, NOTIFICATION_GAP = 340, 82, 10
-local RIGHT_MARGIN, BOTTOM_MARGIN = 20, 20
+
+local NOTIFICATION_WIDTH = 340
+local NOTIFICATION_HEIGHT = 82
+local NOTIFICATION_GAP = 10
+
+local RIGHT_MARGIN = 20
+local BOTTOM_MARGIN = 20
 
 local function notificationPosition(index)
-	return UDim2.new(1, -RIGHT_MARGIN, 1, -BOTTOM_MARGIN - ((index - 1) * (NOTIFICATION_HEIGHT + NOTIFICATION_GAP)))
+	return UDim2.new(
+		1,
+		-RIGHT_MARGIN,
+		1,
+		-BOTTOM_MARGIN - ((index - 1) * (NOTIFICATION_HEIGHT + NOTIFICATION_GAP))
+	)
 end
 
 local function updateNotifications()
 	for i, notification in ipairs(activeNotifications) do
 		if notification and notification.Parent then
-			tween(notification, {Position = notificationPosition(i)}, .25, Enum.EasingStyle.Quart)
+			tween(
+				notification,
+				{Position = notificationPosition(i)},
+				.25,
+				Enum.EasingStyle.Quart
+			)
 		end
 	end
 end
 
 local function showNotification(titleText, messageText, notificationType)
-	local accent, iconText = COLORS.Success, "✓"
+	local accent = COLORS.Success
+	local iconText = "✓"
 
 	if notificationType == "error" then
-		accent, iconText = COLORS.Danger, "!"
+		accent = COLORS.Danger
+		iconText = "!"
 	elseif notificationType == "info" then
-		accent, iconText = COLORS.Info, "i"
+		accent = COLORS.Info
+		iconText = "i"
 	elseif notificationType == "warning" then
-		accent, iconText = COLORS.Warning, "!"
+		accent = COLORS.Warning
+		iconText = "!"
 	end
 
 	local notification = Instance.new("Frame")
 	notification.Name = "Notification"
 	notification.AnchorPoint = Vector2.new(1,1)
-	notification.Size = UDim2.fromOffset(NOTIFICATION_WIDTH, NOTIFICATION_HEIGHT)
-	notification.Position = UDim2.new(1, NOTIFICATION_WIDTH + 50, 1, -BOTTOM_MARGIN)
+	notification.Size = UDim2.fromOffset(
+		NOTIFICATION_WIDTH,
+		NOTIFICATION_HEIGHT
+	)
+
+	notification.Position = UDim2.new(
+		1,
+		NOTIFICATION_WIDTH + 50,
+		1,
+		-BOTTOM_MARGIN
+	)
+
 	notification.BackgroundColor3 = Color3.fromRGB(10,18,30)
 	notification.BackgroundTransparency = .04
 	notification.BorderSizePixel = 0
@@ -241,21 +300,47 @@ local function showNotification(titleText, messageText, notificationType)
 	progress.Parent = notification
 
 	table.insert(activeNotifications, 1, notification)
+
 	updateNotifications()
 
-	tween(notification, {Position = notificationPosition(1)}, .3, Enum.EasingStyle.Quart)
-	tween(progress, {Size = UDim2.new(0,0,0,2)}, 3, Enum.EasingStyle.Linear)
+	tween(
+		notification,
+		{Position = notificationPosition(1)},
+		.3,
+		Enum.EasingStyle.Quart
+	)
+
+	tween(
+		progress,
+		{Size = UDim2.new(0,0,0,2)},
+		3,
+		Enum.EasingStyle.Linear
+	)
 
 	task.delay(3, function()
-		if not notification.Parent then return end
+		if not notification.Parent then
+			return
+		end
 
-		tween(notification, {
-			Position = UDim2.new(1,-RIGHT_MARGIN,1,NOTIFICATION_HEIGHT + 30)
-		}, .35, Enum.EasingStyle.Quart)
+		tween(
+			notification,
+			{
+				Position = UDim2.new(
+					1,
+					-RIGHT_MARGIN,
+					1,
+					NOTIFICATION_HEIGHT + 30
+				)
+			},
+			.35,
+			Enum.EasingStyle.Quart
+		)
 
 		task.wait(.4)
 
-		if notification.Parent then notification:Destroy() end
+		if notification.Parent then
+			notification:Destroy()
+		end
 
 		for i, item in ipairs(activeNotifications) do
 			if item == notification then
@@ -292,10 +377,16 @@ frameStroke.Color = COLORS.Border
 frameStroke.Thickness = 1.5
 frameStroke.Transparency = .2
 frameStroke.Parent = keyFrame
-applyGradient(frameStroke, COLORS.Accent, COLORS.AccentB, 45)
+
+applyGradient(
+	frameStroke,
+	COLORS.Accent,
+	COLORS.AccentB,
+	45
+)
 
 --============================================================
--- LOGO / HEADER
+-- HEADER
 --============================================================
 
 local logo = Instance.new("ImageLabel")
@@ -381,11 +472,23 @@ keyInput.ZIndex = 12
 keyInput.Parent = inputBox
 
 keyInput.Focused:Connect(function()
-	tween(inputStroke, {Color = COLORS.Accent, Transparency = 0})
+	tween(
+		inputStroke,
+		{
+			Color = COLORS.Accent,
+			Transparency = 0
+		}
+	)
 end)
 
 keyInput.FocusLost:Connect(function()
-	tween(inputStroke, {Color = COLORS.Border, Transparency = .15})
+	tween(
+		inputStroke,
+		{
+			Color = COLORS.Border,
+			Transparency = .15
+		}
+	)
 end)
 
 --============================================================
@@ -416,24 +519,42 @@ getStroke.Transparency = .2
 getStroke.Parent = getKeyButton
 
 getKeyButton.MouseEnter:Connect(function()
-	tween(getKeyButton, {BackgroundColor3 = COLORS.Card})
+	tween(
+		getKeyButton,
+		{BackgroundColor3 = COLORS.Card}
+	)
 end)
 
 getKeyButton.MouseLeave:Connect(function()
-	tween(getKeyButton, {BackgroundColor3 = COLORS.SurfaceLight})
+	tween(
+		getKeyButton,
+		{BackgroundColor3 = COLORS.SurfaceLight}
+	)
 end)
 
 getKeyButton.MouseButton1Click:Connect(function()
 	if type(setclipboard) == "function" then
 		setclipboard(GET_KEY_LINK)
-		showNotification("Link Copied!", "Link lấy KEY đã được copy.", "success")
+
+		showNotification(
+			"Link Copied!",
+			"Link lấy KEY đã được copy.",
+			"success"
+		)
+
 		getKeyButton.Text = "LINK COPIED!"
 
 		task.delay(1.2, function()
-			if getKeyButton.Parent then getKeyButton.Text = "GET KEY" end
+			if getKeyButton.Parent then
+				getKeyButton.Text = "GET KEY"
+			end
 		end)
 	else
-		showNotification("Copy Failed", "Không thể copy link.", "error")
+		showNotification(
+			"Copy Failed",
+			"Không thể copy link.",
+			"error"
+		)
 	end
 end)
 
@@ -457,14 +578,28 @@ submitButton.Parent = keyFrame
 local submitCorner = Instance.new("UICorner")
 submitCorner.CornerRadius = UDim.new(0,12)
 submitCorner.Parent = submitButton
-applyGradient(submitButton, COLORS.Accent, COLORS.AccentB, 0)
+
+applyGradient(
+	submitButton,
+	COLORS.Accent,
+	COLORS.AccentB,
+	0
+)
 
 submitButton.MouseEnter:Connect(function()
-	tween(submitButton, {Size = UDim2.new(1,-36,0,44)}, .12)
+	tween(
+		submitButton,
+		{Size = UDim2.new(1,-36,0,44)},
+		.12
+	)
 end)
 
 submitButton.MouseLeave:Connect(function()
-	tween(submitButton, {Size = UDim2.new(1,-40,0,44)}, .12)
+	tween(
+		submitButton,
+		{Size = UDim2.new(1,-40,0,44)},
+		.12
+	)
 end)
 
 --============================================================
@@ -493,32 +628,49 @@ end
 --============================================================
 
 local function getUniverseId(placeId)
-	if not placeId then return nil end
+	if not placeId then
+		return nil
+	end
 
 	local ok, result = pcall(function()
-		local url = "https://apis.roblox.com/universes/v1/places/" .. tostring(placeId) .. "/universe"
+		local url =
+			"https://apis.roblox.com/universes/v1/places/"
+			.. tostring(placeId)
+			.. "/universe"
+
 		local response = game:HttpGet(url)
-		if not response or response == "" then error("Empty response") end
+
+		if not response or response == "" then
+			error("Empty response")
+		end
 
 		local data = HttpService:JSONDecode(response)
-		if not data then error("Invalid JSON") end
+
+		if not data then
+			error("Invalid JSON")
+		end
 
 		return tonumber(data.universeId)
 	end)
 
-	if ok and result then return result end
+	if ok and result then
+		return result
+	end
 
-	warn("[LPT HUB] UniverseId Error:", tostring(result))
 	return nil
 end
 
 local function containsId(list, id)
-	if not id or type(list) ~= "table" then return false end
+	if not id or type(list) ~= "table" then
+		return false
+	end
 
 	local target = tonumber(id)
 
 	for _, value in ipairs(list) do
-		if tonumber(value) == target then return true end
+		if tonumber(value) == target then
+			return true
+		end
 	end
 
 	return false
@@ -526,7 +678,9 @@ end
 
 local function findGameConfig(placeId, universeId)
 	for configKey, config in pairs(GAME_HO_TRO) do
-		if type(config) ~= "table" then continue end
+		if type(config) ~= "table" then
+			continue
+		end
 
 		if containsId(config.PlaceId, placeId) then
 			return config, "PlaceId", configKey
@@ -547,27 +701,49 @@ local function resolveGame()
 		return false, "Không lấy được PlaceId."
 	end
 
-	setStatus("PlaceId: " .. tostring(State.PlaceId) .. " • Đang nhận diện...", COLORS.Info)
-	showNotification("Detecting Game", "Đang lấy PlaceId và UniverseId...", "info")
+	setStatus(
+		"PlaceId: " .. tostring(State.PlaceId) .. " • Đang nhận diện...",
+		COLORS.Info
+	)
+
+	showNotification(
+		"Detecting Game",
+		"Đang lấy PlaceId và UniverseId...",
+		"info"
+	)
 
 	task.wait(.25)
 
 	State.UniverseId = getUniverseId(State.PlaceId)
 
 	if State.UniverseId then
-		setStatus("UniverseId: " .. tostring(State.UniverseId) .. " • Đang tìm game...", COLORS.Info)
+		setStatus(
+			"UniverseId: "
+				.. tostring(State.UniverseId)
+				.. " • Đang tìm game...",
+			COLORS.Info
+		)
 	else
-		setStatus("Không lấy được UniverseId • Kiểm tra PlaceId...", COLORS.Warning)
+		setStatus(
+			"Không lấy được UniverseId • Kiểm tra PlaceId...",
+			COLORS.Warning
+		)
 	end
 
 	task.wait(.2)
 
-	local gameConfig, matchType, configKey = findGameConfig(State.PlaceId, State.UniverseId)
+	local gameConfig, matchType, configKey =
+		findGameConfig(
+			State.PlaceId,
+			State.UniverseId
+		)
 
+	-- Không tìm thấy game
 	if not gameConfig then
 		State.GameSupported = false
 		State.GameConfig = nil
 		State.MainUI = nil
+
 		return false, "Game không được hỗ trợ."
 	end
 
@@ -575,8 +751,17 @@ local function resolveGame()
 		return false, "Config game không hợp lệ."
 	end
 
-	local gameName = gameConfig.Name or gameConfig.name or configKey or "Unknown Game"
-	local mainUI = gameConfig.MainUI or gameConfig.mainUI or gameConfig.URL or gameConfig.url
+	local gameName =
+		gameConfig.Name
+		or gameConfig.name
+		or configKey
+		or "Unknown Game"
+
+	local mainUI =
+		gameConfig.MainUI
+		or gameConfig.mainUI
+		or gameConfig.URL
+		or gameConfig.url
 
 	if type(mainUI) ~= "string" or mainUI == "" then
 		return false, "Game đã nhận diện nhưng chưa có MainUI."
@@ -587,8 +772,16 @@ local function resolveGame()
 	State.MainUI = mainUI
 	State.GameSupported = true
 
-	setStatus("Đã nhận diện: " .. State.GameName, COLORS.Success)
-	showNotification("Game Detected", State.GameName .. " • " .. tostring(matchType), "success")
+	setStatus(
+		"Đã nhận diện: " .. State.GameName,
+		COLORS.Success
+	)
+
+	showNotification(
+		"Game Detected",
+		State.GameName .. " • " .. tostring(matchType),
+		"success"
+	)
 
 	return true
 end
@@ -598,21 +791,28 @@ end
 --============================================================
 
 local function waitForGameData(config)
-	if type(config) ~= "table" or config.WaitForDataLoaded ~= true then
+	if type(config) ~= "table"
+		or config.WaitForDataLoaded ~= true then
 		return true
 	end
 
-	setStatus("Đang chờ dữ liệu game...", COLORS.Info)
+	setStatus(
+		"Đang chờ dữ liệu game...",
+		COLORS.Info
+	)
 
-	local dataLoaded = player:FindFirstChild("DataLoaded")
+	local dataLoaded =
+		player:FindFirstChild("DataLoaded")
 
 	if not dataLoaded then
 		local ok, result = pcall(function()
-			return player:WaitForChild("DataLoaded", 30)
+			return player:WaitForChild(
+				"DataLoaded",
+				30
+			)
 		end)
 
 		if not ok or not result then
-			warn("[LPT HUB] DataLoaded không tồn tại.")
 			return false
 		end
 
@@ -622,20 +822,48 @@ local function waitForGameData(config)
 	if dataLoaded:IsA("BoolValue") then
 		local timeout = os.clock() + 30
 
-		while not dataLoaded.Value and os.clock() < timeout do
+		while not dataLoaded.Value
+			and os.clock() < timeout do
 			task.wait(.2)
 		end
 
-		if dataLoaded.Value then
-			return true
-		end
-
-		warn("[LPT HUB] DataLoaded timeout.")
-		return false
+		return dataLoaded.Value
 	end
 
-	warn("[LPT HUB] DataLoaded không phải BoolValue:", dataLoaded.ClassName)
 	return true
+end
+
+--============================================================
+-- EXECUTE REMOTE SCRIPT
+--============================================================
+
+local function executeScript(url, scriptName)
+	if type(url) ~= "string" or url == "" then
+		error(
+			tostring(scriptName)
+				.. " URL không hợp lệ."
+		)
+	end
+
+	local response = game:HttpGet(url)
+
+	if not response or response == "" then
+		error(
+			tostring(scriptName)
+				.. " trả về dữ liệu rỗng."
+		)
+	end
+
+	local mainFunction = loadstring(response)
+
+	if type(mainFunction) ~= "function" then
+		error(
+			tostring(scriptName)
+				.. " không trả về function."
+		)
+	end
+
+	return mainFunction()
 end
 
 --============================================================
@@ -643,65 +871,169 @@ end
 --============================================================
 
 local function loadMainUI()
-	if State.Loading then return end
+	if State.Loading then
+		return
+	end
 
 	State.Loading = true
 	keyFrame.Visible = true
 
-	setStatus("KEY hợp lệ • Đang nhận diện game...", COLORS.Success)
+	setStatus(
+		"KEY hợp lệ • Đang nhận diện game...",
+		COLORS.Success
+	)
+
 	task.wait(.25)
 
-	local resolved, resolveError = resolveGame()
+	local resolved, resolveError =
+		resolveGame()
+
+	--========================================================
+	-- GAME KHÔNG ĐƯỢC HỖ TRỢ
+	--========================================================
 
 	if not resolved then
+		if resolveError == "Game không được hỗ trợ." then
+
+			setStatus(
+				"Game chưa hỗ trợ • Đang tải script...",
+				COLORS.Warning
+			)
+
+			showNotification(
+				"Game Not Supported",
+				"Đang chạy script mặc định...",
+				"warning"
+			)
+
+			task.wait(.5)
+
+			local ok, result = pcall(function()
+				return executeScript(
+					SCRIPT_UNSUPPORTED,
+					"Unsupported Script"
+				)
+			end)
+
+			if not ok then
+				keyFrame.Visible = true
+
+				setStatus(
+					"Không thể tải script.",
+					COLORS.Danger
+				)
+
+				showNotification(
+					"Script Error",
+					tostring(result),
+					"error"
+				)
+
+				State.Loading = false
+				return
+			end
+
+			setStatus(
+				"Đã tải script mặc định.",
+				COLORS.Success
+			)
+
+			showNotification(
+				"LPT HUB",
+				"Đã tải script cho game chưa được hỗ trợ.",
+				"success"
+			)
+
+			task.wait(.25)
+
+			keyFrame.Visible = false
+			State.Loading = false
+
+			return
+		end
+
 		keyFrame.Visible = true
-		setStatus(resolveError, COLORS.Danger)
-		showNotification("Game Not Supported", resolveError, "error")
+
+		setStatus(
+			resolveError,
+			COLORS.Danger
+		)
+
+		showNotification(
+			"Game Detection Error",
+			resolveError,
+			"error"
+		)
+
 		State.Loading = false
 		return
 	end
+
+	--========================================================
+	-- GAME ĐƯỢC HỖ TRỢ
+	--========================================================
 
 	task.wait(.4)
 
 	if not waitForGameData(State.GameConfig) then
 		keyFrame.Visible = true
-		setStatus("Game chưa sẵn sàng.", COLORS.Danger)
-		showNotification("Game Loading", "DataLoaded chưa hoàn tất.", "error")
+
+		setStatus(
+			"Game chưa sẵn sàng.",
+			COLORS.Danger
+		)
+
+		showNotification(
+			"Game Loading",
+			"DataLoaded chưa hoàn tất.",
+			"error"
+		)
+
 		State.Loading = false
 		return
 	end
 
-	setStatus("Đang tải MainUI...", COLORS.Info)
-	showNotification("Loading UI", "Đang tải " .. State.GameName .. "...", "info")
+	setStatus(
+		"Đang tải MainUI...",
+		COLORS.Info
+	)
+
+	showNotification(
+		"Loading UI",
+		"Đang tải " .. State.GameName .. "...",
+		"info"
+	)
+
 	task.wait(.25)
 
 	local ok, result = pcall(function()
-		local response = game:HttpGet(State.MainUI)
-
-		if not response or response == "" then
-			error("MainUI trả về dữ liệu rỗng.")
-		end
-
-		local mainFunction = loadstring(response)
-
-		if type(mainFunction) ~= "function" then
-			error("MainUI không trả về function.")
-		end
-
-		return mainFunction()
+		return executeScript(
+			State.MainUI,
+			"MainUI"
+		)
 	end)
 
 	if not ok then
 		keyFrame.Visible = true
-		setStatus("Không thể tải MainUI.", COLORS.Danger)
-		showNotification("MainUI Error", tostring(result), "error")
-		warn("[LPT HUB] MainUI Error:", result)
+
+		setStatus(
+			"Không thể tải MainUI.",
+			COLORS.Danger
+		)
+
+		showNotification(
+			"MainUI Error",
+			tostring(result),
+			"error"
+		)
+
 		State.Loading = false
 		return
 	end
 
-	setStatus("Đã tải " .. State.GameName, COLORS.Success)
-	showNotification("LPT HUB", "Đã tải UI: " .. State.GameName, "success")
+	setStatus("Đã tải " .. State.GameName,COLORS.Success)
+
+	showNotification("LPT HUB","Đã tải UI: " .. State.GameName,"success")
 
 	task.wait(.25)
 
@@ -714,41 +1046,85 @@ end
 --============================================================
 
 local function attemptSubmit()
-	if State.Submitting or State.Loading then return end
+	if State.Submitting
+		or State.Loading then
+		return
+	end
 
 	State.Submitting = true
 
-	local key = tostring(keyInput.Text or "")
-	key = key:gsub("^%s+", ""):gsub("%s+$", "")
+	local key = tostring(
+		keyInput.Text or ""
+	)
+
+	key = key
+		:gsub("^%s+", "")
+		:gsub("%s+$", "")
 
 	if key == "" then
-		setStatus("Vui lòng nhập KEY.", COLORS.Danger)
+		setStatus("Vui lòng nhập KEY.",COLORS.Danger)
+
 		State.Submitting = false
 		return
 	end
 
-	setStatus("Đang xác thực KEY...", COLORS.Info)
+	setStatus("Đang xác thực KEY...",COLORS.Info)
+
 	task.wait(.2)
 
 	if not checkKey(key) then
-		setStatus("KEY không đúng, thử lại.", COLORS.Danger)
-		showNotification("Invalid Key", "KEY không hợp lệ.", "error")
+		setStatus(
+			"KEY không đúng, thử lại.",
+			COLORS.Danger
+		)
 
-		tween(inputStroke, {Color = COLORS.Danger, Transparency = 0}, .1)
+		showNotification(
+			"Invalid Key",
+			"KEY không hợp lệ.",
+			"error"
+		)
+
+		tween(
+			inputStroke,
+			{
+				Color = COLORS.Danger,
+				Transparency = 0
+			},
+			.1
+		)
+
 		task.wait(.15)
-		tween(inputStroke, {Color = COLORS.Border, Transparency = .15}, .2)
+
+		tween(
+			inputStroke,
+			{
+				Color = COLORS.Border,
+				Transparency = .15
+			},
+			.2
+		)
 
 		State.Submitting = false
 		return
 	end
 
 	State.KeyValid = true
+
 	saveKey(key)
 
-	showNotification("Key Valid!", "KEY hợp lệ. Đang nhận diện game...", "success")
-	setStatus("KEY hợp lệ! Đang nhận diện game...", COLORS.Success)
+	showNotification(
+		"Key Valid!",
+		"KEY hợp lệ. Đang nhận diện game...",
+		"success"
+	)
+
+	setStatus(
+		"KEY hợp lệ! Đang nhận diện game...",
+		COLORS.Success
+	)
 
 	State.Submitting = false
+
 	loadMainUI()
 end
 
@@ -756,10 +1132,16 @@ end
 -- EVENTS
 --============================================================
 
-submitButton.MouseButton1Click:Connect(attemptSubmit)
+submitButton.MouseButton1Click:Connect(
+	attemptSubmit
+)
 
-keyInput.FocusLost:Connect(function(enterPressed)
-	if enterPressed then attemptSubmit() end
+keyInput.FocusLost:Connect(function(
+	enterPressed
+)
+	if enterPressed then
+		attemptSubmit()
+	end
 end)
 
 --============================================================
@@ -769,15 +1151,21 @@ end)
 task.spawn(function()
 	local savedKey = getSavedKey()
 
-	if not savedKey or savedKey == "" then
+	if not savedKey
+		or savedKey == "" then
 		return
 	end
 
 	task.wait(.4)
 
 	keyInput.Text = savedKey
-	setStatus("Đang xác thực KEY đã lưu...", COLORS.Info)
+
+	setStatus(
+		"Đang xác thực KEY đã lưu...",
+		COLORS.Info
+	)
 
 	task.wait(.4)
+
 	attemptSubmit()
 end)
