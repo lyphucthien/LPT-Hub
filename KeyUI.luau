@@ -512,29 +512,56 @@ getKeyButton.MouseLeave:Connect(function()
 end)
 
 getKeyButton.MouseButton1Click:Connect(function()
-	if type(setclipboard)=="function" then
-		setclipboard(GET_KEY_LINK)
+	getKeyButton.Text="OPENING..."
 
-		showNotification(
-			"Link Copied!",
-			"Link lấy KEY đã được copy.",
-			"success"
-		)
+	local opened=false
 
-		getKeyButton.Text="LINK COPIED!"
-
-		task.delay(1.2,function()
-			if getKeyButton.Parent then
-				getKeyButton.Text="GET KEY"
-			end
+	if type(openurl)=="function" then
+		local ok=pcall(function()
+			openurl(GET_KEY_LINK)
 		end)
-	else
-		showNotification(
-			"Copy Failed",
-			"Không thể copy link.",
-			"error"
-		)
+
+		if ok then
+			opened=true
+		end
 	end
+
+	if not opened and type(open_url)=="function" then
+		local ok=pcall(function()
+			open_url(GET_KEY_LINK)
+		end)
+
+		if ok then
+			opened=true
+		end
+	end
+
+	else
+
+		if type(setclipboard)=="function" then
+			pcall(function()
+				setclipboard(GET_KEY_LINK)
+			end)
+
+			showNotification(
+				"Link Copied",
+				"Executor không hỗ trợ mở trình duyệt tự động. Link đã được copy.",
+				"warning"
+			)
+		else
+			showNotification(
+				"Open Failed",
+				"Executor không hỗ trợ mở trình duyệt hoặc copy link.",
+				"error"
+			)
+		end
+	end
+
+	task.delay(.8,function()
+		if getKeyButton.Parent then
+			getKeyButton.Text="GET KEY"
+		end
+	end)
 end)
 
 --============================================================
