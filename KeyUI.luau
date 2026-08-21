@@ -17,7 +17,7 @@ local VALID_KEYS = {
 	["LPT-HUB"] = true,
 }
 
-local SCRIPT_UNSUPPORTED = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Universal/Universal.luau"
+local GAME_KO_HO_TRO = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Script%20Ko%20H%E1%BB%97%20Tr%E1%BB%A3%20Game/Universal.luau"
 
 local GAME_HO_TRO = {
 	["+1 Speed Keyboard Escape"] = {
@@ -892,80 +892,62 @@ local function loadMainUI()
 	-- GAME KHÔNG ĐƯỢC HỖ TRỢ
 	--========================================================
 
-	if not resolved then
-		if resolveError == "Game không được hỗ trợ." then
-
-			setStatus(
-				"Game chưa hỗ trợ • Đang tải script...",
-				COLORS.Warning
-			)
-
-			showNotification(
-				"Game Not Supported",
-				"Đang chạy script mặc định...",
-				"warning"
-			)
-
-			task.wait(.5)
-
-			local ok, result = pcall(function()
-				return executeScript(
-					SCRIPT_UNSUPPORTED,
-					"Unsupported Script"
-				)
-			end)
-
-			if not ok then
-				keyFrame.Visible = true
-
-				setStatus(
-					"Không thể tải script.",
-					COLORS.Danger
-				)
-
-				showNotification(
-					"Script Error",
-					tostring(result),
-					"error"
-				)
-
-				State.Loading = false
-				return
-			end
-
-			setStatus(
-				"Đã tải script mặc định.",
-				COLORS.Success
-			)
-
-			showNotification(
-				"LPT HUB",
-				"Đã tải script cho game chưa được hỗ trợ.",
-				"success"
-			)
-
-			task.wait(.25)
-
-			keyFrame.Visible = false
-			State.Loading = false
-
-			return
-		end
-
-		keyFrame.Visible = true
-
+if not resolved then
+	if resolveError=="Game không được hỗ trợ." then
 		setStatus(
-			resolveError,
-			COLORS.Danger
+			"Game chưa hỗ trợ • Đang tải script...",
+			COLORS.Warning
 		)
 
 		showNotification(
-			"Game Detection Error",
-			resolveError,
-			"error"
+			"Game Not Supported",
+			"Đang chạy script mặc định...",
+			"warning"
 		)
 
-		State.Loading = false
+		task.wait(.5)
+
+		local ok,result=pcall(function()
+			return executeScript(
+				GAME_KO_HO_TRO,
+				"Unsupported Script"
+			)
+		end)
+
+		if not ok then
+			keyFrame.Visible=true
+
+			setStatus(
+				"Không thể tải script.",
+				COLORS.Danger
+			)
+
+			showNotification(
+				"Script Error",
+				tostring(result),
+				"error"
+			)
+
+			State.Loading=false
+			return
+		end
+
+		setStatus(
+			"Đã tải script mặc định.",
+			COLORS.Success
+		)
+
+		showNotification(
+			"LPT HUB",
+			"Đã tải script cho game chưa được hỗ trợ.",
+			"success"
+		)
+
+		task.wait(.25)
+
+		keyFrame.Visible=false
+		State.Loading=false
+
 		return
 	end
 
