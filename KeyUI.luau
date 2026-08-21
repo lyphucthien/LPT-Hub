@@ -536,8 +536,6 @@ getKeyButton.MouseButton1Click:Connect(function()
 		end
 	end
 
-	else
-
 		if type(setclipboard)=="function" then
 			pcall(function()
 				setclipboard(GET_KEY_LINK)
