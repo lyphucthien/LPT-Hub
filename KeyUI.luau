@@ -16,7 +16,7 @@ local VALID_KEYS={
 	["LPT-HUB"]=true,
 }
 
-local UNIVERSAL_SCRIPT="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Script%20Ko%20H%E1%BB%97%20Tr%E1%BB%A3%20Game/Universal.luau"
+local UNIVERSAL_SCRIPT="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Script%20Ko%20H%E1%BB%97%20Tr%E1%BB%A3%20Game/Script.luau"
 
 local GAME_HO_TRO={
 	["+1 Speed Keyboard Escape"]={
