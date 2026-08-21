@@ -248,7 +248,7 @@ local function startFly()
 	stopFly()
 	State.Fly=true
 
-	local idleY=nil
+	local lockedPosition=nil
 
 	FlyConnection=RunService.Heartbeat:Connect(function()
 		if not State.Fly then return end
@@ -262,8 +262,8 @@ local function startFly()
 		humanoid.PlatformStand=true
 		humanoid.AutoRotate=false
 
-		if idleY==nil then
-			idleY=root.Position.Y
+		if not lockedPosition then
+			lockedPosition=root.Position
 		end
 
 		local lookVector=camera.CFrame.LookVector
@@ -296,35 +296,36 @@ local function startFly()
 
 		if direction.Magnitude>0 then
 			direction=direction.Unit
-			root.AssemblyLinearVelocity=direction.Unit*State.FlySpeed
+			root.AssemblyLinearVelocity=direction*State.FlySpeed
+			root.AssemblyAngularVelocity=Vector3.zero
 
-			if not UserInputService:IsKeyDown(Enum.KeyCode.Space)
-				and not UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-				idleY=root.Position.Y
+			lockedPosition=root.Position
+
+			local flatLook=Vector3.new(lookVector.X,0,lookVector.Z)
+
+			if flatLook.Magnitude>0.001 then
+				root.CFrame=CFrame.lookAt(
+					root.Position,
+					root.Position+flatLook.Unit
+				)
 			end
 		else
 
 			root.AssemblyLinearVelocity=Vector3.zero
-			root.CFrame=CFrame.new(
-				root.Position.X,
-				idleY,
-				root.Position.Z
-			)*root.CFrame.Rotation
-		end
+			root.AssemblyAngularVelocity=Vector3.zero
 
-		root.AssemblyAngularVelocity=Vector3.zero
+			local flatLook=Vector3.new(lookVector.X,0,lookVector.Z)
 
-		local flatLook=Vector3.new(
-			lookVector.X,
-			0,
-			lookVector.Z
-		)
-
-		if flatLook.Magnitude>0.001 then
-			root.CFrame=CFrame.lookAt(
-				root.Position,
-				root.Position+flatLook.Unit
-			)
+			if flatLook.Magnitude>0.001 then
+				root.CFrame=CFrame.lookAt(
+					lockedPosition,
+					lockedPosition+flatLook.Unit
+				)
+			else
+				root.CFrame=CFrame.new(
+					lockedPosition
+				)*root.CFrame.Rotation
+			end
 		end
 	end)
 end
