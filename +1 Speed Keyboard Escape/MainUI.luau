@@ -2254,34 +2254,24 @@ local function createSidebarButton(name, order)
 	corner.CornerRadius = UDim.new(0, 10)
 	corner.Parent = button
 
-	local iconLabel = Instance.new("TextLabel")
-	iconLabel.Size = UDim2.fromOffset(32, 48)
-	iconLabel.Position = UDim2.fromOffset(12, 0)
-	iconLabel.BackgroundTransparency = 1
-	iconLabel.Text = config.icon
-	iconLabel.TextColor3 = COLORS.TextDim
-	iconLabel.TextSize = 17
-	iconLabel.Font = Enum.Font.Gotham
-	iconLabel.Parent = button
+	local textLabel=Instance.new("TextLabel")
+	textLabel.Size=UDim2.new(1,-32,1,0)
+	textLabel.Position=UDim2.fromOffset(18,0)
+	textLabel.BackgroundTransparency=1
+	textLabel.Text=config.text
+	textLabel.TextColor3=COLORS.Text
+	textLabel.TextSize=14
+	textLabel.Font=Enum.Font.GothamBold
+	textLabel.TextXAlignment=Enum.TextXAlignment.Left
+	textLabel.TextYAlignment=Enum.TextYAlignment.Center
+	textLabel.Parent=button
 
-	local textLabel = Instance.new("TextLabel")
-	textLabel.Size = UDim2.new(1, -55, 1, 0)
-	textLabel.Position = UDim2.fromOffset(48, 0)
-	textLabel.BackgroundTransparency = 1
-	textLabel.Text = config.text
-	textLabel.TextColor3 = COLORS.TextDim
-	textLabel.TextSize = 14
-	textLabel.Font = Enum.Font.GothamMedium
-	textLabel.TextXAlignment = Enum.TextXAlignment.Left
-	textLabel.Parent = button
-
-	sidebarButtons[name] = {
-		button = button,
-		icon = iconLabel,
-		label = textLabel,
-		accent = config.accent,
+	sidebarButtons[name]={
+		button=button,
+		label=textLabel,
+		accent=config.accent,
 	}
-
+	
 	button.MouseEnter:Connect(function()
 		if currentPage ~= name then
 			tween(button, {BackgroundTransparency = 0.72}, 0.15)
