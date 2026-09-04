@@ -685,6 +685,7 @@ end
 
 local informationPage=createPage("Information")
 local mainPage=createPage("Main")
+local aimPage=createPage("Aim")
 local settingsPage=createPage("Settings")
 
 --========================================================
@@ -720,6 +721,7 @@ end
 createPageTitle(informationPage,"Thông Tin","Thông tin Owner, Tên Game, Chức năng và trạng thái.")
 createPageTitle(mainPage,"Main")
 createPageTitle(settingsPage,"Settings")
+createPageTitle(aimPage,"Aim","Các thiết lập hỗ trợ ngắm.")
 
 --========================================================
 -- TOGGLE
@@ -1127,6 +1129,525 @@ end)
 mainPage.CanvasSize=UDim2.new(0,0,0,420)
 
 --========================================================
+-- AIM SYSTEM
+--========================================================
+
+local AimState = {
+	Enabled = false,
+	TeamCheck = true,
+	VisibleCheck = false,
+	FOV = 360,
+}
+
+--========================================================
+-- AIM FOV CIRCLE
+--========================================================
+
+local AimFOVCircle = Instance.new("Frame")
+AimFOVCircle.Name = "AimFOVCircle"
+AimFOVCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+AimFOVCircle.Position = UDim2.fromScale(0.5, 0.5)
+AimFOVCircle.Size = UDim2.fromOffset(AimState.FOV * 2, AimState.FOV * 2)
+AimFOVCircle.BackgroundTransparency = 1
+AimFOVCircle.Visible = false
+AimFOVCircle.ZIndex = 999
+AimFOVCircle.Parent = screenGui
+
+local AimFOVCorner = Instance.new("UICorner")
+AimFOVCorner.CornerRadius = UDim.new(1, 0)
+AimFOVCorner.Parent = AimFOVCircle
+
+local AimFOVStroke = Instance.new("UIStroke")
+AimFOVStroke.Thickness = 2
+AimFOVStroke.Color = COLORS.Accent
+AimFOVStroke.Transparency = 0.15
+AimFOVStroke.Parent = AimFOVCircle
+
+local function getAimTarget()
+	local camera = workspace.CurrentCamera
+	if not camera then return nil end
+
+	local mousePosition = UserInputService:GetMouseLocation()
+	local bestTarget = nil
+	local bestDistance = AimState.FOV
+
+	for _, targetPlayer in ipairs(Players:GetPlayers()) do
+		if targetPlayer ~= player then
+
+			-- TEAM CHECK
+			if AimState.TeamCheck and targetPlayer.Team == player.Team then
+				continue
+			end
+
+			local character = targetPlayer.Character
+			if not character then
+				continue
+			end
+
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			local head = character:FindFirstChild("Head")
+
+			if not humanoid or humanoid.Health <= 0 or not head then
+				continue
+			end
+
+			local screenPosition, onScreen =
+				camera:WorldToViewportPoint(head.Position)
+
+			if not onScreen then
+				continue
+			end
+
+			-- VISIBLE CHECK
+			if AimState.VisibleCheck then
+				local origin = camera.CFrame.Position
+				local direction = head.Position - origin
+
+				local rayParams = RaycastParams.new()
+				rayParams.FilterType = Enum.RaycastFilterType.Exclude
+				rayParams.FilterDescendantsInstances = {
+					player.Character
+				}
+				rayParams.IgnoreWater = true
+
+				local result = workspace:Raycast(
+					origin,
+					direction,
+					rayParams
+				)
+
+				if result and not result.Instance:IsDescendantOf(character) then
+					continue
+				end
+			end
+
+			local distance = (
+				Vector2.new(screenPosition.X, screenPosition.Y)
+				- mousePosition
+			).Magnitude
+
+			if distance < bestDistance then
+				bestDistance = distance
+				bestTarget = head
+			end
+		end
+	end
+
+	return bestTarget
+end
+
+local AimConnection=nil
+
+local function stopAim()
+	AimState.Enabled=false
+
+	if AimConnection then
+		AimConnection:Disconnect()
+		AimConnection=nil
+	end
+
+	if AimFOVCircle then
+		AimFOVCircle.Visible=false
+	end
+end
+
+local function startAim()
+	stopAim()
+
+	AimState.Enabled=true
+	AimFOVCircle.Visible=true
+
+	AimFOVCircle.Size=UDim2.fromOffset(
+		AimState.FOV * 2,
+		AimState.FOV * 2
+	)
+
+	AimConnection=RunService.RenderStepped:Connect(function()
+		if not AimState.Enabled then
+			return
+		end
+
+		AimFOVCircle.Position=UDim2.fromScale(0.5,0.5)
+
+		AimFOVCircle.Size=UDim2.fromOffset(
+			AimState.FOV * 2,
+			AimState.FOV * 2
+		)
+
+		local camera=workspace.CurrentCamera
+		if not camera then
+			return
+		end
+
+		local target=getAimTarget()
+		if not target then
+			return
+		end
+
+		local cameraPosition=camera.CFrame.Position
+		local targetPosition=target.Position
+
+		camera.CFrame=CFrame.lookAt(
+			cameraPosition,
+			targetPosition
+		)
+	end)
+end
+
+--========================================================
+-- ESP PLAYER - STABLE VERSION
+--========================================================
+
+local ESPState = {
+	Enabled = false,
+	TeamCheck = false,
+}
+
+local ESPObjects = {}
+local ESPConnections = {}
+
+local function safeDisconnect(connection)
+	if connection then
+		pcall(function()
+			connection:Disconnect()
+		end)
+	end
+end
+
+local function removeESP(targetPlayer)
+	local data = ESPObjects[targetPlayer]
+
+	if data then
+		if data.Highlight then
+			pcall(function()
+				data.Highlight:Destroy()
+			end)
+		end
+
+		if data.Billboard then
+			pcall(function()
+				data.Billboard:Destroy()
+			end)
+		end
+	end
+
+	ESPObjects[targetPlayer] = nil
+end
+
+local function createESP(targetPlayer)
+	if targetPlayer == player then
+		return false
+	end
+
+	local character = targetPlayer.Character
+
+	if not character or not character.Parent then
+		return false
+	end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local head = character:FindFirstChild("Head")
+
+	if not humanoid or humanoid.Health <= 0 or not head then
+		return false
+	end
+
+	removeESP(targetPlayer)
+
+	--====================================================
+	-- HIGHLIGHT
+	--====================================================
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "LPT_ESP_Highlight"
+	highlight.Adornee = character
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.FillColor = COLORS.Accent
+	highlight.FillTransparency = 0.65
+	highlight.OutlineColor = COLORS.AccentB
+	highlight.OutlineTransparency = 0
+	highlight.Parent = workspace
+
+	--====================================================
+	-- BILLBOARD
+	--====================================================
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "LPT_ESP_Info"
+	billboard.Adornee = head
+	billboard.Size = UDim2.fromOffset(220, 50)
+	billboard.StudsOffset = Vector3.new(0, 3.2, 0)
+	billboard.AlwaysOnTop = true
+	billboard.LightInfluence = 0
+	billboard.ResetOnSpawn = false
+	billboard.Parent = playerGui
+
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.new(1, 0, 0, 24)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = targetPlayer.DisplayName
+	nameLabel.TextColor3 = Color3.new(1, 1, 1)
+	nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+	nameLabel.TextStrokeTransparency = 0.3
+	nameLabel.TextSize = 16
+	nameLabel.Font = Enum.Font.GothamBold
+	nameLabel.TextXAlignment = Enum.TextXAlignment.Center
+	nameLabel.Parent = billboard
+
+	local distanceLabel = Instance.new("TextLabel")
+	distanceLabel.Size = UDim2.new(1, 0, 0, 20)
+	distanceLabel.Position = UDim2.fromOffset(0, 23)
+	distanceLabel.BackgroundTransparency = 1
+	distanceLabel.Text = "0 studs"
+	distanceLabel.TextColor3 = Color3.fromRGB(190, 190, 200)
+	distanceLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+	distanceLabel.TextStrokeTransparency = 0.3
+	distanceLabel.TextSize = 13
+	distanceLabel.Font = Enum.Font.GothamMedium
+	distanceLabel.TextXAlignment = Enum.TextXAlignment.Center
+	distanceLabel.Parent = billboard
+
+	ESPObjects[targetPlayer] = {
+		Character = character,
+		Head = head,
+		Highlight = highlight,
+		Billboard = billboard,
+		NameLabel = nameLabel,
+		DistanceLabel = distanceLabel,
+	}
+
+	return true
+end
+
+local function ensureESP(targetPlayer)
+	if targetPlayer == player then
+		return
+	end
+
+	if not ESPState.Enabled then
+		return
+	end
+
+	if ESPState.TeamCheck and targetPlayer.Team == player.Team then
+		removeESP(targetPlayer)
+		return
+	end
+
+	local character = targetPlayer.Character
+
+	if not character or not character.Parent then
+		removeESP(targetPlayer)
+		return
+	end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local head = character:FindFirstChild("Head")
+
+	if not humanoid or humanoid.Health <= 0 or not head then
+		removeESP(targetPlayer)
+		return
+	end
+
+	local data = ESPObjects[targetPlayer]
+	local needsRebuild = false
+
+	if not data then
+		needsRebuild = true
+	elseif data.Character ~= character then
+		needsRebuild = true
+	elseif not data.Highlight
+		or not data.Highlight.Parent
+		or data.Highlight.Adornee ~= character then
+		needsRebuild = true
+	elseif not data.Billboard
+		or not data.Billboard.Parent
+		or data.Billboard.Adornee ~= head then
+		needsRebuild = true
+	end
+
+	if needsRebuild then
+		createESP(targetPlayer)
+		data = ESPObjects[targetPlayer]
+	end
+
+	if not data then
+		return
+	end
+
+	if data.NameLabel and data.NameLabel.Parent then
+		data.NameLabel.Text = targetPlayer.DisplayName
+	end
+
+	local myCharacter = player.Character
+	local myRoot = myCharacter and myCharacter:FindFirstChild("HumanoidRootPart")
+
+	if myRoot and data.DistanceLabel and data.DistanceLabel.Parent then
+		local distance = (myRoot.Position - head.Position).Magnitude
+
+		data.DistanceLabel.Text = string.format(
+			"%d studs",
+			math.floor(distance + 0.5)
+		)
+	end
+end
+
+local function updateESP()
+	if not ESPState.Enabled then
+		return
+	end
+
+	for _, targetPlayer in ipairs(Players:GetPlayers()) do
+		if targetPlayer ~= player then
+			ensureESP(targetPlayer)
+		end
+	end
+end
+
+local function clearAllESP()
+	for targetPlayer in pairs(ESPObjects) do
+		removeESP(targetPlayer)
+	end
+end
+
+local function bindESPPlayer(targetPlayer)
+	if targetPlayer == player then
+		return
+	end
+
+	if ESPConnections[targetPlayer] then
+		for _, connection in pairs(ESPConnections[targetPlayer]) do
+			safeDisconnect(connection)
+		end
+	end
+
+	ESPConnections[targetPlayer] = {}
+
+	ESPConnections[targetPlayer].CharacterAdded = targetPlayer.CharacterAdded:Connect(function(character)
+		local humanoid = character:WaitForChild("Humanoid", 10)
+		local head = character:WaitForChild("Head", 10)
+
+		if humanoid and head then
+			task.wait(0.1)
+
+			if ESPState.Enabled then
+				ensureESP(targetPlayer)
+			end
+		end
+	end)
+
+	ESPConnections[targetPlayer].CharacterRemoving = targetPlayer.CharacterRemoving:Connect(function()
+		removeESP(targetPlayer)
+	end)
+
+	ESPConnections[targetPlayer].AncestryChanged = targetPlayer.AncestryChanged:Connect(function(_, parent)
+		if not parent then
+			removeESP(targetPlayer)
+		end
+	end)
+end
+
+-- Bind players that already exist
+for _, targetPlayer in ipairs(Players:GetPlayers()) do
+	if targetPlayer ~= player then
+		bindESPPlayer(targetPlayer)
+	end
+end
+
+-- Bind players joining later
+ESPConnections.PlayerAdded = Players.PlayerAdded:Connect(function(targetPlayer)
+	bindESPPlayer(targetPlayer)
+
+	task.defer(function()
+		if ESPState.Enabled and targetPlayer.Character then
+			ensureESP(targetPlayer)
+		end
+	end)
+end)
+
+-- Remove data when a player leaves
+ESPConnections.PlayerRemoving = Players.PlayerRemoving:Connect(function(targetPlayer)
+	removeESP(targetPlayer)
+
+	if ESPConnections[targetPlayer] then
+		for _, connection in pairs(ESPConnections[targetPlayer]) do
+			safeDisconnect(connection)
+		end
+
+		ESPConnections[targetPlayer] = nil
+	end
+end)
+
+-- Main ESP updater
+ESPConnections.RenderStepped = RunService.RenderStepped:Connect(function()
+	if ESPState.Enabled then
+		updateESP()
+	end
+end)
+
+local function setESPEnabled(enabled)
+	ESPState.Enabled = enabled == true
+
+	if ESPState.Enabled then
+		updateESP()
+	else
+		clearAllESP()
+	end
+end
+
+--========================================================
+-- AIM PAGE
+--========================================================
+
+local setESPPlayerUI=createToggle(
+	aimPage,
+	"ESP Player",
+	95,
+	function(enabled)
+		setESPEnabled(enabled)
+	end
+)
+
+local setAimEnabledUI=createToggle(
+	aimPage,
+	"Aim Assist",
+	161,
+	function(enabled)
+		AimState.Enabled=enabled
+
+		if enabled then
+			startAim()
+		else
+			stopAim()
+		end
+	end
+)
+
+local setTeamCheckUI=createToggle(
+	aimPage,
+	"Team Check",
+	227,
+	function(enabled)
+		AimState.TeamCheck=enabled
+		ESPState.TeamCheck=enabled
+
+		if ESPState.Enabled then
+			updateESP()
+		end
+	end
+)
+
+local setVisibleCheckUI=createToggle(
+	aimPage,
+	"Visible Check",
+	293,
+	function(enabled)
+		AimState.VisibleCheck=enabled
+	end
+)
+
+aimPage.CanvasSize=UDim2.new(0,0,0,370)
+
+--========================================================
 -- SETTINGS
 --========================================================
 
@@ -1325,7 +1846,7 @@ fixLag.MouseButton1Click:Connect(function()
 				changedEffects+=1
 			end
 
-			if object:IsA("Highlight") then
+			if object:IsA("Highlight") and object.Name ~= "LPT_ESP_Highlight" then
 				pcall(function()
 					object.Enabled=false
 					object.FillTransparency=1
@@ -1533,7 +2054,8 @@ end
 
 createSidebarButton("Information",1,"Information")
 createSidebarButton("Main",2,"Main")
-createSidebarButton("Settings",3,"Settings")
+createSidebarButton("Aim",3,"Aim")
+createSidebarButton("Settings",4,"Settings")
 
 selectPage("Information")
 
@@ -1777,6 +2299,22 @@ close.MouseButton1Click:Connect(function()
 
 	State.NoClip=false
 	restoreCollision()
+
+	clearAllESP()
+
+	for _,connection in pairs(ESPConnections) do
+		if typeof(connection)=="RBXScriptConnection" then
+			pcall(function()
+				connection:Disconnect()
+			end)
+		elseif type(connection)=="table" then
+			for _,subConnection in pairs(connection) do
+				safeDisconnect(subConnection)
+			end
+		end
+	end
+
+	table.clear(ESPConnections)
 
 	for name,connection in pairs(Connections) do
 		if connection then
