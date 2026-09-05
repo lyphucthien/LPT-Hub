@@ -4,6 +4,7 @@ local RunService=game:GetService("RunService")
 local TweenService=game:GetService("TweenService")
 local MarketplaceService=game:GetService("MarketplaceService")
 local HttpService=game:GetService("HttpService")
+local GuiService = game:GetService("GuiService")
 
 local player=Players.LocalPlayer
 local playerGui=player:WaitForChild("PlayerGui")
@@ -141,6 +142,36 @@ end
 local function getRoot()
 	local character=getCharacter()
 	return character and character:FindFirstChild("HumanoidRootPart")
+end
+
+local function getTargetPart(character)
+	if not character then
+		return nil
+	end
+
+	local candidates = {
+		"HumanoidRootPart",
+		"Head",
+		"UpperTorso",
+		"Torso",
+		"LowerTorso",
+	}
+
+	for _, name in ipairs(candidates) do
+		local part = character:FindFirstChild(name)
+
+		if part and part:IsA("BasePart") then
+			return part
+		end
+	end
+
+	for _, object in ipairs(character:GetChildren()) do
+		if object:IsA("BasePart") then
+			return object
+		end
+	end
+
+	return nil
 end
 
 --========================================================
@@ -1167,7 +1198,7 @@ local function getAimTarget()
 	local camera = workspace.CurrentCamera
 	if not camera then return nil end
 
-	local mousePosition = UserInputService:GetMouseLocation()
+	local mousePosition = UserInputService:GetMouseLocation() - GuiService:GetGuiInset()
 	local bestTarget = nil
 	local bestDistance = AimState.FOV
 
@@ -1185,14 +1216,14 @@ local function getAimTarget()
 			end
 
 			local humanoid = character:FindFirstChildOfClass("Humanoid")
-			local head = character:FindFirstChild("Head")
+			local targetPart = getTargetPart(character)
 
-			if not humanoid or humanoid.Health <= 0 or not head then
+			if not humanoid or humanoid.Health <= 0 or not targetPart then
 				continue
 			end
 
 			local screenPosition, onScreen =
-				camera:WorldToViewportPoint(head.Position)
+				camera:WorldToViewportPoint(targetPart.Position)
 
 			if not onScreen then
 				continue
@@ -1201,7 +1232,7 @@ local function getAimTarget()
 			-- VISIBLE CHECK
 			if AimState.VisibleCheck then
 				local origin = camera.CFrame.Position
-				local direction = head.Position - origin
+				local direction = targetPart.Position - origin
 
 				local rayParams = RaycastParams.new()
 				rayParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -1228,7 +1259,7 @@ local function getAimTarget()
 
 			if distance < bestDistance then
 				bestDistance = distance
-				bestTarget = head
+				bestTarget = targetPart
 			end
 		end
 	end
@@ -1295,316 +1326,486 @@ local function startAim()
 end
 
 --========================================================
--- ESP PLAYER - STABLE VERSION
+-- ESP PLAYER
 --========================================================
 
 local ESPState = {
-	Enabled = false,
-	TeamCheck = false,
+    Enabled = false,
+    TeamCheck = false,
 }
 
 local ESPObjects = {}
 local ESPConnections = {}
 
 local function safeDisconnect(connection)
-	if connection then
-		pcall(function()
-			connection:Disconnect()
-		end)
-	end
+    if connection then
+        pcall(function()
+            connection:Disconnect()
+        end)
+    end
+end
+
+local function safeDestroy(object)
+    if object then
+        pcall(function()
+            object:Destroy()
+        end)
+    end
+end
+
+local function getESPPart(character)
+    if not character then
+        return nil
+    end
+
+    -- Ưu tiên Head để Billboard ổn định hơn
+    local head = character:FindFirstChild("Head")
+    if head and head:IsA("BasePart") then
+        return head
+    end
+
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if hrp and hrp:IsA("BasePart") then
+        return hrp
+    end
+
+    for _, name in ipairs({
+        "UpperTorso",
+        "Torso",
+        "LowerTorso",
+    }) do
+        local part = character:FindFirstChild(name)
+        if part and part:IsA("BasePart") then
+            return part
+        end
+    end
+
+    return nil
 end
 
 local function removeESP(targetPlayer)
-	local data = ESPObjects[targetPlayer]
+    local data = ESPObjects[targetPlayer]
 
-	if data then
-		if data.Highlight then
-			pcall(function()
-				data.Highlight:Destroy()
-			end)
-		end
+    if data then
+        safeDestroy(data.Highlight)
+        safeDestroy(data.Billboard)
+    end
 
-		if data.Billboard then
-			pcall(function()
-				data.Billboard:Destroy()
-			end)
-		end
-	end
-
-	ESPObjects[targetPlayer] = nil
+    ESPObjects[targetPlayer] = nil
 end
 
 local function createESP(targetPlayer)
-	if targetPlayer == player then
-		return false
-	end
+    if targetPlayer == player then
+        return nil
+    end
 
-	local character = targetPlayer.Character
+    local character = targetPlayer.Character
+    if not character or not character.Parent then
+        return nil
+    end
 
-	if not character or not character.Parent then
-		return false
-	end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then
+        return nil
+    end
 
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	local head = character:FindFirstChild("Head")
+    local targetPart = getESPPart(character)
+    if not targetPart then
+        return nil
+    end
 
-	if not humanoid or humanoid.Health <= 0 or not head then
-		return false
-	end
+    removeESP(targetPlayer)
 
-	removeESP(targetPlayer)
+    --====================================================
+    -- HIGHLIGHT
+    --====================================================
 
-	--====================================================
-	-- HIGHLIGHT
-	--====================================================
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "LPT_ESP_Highlight"
+    highlight.Adornee = character
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.FillColor = COLORS.Accent
+    highlight.FillTransparency = 0.65
+    highlight.OutlineColor = COLORS.AccentB
+    highlight.OutlineTransparency = 0
+    highlight.Enabled = true
+    highlight.Parent = workspace
 
-	local highlight = Instance.new("Highlight")
-	highlight.Name = "LPT_ESP_Highlight"
-	highlight.Adornee = character
-	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.FillColor = COLORS.Accent
-	highlight.FillTransparency = 0.65
-	highlight.OutlineColor = COLORS.AccentB
-	highlight.OutlineTransparency = 0
-	highlight.Parent = workspace
+    --====================================================
+    -- BILLBOARD
+    --====================================================
 
-	--====================================================
-	-- BILLBOARD
-	--====================================================
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "LPT_ESP_Info"
+    billboard.Adornee = targetPart
+    billboard.Size = UDim2.fromOffset(220, 52)
+    billboard.StudsOffset = Vector3.new(0, 3.2, 0)
+    billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 1000000
+    billboard.LightInfluence = 0
+    billboard.ResetOnSpawn = false
+    billboard.Enabled = true
+    billboard.Parent = playerGui
 
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "LPT_ESP_Info"
-	billboard.Adornee = head
-	billboard.Size = UDim2.fromOffset(220, 50)
-	billboard.StudsOffset = Vector3.new(0, 3.2, 0)
-	billboard.AlwaysOnTop = true
-	billboard.LightInfluence = 0
-	billboard.ResetOnSpawn = false
-	billboard.Parent = playerGui
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Name = "Name"
+    nameLabel.Size = UDim2.new(1, 0, 0, 24)
+    nameLabel.Position = UDim2.fromOffset(0, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = targetPlayer.DisplayName
+    nameLabel.TextColor3 = Color3.new(1, 1, 1)
+    nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+    nameLabel.TextStrokeTransparency = 0.2
+    nameLabel.TextSize = 16
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Center
+    nameLabel.Parent = billboard
 
-	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Size = UDim2.new(1, 0, 0, 24)
-	nameLabel.BackgroundTransparency = 1
-	nameLabel.Text = targetPlayer.DisplayName
-	nameLabel.TextColor3 = Color3.new(1, 1, 1)
-	nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-	nameLabel.TextStrokeTransparency = 0.3
-	nameLabel.TextSize = 16
-	nameLabel.Font = Enum.Font.GothamBold
-	nameLabel.TextXAlignment = Enum.TextXAlignment.Center
-	nameLabel.Parent = billboard
+    local distanceLabel = Instance.new("TextLabel")
+    distanceLabel.Name = "Distance"
+    distanceLabel.Size = UDim2.new(1, 0, 0, 20)
+    distanceLabel.Position = UDim2.fromOffset(0, 25)
+    distanceLabel.BackgroundTransparency = 1
+    distanceLabel.Text = "0 m"
+    distanceLabel.TextColor3 = Color3.fromRGB(190, 190, 200)
+    distanceLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+    distanceLabel.TextStrokeTransparency = 0.2
+    distanceLabel.TextSize = 13
+    distanceLabel.Font = Enum.Font.GothamMedium
+    distanceLabel.TextXAlignment = Enum.TextXAlignment.Center
+    distanceLabel.Parent = billboard
 
-	local distanceLabel = Instance.new("TextLabel")
-	distanceLabel.Size = UDim2.new(1, 0, 0, 20)
-	distanceLabel.Position = UDim2.fromOffset(0, 23)
-	distanceLabel.BackgroundTransparency = 1
-	distanceLabel.Text = "0 studs"
-	distanceLabel.TextColor3 = Color3.fromRGB(190, 190, 200)
-	distanceLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-	distanceLabel.TextStrokeTransparency = 0.3
-	distanceLabel.TextSize = 13
-	distanceLabel.Font = Enum.Font.GothamMedium
-	distanceLabel.TextXAlignment = Enum.TextXAlignment.Center
-	distanceLabel.Parent = billboard
+    ESPObjects[targetPlayer] = {
+        Character = character,
+        TargetPart = targetPart,
 
-	ESPObjects[targetPlayer] = {
-		Character = character,
-		Head = head,
-		Highlight = highlight,
-		Billboard = billboard,
-		NameLabel = nameLabel,
-		DistanceLabel = distanceLabel,
-	}
+        Highlight = highlight,
+        Billboard = billboard,
 
-	return true
+        NameLabel = nameLabel,
+        DistanceLabel = distanceLabel,
+    }
+
+    return ESPObjects[targetPlayer]
 end
 
 local function ensureESP(targetPlayer)
-	if targetPlayer == player then
+    if targetPlayer == player then
+        return
+    end
+
+    if not ESPState.Enabled then
+        return
+    end
+
+    if ESPState.TeamCheck and targetPlayer.Team == player.Team then
+        removeESP(targetPlayer)
+        return
+    end
+
+    local character = targetPlayer.Character
+    if not character or not character.Parent then
+        removeESP(targetPlayer)
+        return
+    end
+
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then
 		return
 	end
 
-	if not ESPState.Enabled then
-		return
-	end
-
-	if ESPState.TeamCheck and targetPlayer.Team == player.Team then
+	if humanoid.Health <= 0 then
 		removeESP(targetPlayer)
 		return
 	end
 
-	local character = targetPlayer.Character
+    local targetPart = getESPPart(character)
+    if not targetPart then
+        removeESP(targetPlayer)
+        return
+    end
 
-	if not character or not character.Parent then
-		removeESP(targetPlayer)
-		return
-	end
+    local data = ESPObjects[targetPlayer]
 
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	local head = character:FindFirstChild("Head")
+    local needsRebuild = false
 
-	if not humanoid or humanoid.Health <= 0 or not head then
-		removeESP(targetPlayer)
-		return
-	end
+    if not data then
+        needsRebuild = true
 
-	local data = ESPObjects[targetPlayer]
-	local needsRebuild = false
+    elseif data.Character ~= character then
+        needsRebuild = true
 
-	if not data then
-		needsRebuild = true
-	elseif data.Character ~= character then
-		needsRebuild = true
 	elseif not data.Highlight
 		or not data.Highlight.Parent
+		or not data.Highlight.Enabled
 		or data.Highlight.Adornee ~= character then
+
 		needsRebuild = true
+
 	elseif not data.Billboard
 		or not data.Billboard.Parent
-		or data.Billboard.Adornee ~= head then
+		or not data.Billboard.Enabled
+		or data.Billboard.Adornee ~= targetPart then
+
 		needsRebuild = true
 	end
 
-	if needsRebuild then
-		createESP(targetPlayer)
-		data = ESPObjects[targetPlayer]
-	end
+    if needsRebuild then
+        data = createESP(targetPlayer)
+    end
 
-	if not data then
-		return
-	end
+    if not data then
+        return
+    end
 
-	if data.NameLabel and data.NameLabel.Parent then
-		data.NameLabel.Text = targetPlayer.DisplayName
-	end
+    if data.TargetPart ~= targetPart then
+        data.TargetPart = targetPart
 
-	local myCharacter = player.Character
-	local myRoot = myCharacter and myCharacter:FindFirstChild("HumanoidRootPart")
+        if data.Billboard and data.Billboard.Parent then
+            data.Billboard.Adornee = targetPart
+        end
+    end
 
-	if myRoot and data.DistanceLabel and data.DistanceLabel.Parent then
-		local distance = (myRoot.Position - head.Position).Magnitude
+    if data.NameLabel and data.NameLabel.Parent then
+        data.NameLabel.Text = targetPlayer.DisplayName
+    end
+end
 
-		data.DistanceLabel.Text = string.format(
-			"%d studs",
-			math.floor(distance + 0.5)
-		)
-	end
+--========================================================
+-- UPDATE DISTANCE
+--========================================================
+
+local function updateESPDistance()
+    if not ESPState.Enabled then
+        return
+    end
+
+    local myCharacter = player.Character
+    local myRoot = myCharacter and myCharacter:FindFirstChild("HumanoidRootPart")
+
+    if not myRoot then
+        return
+    end
+
+    for targetPlayer, data in pairs(ESPObjects) do
+        if not targetPlayer
+            or targetPlayer.Parent ~= Players
+            or not data
+            or not data.Character
+            or not data.Character.Parent then
+
+            removeESP(targetPlayer)
+            continue
+        end
+
+        local targetPart = data.TargetPart
+
+        if not targetPart or not targetPart.Parent then
+            local newPart = getESPPart(data.Character)
+
+            if newPart then
+                data.TargetPart = newPart
+
+                if data.Billboard and data.Billboard.Parent then
+                    data.Billboard.Adornee = newPart
+                end
+
+                targetPart = newPart
+            else
+                continue
+            end
+        end
+
+        if data.DistanceLabel and data.DistanceLabel.Parent then
+            local distance = (myRoot.Position - targetPart.Position).Magnitude
+
+            data.DistanceLabel.Text = string.format(
+                "%d m",
+                math.floor(distance + 0.5)
+            )
+        end
+    end
 end
 
 local function updateESP()
-	if not ESPState.Enabled then
-		return
-	end
+    if not ESPState.Enabled then
+        return
+    end
 
-	for _, targetPlayer in ipairs(Players:GetPlayers()) do
-		if targetPlayer ~= player then
-			ensureESP(targetPlayer)
-		end
-	end
+    for _, targetPlayer in ipairs(Players:GetPlayers()) do
+        if targetPlayer ~= player then
+            ensureESP(targetPlayer)
+        end
+    end
 end
 
 local function clearAllESP()
-	for targetPlayer in pairs(ESPObjects) do
-		removeESP(targetPlayer)
-	end
+    for targetPlayer in pairs(ESPObjects) do
+        removeESP(targetPlayer)
+    end
 end
 
 local function bindESPPlayer(targetPlayer)
-	if targetPlayer == player then
-		return
-	end
+    if targetPlayer == player then
+        return
+    end
 
-	if ESPConnections[targetPlayer] then
-		for _, connection in pairs(ESPConnections[targetPlayer]) do
-			safeDisconnect(connection)
-		end
-	end
+    if ESPConnections[targetPlayer] then
+        for _, connection in pairs(ESPConnections[targetPlayer]) do
+            safeDisconnect(connection)
+        end
+    end
 
-	ESPConnections[targetPlayer] = {}
+    ESPConnections[targetPlayer] = {}
 
-	ESPConnections[targetPlayer].CharacterAdded = targetPlayer.CharacterAdded:Connect(function(character)
-		local humanoid = character:WaitForChild("Humanoid", 10)
-		local head = character:WaitForChild("Head", 10)
+    ESPConnections[targetPlayer].CharacterAdded = targetPlayer.CharacterAdded:Connect(function(character)
 
-		if humanoid and head then
-			task.wait(0.1)
+            removeESP(targetPlayer)
 
-			if ESPState.Enabled then
-				ensureESP(targetPlayer)
-			end
-		end
-	end)
+            local humanoid = character:WaitForChild("Humanoid", 10)
 
-	ESPConnections[targetPlayer].CharacterRemoving = targetPlayer.CharacterRemoving:Connect(function()
-		removeESP(targetPlayer)
-	end)
+            if not humanoid then
+                return
+            end
 
-	ESPConnections[targetPlayer].AncestryChanged = targetPlayer.AncestryChanged:Connect(function(_, parent)
-		if not parent then
-			removeESP(targetPlayer)
-		end
-	end)
+            task.wait(0.15)
+
+            if ESPState.Enabled then
+                ensureESP(targetPlayer)
+            end
+        end)
+
+    ESPConnections[targetPlayer].CharacterRemoving = targetPlayer.CharacterRemoving:Connect(function()
+            removeESP(targetPlayer)
+        end)
+
+    ESPConnections[targetPlayer].AncestryChanged = targetPlayer.AncestryChanged:Connect(function(_, parent)
+
+            if not parent then
+                removeESP(targetPlayer)
+            end
+        end)
+
+    ESPConnections[targetPlayer].Team = targetPlayer:GetPropertyChangedSignal("Team"):Connect(function()
+
+            if ESPState.Enabled then
+                ensureESP(targetPlayer)
+            end
+        end)
+
+    ESPConnections[targetPlayer].DisplayName = targetPlayer:GetPropertyChangedSignal("DisplayName"):Connect(function()
+
+            local data = ESPObjects[targetPlayer]
+
+            if data
+                and data.NameLabel
+                and data.NameLabel.Parent then
+
+                data.NameLabel.Text = targetPlayer.DisplayName
+            end
+        end)
+
+	ESPConnections[targetPlayer].Health = targetPlayer.CharacterAdded:Connect(function(character)
+
+        local humanoid = character:WaitForChild("Humanoid", 10)
+
+        if humanoid then
+            ESPConnections[targetPlayer].HealthChanged =
+                humanoid.HealthChanged:Connect(function()
+
+                    if ESPState.Enabled then
+                        task.defer(function()
+                            ensureESP(targetPlayer)
+                        end)
+                    end
+
+                end)
+        end
+
+    end)
+
+    if targetPlayer.Character and ESPState.Enabled then
+        task.defer(function()
+            ensureESP(targetPlayer)
+        end)
+    end
 end
 
--- Bind players that already exist
 for _, targetPlayer in ipairs(Players:GetPlayers()) do
-	if targetPlayer ~= player then
-		bindESPPlayer(targetPlayer)
-	end
+    if targetPlayer ~= player then
+        bindESPPlayer(targetPlayer)
+    end
 end
 
--- Bind players joining later
 ESPConnections.PlayerAdded = Players.PlayerAdded:Connect(function(targetPlayer)
-	bindESPPlayer(targetPlayer)
 
-	task.defer(function()
-		if ESPState.Enabled and targetPlayer.Character then
-			ensureESP(targetPlayer)
-		end
-	end)
-end)
+        bindESPPlayer(targetPlayer)
 
--- Remove data when a player leaves
+        task.defer(function()
+            if ESPState.Enabled then
+                ensureESP(targetPlayer)
+            end
+        end)
+    end)
+
 ESPConnections.PlayerRemoving = Players.PlayerRemoving:Connect(function(targetPlayer)
-	removeESP(targetPlayer)
 
-	if ESPConnections[targetPlayer] then
-		for _, connection in pairs(ESPConnections[targetPlayer]) do
-			safeDisconnect(connection)
-		end
+        removeESP(targetPlayer)
 
-		ESPConnections[targetPlayer] = nil
-	end
-end)
+        if ESPConnections[targetPlayer] then
+            for _, connection in pairs(ESPConnections[targetPlayer]) do
+                safeDisconnect(connection)
+            end
 
--- Main ESP updater
-ESPConnections.RenderStepped = RunService.RenderStepped:Connect(function()
-	if ESPState.Enabled then
-		updateESP()
-	end
-end)
+            ESPConnections[targetPlayer] = nil
+        end
+    end)
+
+ESPConnections.DistanceUpdate = RunService.RenderStepped:Connect(function()
+
+        if not ESPState.Enabled then
+            return
+        end
+
+        updateESPDistance()
+    end)
+
+ESPConnections.Validation = task.spawn(function()
+
+        while screenGui and screenGui.Parent do
+            if ESPState.Enabled then
+                updateESP()
+            end
+
+            task.wait(0.35)
+        end
+    end)
+
+--========================================================
+-- ENABLE / DISABLE
+--========================================================
 
 local function setESPEnabled(enabled)
-	ESPState.Enabled = enabled == true
+    ESPState.Enabled = enabled == true
 
-	if ESPState.Enabled then
-		updateESP()
-	else
-		clearAllESP()
-	end
+    if ESPState.Enabled then
+        updateESP()
+    else
+        clearAllESP()
+    end
 end
 
 --========================================================
 -- AIM PAGE
 --========================================================
 
-local setESPPlayerUI=createToggle(
-	aimPage,
-	"ESP Player",
-	95,
-	function(enabled)
-		setESPEnabled(enabled)
-	end
+local setESPPlayerUI = createToggle(
+    aimPage,
+    "ESP Player",
+    95,
+    function(enabled)
+        setESPEnabled(enabled)
+    end
 )
 
 local setAimEnabledUI=createToggle(
