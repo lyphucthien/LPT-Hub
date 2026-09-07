@@ -6,18 +6,208 @@ local RunService=game:GetService("RunService")
 local player=Players.LocalPlayer
 local playerGui=player:WaitForChild("PlayerGui")
 
-local oldESPGui=playerGui:FindFirstChild("LPT_ESP_Screen")
-if oldESPGui then
-	oldESPGui:Destroy()
+local ESPModule=loadstring(game:HttpGet("https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/ESP.lua"))()
+local SettingsModule=loadstring(game:HttpGet("https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/Settings.lua"))()
+
+local HttpService=game:GetService("HttpService")
+
+--========================================================
+-- LPT HUB DATA
+--========================================================
+
+local CONFIG_FOLDER="LPT Hub"
+
+local function ensureLPTFolder()
+	if type(isfolder)~="function" or type(makefolder)~="function" then
+		return false
+	end
+
+	local success,exists=pcall(function()
+		return isfolder(CONFIG_FOLDER)
+	end)
+
+	if not success then
+		return false
+	end
+
+	if not exists then
+		pcall(function()
+			makefolder(CONFIG_FOLDER)
+		end)
+	end
+
+	local checkSuccess,folderExists=pcall(function()
+		return isfolder(CONFIG_FOLDER)
+	end)
+
+	return checkSuccess and folderExists
 end
 
-local espGui=Instance.new("ScreenGui")
-espGui.Name="LPT_ESP_Screen"
-espGui.ResetOnSpawn=false
-espGui.IgnoreGuiInset=true
-espGui.ZIndexBehavior=Enum.ZIndexBehavior.Global
-espGui.DisplayOrder=999999
-espGui.Parent=playerGui
+ensureLPTFolder()
+
+--========================================================
+-- FILE NAME
+--========================================================
+
+local function sanitizeFileName(name)
+	return tostring(name or "Unknown")
+		:gsub("[\\/:*?\"<>|]","_")
+		:gsub("[\r\n]","")
+		:gsub("%s+","_")
+end
+
+local playerName=sanitizeFileName(player.Name)
+local safeGameName="BloxFruits"
+
+local CONFIG_FILE=
+	CONFIG_FOLDER
+	.."/"
+	..playerName
+	.."-"
+	..safeGameName
+	..".json"
+
+--========================================================
+-- DEFAULT CONFIG
+--========================================================
+
+local DefaultConfig={
+	Island=false,
+	Fruit=false,
+	Player=false,
+
+	WhiteScreen=false,
+	BlackScreen=false,
+	RemoveNotifications=false,
+	BoostFPS=false
+}
+
+local Config={}
+
+local function deepCopy(tbl)
+	local result={}
+
+	for key,value in pairs(tbl) do
+		if type(value)=="table" then
+			result[key]=deepCopy(value)
+		else
+			result[key]=value
+		end
+	end
+
+	return result
+end
+
+Config=deepCopy(DefaultConfig)
+
+--========================================================
+-- LOAD CONFIG
+--========================================================
+
+local function loadConfig()
+
+	ensureLPTFolder()
+
+	if type(isfile)~="function" then
+		return
+	end
+
+	local exists=false
+
+	local checkSuccess,checkResult=pcall(function()
+		return isfile(CONFIG_FILE)
+	end)
+
+	if checkSuccess then
+		exists=checkResult
+	end
+
+	if not exists then
+		return
+	end
+
+	local success,data=pcall(function()
+		return readfile(CONFIG_FILE)
+	end)
+
+	if not success
+		or type(data)~="string"
+		or data=="" then
+
+		return
+	end
+
+	local decodeSuccess,decoded=pcall(function()
+		return HttpService:JSONDecode(data)
+	end)
+
+	if not decodeSuccess
+		or type(decoded)~="table" then
+
+		return
+	end
+
+	for key in pairs(DefaultConfig) do
+		if decoded[key]~=nil then
+			Config[key]=decoded[key]==true
+		end
+	end
+end
+
+--========================================================
+-- SAVE CONFIG
+--========================================================
+
+local saveQueued=false
+
+local function saveConfig()
+
+	if saveQueued then
+		return
+	end
+
+	saveQueued=true
+
+	task.delay(.1,function()
+
+		saveQueued=false
+
+		ensureLPTFolder()
+
+		if type(writefile)~="function" then
+			return
+		end
+
+		local success,json=pcall(function()
+			return HttpService:JSONEncode(Config)
+		end)
+
+		if not success then
+			warn(
+				"[LPT Hub] Config encode failed:",
+				json
+			)
+
+			return
+		end
+
+		local writeSuccess,writeError=pcall(function()
+			writefile(
+				CONFIG_FILE,
+				json
+			)
+		end)
+
+		if not writeSuccess then
+			warn(
+				"[LPT Hub] Config save failed:",
+				writeError
+			)
+		end
+	end)
+end
+
+loadConfig()
 
 local oldGui=playerGui:FindFirstChild("LPTHub")
 if oldGui then oldGui:Destroy() end
@@ -1556,6 +1746,12 @@ local espPage=createPage(
 	"ESP"
 )
 
+local settingsPage=createPage(
+	"Settings",
+	"Settings",
+	"General script settings and utilities."
+)
+
 --========================================================
 -- CARD / TOGGLE / CHECKBOX
 --========================================================
@@ -1592,146 +1788,216 @@ local function createCard(parent,text,y,height)
 	return frame
 end
 
-local function createToggle(parent,text,y,default,callback)
-	local row=createCard(parent,text,y,58)
+--========================================================
+-- UNIFIED TOGGLE / CHECKBOX
+--========================================================
 
-	local button=Instance.new("TextButton")
-	button.Size=UDim2.fromOffset(48,24)
-	button.Position=UDim2.new(1,-68,.5,-12)
-	button.BackgroundColor3=Color3.fromRGB(80,84,95)
-	button.BackgroundTransparency=.15
-	button.BorderSizePixel=0
-	button.Text=""
-	button.AutoButtonColor=false
-	button.Parent=row
+local function createUnifiedToggle(parent,text,y,default,callback)
+    local row=createCard(parent,text,y,58)
 
-	createCorner(button,50)
+    local toggleFrame=Instance.new("Frame")
+    toggleFrame.Name="ToggleButton"
+    toggleFrame.Size=UDim2.fromOffset(24,24)
+    toggleFrame.Position=UDim2.new(1,-48,.5,-12)
+    toggleFrame.BackgroundColor3=Color3.fromRGB(20,20,25)
+    toggleFrame.BorderSizePixel=0
+    toggleFrame.Parent=row
 
-	local knob=Instance.new("Frame")
-	knob.Size=UDim2.fromOffset(20,20)
-	knob.Position=UDim2.fromOffset(2,2)
-	knob.BackgroundColor3=Color3.fromRGB(225,227,232)
-	knob.BorderSizePixel=0
-	knob.Parent=button
+    createCorner(toggleFrame,4)
 
-	createCorner(knob,50)
+    local stroke=Instance.new("UIStroke")
+    stroke.Color=SIDEBAR_ACCENT
+    stroke.Thickness=2.5
+    stroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+    stroke.Parent=toggleFrame
 
-	local enabled=default==true
+    local fill=Instance.new("Frame")
+    fill.Name="Fill"
+    fill.AnchorPoint=Vector2.new(.5,.5)
+    fill.Position=UDim2.new(.5,0,.5,0)
+    fill.Size=UDim2.fromOffset(0,0)
+    fill.BackgroundColor3=SIDEBAR_ACCENT
+    fill.BorderSizePixel=0
+    fill.ZIndex=2
+    fill.Parent=toggleFrame
 
-	local function setEnabled(value,fire)
-		enabled=value==true
+    createCorner(fill,2)
 
-		tween(button,{
-			BackgroundColor3=enabled and SIDEBAR_ACCENT or Color3.fromRGB(80,84,95),
-			BackgroundTransparency=enabled and 0 or .15
-		},.18)
+    local clickButton=Instance.new("TextButton")
+    clickButton.Name="ClickButton"
+    clickButton.Size=UDim2.fromScale(1,1)
+    clickButton.BackgroundTransparency=1
+    clickButton.BorderSizePixel=0
+    clickButton.AutoButtonColor=false
+    clickButton.Text=""
+    clickButton.ZIndex=3
+    clickButton.Parent=toggleFrame
 
-		tween(knob,{
-			Position=enabled and UDim2.new(1,-22,0,2) or UDim2.fromOffset(2,2)
-		},.18)
+    local enabled=default==true
 
-		if fire~=false and callback then
-			callback(enabled)
-		end
-	end
+    local function updateVisual()
+        local goalSize=enabled
+            and UDim2.new(1,-4.8,1,-4.8)
+            or UDim2.fromOffset(0,0)
 
-	button.MouseButton1Click:Connect(function()
-		setEnabled(not enabled,true)
-	end)
+        tween(fill,{
+            Size=goalSize
+        },.18,Enum.EasingStyle.Quad)
+    end
 
-	setEnabled(enabled,false)
+    local function setEnabled(value,fire)
+        enabled=value==true
 
-	return setEnabled
+        updateVisual()
+
+        if fire~=false and callback then
+            callback(enabled)
+        end
+    end
+
+    clickButton.MouseButton1Click:Connect(function()
+        setEnabled(not enabled,true)
+    end)
+
+    clickButton.MouseEnter:Connect(function()
+        tween(stroke,{
+            Thickness=3
+        },.12)
+    end)
+
+    clickButton.MouseLeave:Connect(function()
+        tween(stroke,{
+            Thickness=2.5
+        },.12)
+    end)
+
+    setEnabled(enabled,false)
+
+    return setEnabled
 end
 
-local function createCheckbox(parent,text,y,default,callback)
-	local row=createCard(parent,text,y,58)
+local createToggle=createUnifiedToggle
+local createCheckbox=createUnifiedToggle
 
-	local button=Instance.new("TextButton")
-	button.Size=UDim2.fromOffset(28,28)
-	button.Position=UDim2.new(1,-48,.5,-14)
-	button.BackgroundColor3=COLORS.Card
-	button.BorderSizePixel=0
-	button.Text=""
-	button.AutoButtonColor=false
-	button.Parent=row
+createCheckbox(
+	espPage,
+	"ESP Island",
+	95,
+	Config.Island,
+	function(enabled)
+		Config.Island=enabled
 
-	createCorner(button,7)
-
-	-- Luôn có viền xanh dương ở cả trạng thái bật và tắt.
-	local stroke=createStroke(
-		button,
-		SIDEBAR_ACCENT,
-		0,
-		1.5
-	)
-
-	local check=Instance.new("TextLabel")
-	check.Size=UDim2.fromScale(1,1)
-	check.BackgroundTransparency=1
-	check.Text="✓"
-	check.Font=Enum.Font.GothamBold
-	check.TextSize=18
-	check.TextColor3=Color3.new(1,1,1)
-	check.TextTransparency=1
-	check.Visible=false
-	check.Parent=button
-
-	local enabled=default==true
-
-	local function setEnabled(value,fire)
-		enabled=value==true
-
-		if enabled then
-			tween(button,{
-				BackgroundColor3=SIDEBAR_ACCENT
-			},.15)
-
-			tween(stroke,{
-				Color=SIDEBAR_ACCENT,
-				Transparency=0
-			},.15)
-
-			check.Visible=true
-
-			tween(check,{
-				TextTransparency=0
-			},.12)
-		else
-			tween(button,{
-				BackgroundColor3=COLORS.Card
-			},.15)
-
-			tween(stroke,{
-				Color=SIDEBAR_ACCENT,
-				Transparency=0
-			},.15)
-
-			tween(check,{
-				TextTransparency=1
-			},.12)
-
-			task.delay(.12,function()
-				if not enabled then
-					check.Visible=false
-				end
-			end)
+		if ESPModule then
+			ESPModule:Set("Island",enabled)
 		end
 
-		if fire~=false and callback then
-			callback(enabled)
-		end
+		saveConfig()
 	end
+)
 
-	button.MouseButton1Click:Connect(function()
-		setEnabled(not enabled,true)
-	end)
+createCheckbox(
+	espPage,
+	"ESP Fruit",
+	161,
+	Config.Fruit,
+	function(enabled)
+		Config.Fruit=enabled
 
+		if ESPModule then
+			ESPModule:Set("Fruit",enabled)
+		end
 
-	setEnabled(enabled,false)
+		saveConfig()
+	end
+)
 
-	return setEnabled
-end
+createCheckbox(
+	espPage,
+	"ESP Player",
+	227,
+	Config.Player,
+	function(enabled)
+		Config.Player=enabled
+
+		if ESPModule then
+			ESPModule:Set("Player",enabled)
+		end
+
+		saveConfig()
+	end
+)
+
+espPage.CanvasSize=UDim2.fromOffset(0,300)
+
+--========================================================
+-- SETTINGS
+--========================================================
+
+createCheckbox(
+	settingsPage,
+	"White Screen",
+	95,
+	Config.WhiteScreen,
+	function(enabled)
+		Config.WhiteScreen=enabled
+
+		if SettingsModule then
+			SettingsModule:Set("WhiteScreen",enabled)
+		end
+
+		saveConfig()
+	end
+)
+
+createCheckbox(
+	settingsPage,
+	"Black Screen",
+	161,
+	Config.BlackScreen,
+	function(enabled)
+		Config.BlackScreen=enabled
+
+		if SettingsModule then
+			SettingsModule:Set("BlackScreen",enabled)
+		end
+
+		saveConfig()
+	end
+)
+
+createCheckbox(
+	settingsPage,
+	"Remove Notifications",
+	227,
+	Config.RemoveNotifications,
+	function(enabled)
+		Config.RemoveNotifications=enabled
+
+		if SettingsModule then
+			SettingsModule:Set("RemoveNotifications",enabled)
+		end
+
+		saveConfig()
+	end
+)
+
+createCheckbox(
+	settingsPage,
+	"Boost FPS",
+	293,
+	Config.BoostFPS,
+	function(enabled)
+		Config.BoostFPS=enabled
+
+		if SettingsModule then
+			SettingsModule:Set("BoostFPS",enabled)
+		end
+
+		saveConfig()
+	end
+)
+
+settingsPage.CanvasSize=UDim2.fromOffset(0,560)
 
 --========================================================
 -- PAGES CONTENT
@@ -1792,964 +2058,6 @@ createToggle(
 farmingPage.CanvasSize=UDim2.fromOffset(0,190)
 
 --========================================================
--- ESP SYSTEM
---========================================================
-
-local ESP={
-	Player=false,
-	Island=false,
-	Fruit=false,
-	Berry=false
-}
-
-local ESPObjects={}
-
-local ESP_COLORS={
-	Player=Color3.fromRGB(56,189,248),
-	Island=Color3.fromRGB(168,105,245),
-	Fruit=Color3.fromRGB(74,222,128),
-	Berry=Color3.fromRGB(236,72,153)
-}
-
-local function isFruitObject(object)
-	if not object or not object:IsA("Tool") then
-		return false
-	end
-
-	return string.find(
-		string.lower(object.Name),
-		"fruit",
-		1,
-		true
-	) ~= nil
-end
-
-local function getESPModelPart(object)
-	if not object or not object.Parent then
-		return nil
-	end
-
-	if object:IsA("BasePart") then
-		return object
-	end
-
-	if object:IsA("Model") then
-		return object:FindFirstChild("HumanoidRootPart",true)
-			or object:FindFirstChild("Head",true)
-			or object:FindFirstChild("Handle",true)
-			or object:FindFirstChild("RootPart",true)
-			or object.PrimaryPart
-			or object:FindFirstChildWhichIsA("BasePart",true)
-	end
-
-	return object:FindFirstChildWhichIsA("BasePart",true)
-end
-
-local function getESPAdornee(object)
-	if not object or not object.Parent then
-		return nil
-	end
-
-	if object:IsA("Model") then
-		return object
-	end
-
-	if object:IsA("BasePart") then
-		return object
-	end
-
-	return getESPModelPart(object)
-end
-
-local function getESPPosition(object)
-	local part=getESPModelPart(object)
-	return part and part.Position or nil
-end
-
-local function removeESP(object)
-	local data=ESPObjects[object]
-
-	if not data then
-		return
-	end
-
-	if data.highlight then
-		data.highlight:Destroy()
-	end
-
-	if data.label then
-		data.label:Destroy()
-	end
-
-	ESPObjects[object]=nil
-end
-
-local function clearESPType(typeName)
-	local toRemove={}
-
-	for object,data in pairs(ESPObjects) do
-		if data.type==typeName then
-			table.insert(toRemove,object)
-		end
-	end
-
-	for _,object in ipairs(toRemove) do
-		removeESP(object)
-	end
-end
-
---========================================================
--- CREATE ESP
---========================================================
-
-local function createESP(object,typeName,displayName)
-	if not object or not object.Parent then
-		return false
-	end
-
-	if not ESP[typeName] then
-		return false
-	end
-
-	if ESPObjects[object] then
-		return true
-	end
-
-	local adornee=getESPAdornee(object)
-	local worldPart=getESPModelPart(object)
-
-	if not adornee or not worldPart then
-		return false
-	end
-
-	local color=ESP_COLORS[typeName]
-
-	local highlight=nil
-
-	if typeName~="Island" then
-		highlight=Instance.new("Highlight")
-		highlight.Name="LPT_ESP_Highlight"
-		highlight.Adornee=adornee
-		highlight.FillColor=color
-		highlight.OutlineColor=color
-		highlight.FillTransparency=.78
-		highlight.OutlineTransparency=0
-		highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
-		highlight.Parent=object
-	end
-
-	local label=Instance.new("TextLabel")
-	label.Name="LPT_ESP_Label"
-	label.Size=UDim2.fromOffset(240,44)
-	label.AnchorPoint=Vector2.new(.5,.5)
-	label.BackgroundTransparency=1
-	label.Text=displayName or object.Name
-
-	label.TextColor3=typeName=="Island"
-		and Color3.fromRGB(255,255,255)
-		or color
-
-	label.TextStrokeColor3=Color3.new(0,0,0)
-	label.TextStrokeTransparency=.1
-	label.TextSize=15
-	label.Font=Enum.Font.GothamBold
-	label.TextXAlignment=Enum.TextXAlignment.Center
-	label.TextYAlignment=Enum.TextYAlignment.Center
-	label.Visible=false
-	label.ZIndex=100
-
-	label.Parent=espGui
-
-	ESPObjects[object]={
-		type=typeName,
-		highlight=highlight,
-		label=label,
-		worldPart=worldPart,
-		name=displayName or object.Name
-	}
-
-	return true
-end
-
---========================================================
--- WORLD FOLDER FINDER
---========================================================
-
-local WORLD_FOLDER_NAMES={
-	Berry={"Berries","Berry"},
-	Island={"Map"}
-}
-
-local function findWorldFolder(typeName)
-	local names=WORLD_FOLDER_NAMES[typeName]
-
-	if not names then
-		return nil
-	end
-
-	for _,name in ipairs(names) do
-		local direct=workspace:FindFirstChild(name)
-
-		if direct then
-			return direct
-		end
-	end
-
-	for _,name in ipairs(names) do
-		for _,object in ipairs(workspace:GetDescendants()) do
-			if object.Name==name
-				and (object:IsA("Folder") or object:IsA("Model")) then
-
-				return object
-			end
-		end
-	end
-
-	return nil
-end
-
---========================================================
--- ISLAND ESP
---========================================================
-
-local islandConnections={}
-
-local function scanIslandESP()
-	if not ESP.Island then
-		return
-	end
-
-	local map=workspace:FindFirstChild("Map")
-
-	if not map then
-		return
-	end
-
-	for _,island in ipairs(map:GetChildren()) do
-		if island:IsA("Model") then
-			createESP(
-				island,
-				"Island",
-				island.Name
-			)
-		end
-	end
-end
-
-local function setupIslandESPWatcher()
-	if islandConnections.setup then
-		return
-	end
-
-	local map=workspace:FindFirstChild("Map")
-
-	if not map then
-		return
-	end
-
-	islandConnections.setup=true
-
-	islandConnections.added=map.ChildAdded:Connect(function(object)
-		if not ESP.Island then
-			return
-		end
-
-		if object:IsA("Model") then
-			task.wait(.1)
-
-			if object.Parent and ESP.Island then
-				createESP(
-					object,
-					"Island",
-					object.Name
-				)
-			end
-		end
-	end)
-
-	islandConnections.removed=map.ChildRemoved:Connect(function(object)
-		removeESP(object)
-	end)
-end
-
-setupIslandESPWatcher()
-
---========================================================
--- FRUIT ESP
---========================================================
-
-local function scanFruitESP()
-	if not ESP.Fruit then
-		return
-	end
-
-	for _,object in ipairs(workspace:GetDescendants()) do
-		if isFruitObject(object) then
-			createESP(object,"Fruit",object.Name)
-		end
-	end
-end
-
---========================================================
--- PLAYER ESP
---========================================================
-
-local function addPlayerESP(target)
-	if target==player or not ESP.Player then
-		return
-	end
-
-	local character=target.Character
-	if not character or not character.Parent then
-		return
-	end
-
-	local humanoid=character:FindFirstChildOfClass("Humanoid")
-	if not humanoid or humanoid.Health<=0 then
-		return
-	end
-
-	for _=1,10 do
-		if getESPModelPart(character) then
-			break
-		end
-		task.wait(.1)
-	end
-
-	if ESP.Player and target.Parent and character.Parent then
-		createESP(character,"Player",target.DisplayName)
-	end
-end
-
-local function refreshPlayerESP()
-	clearESPType("Player")
-
-	if not ESP.Player then
-		return
-	end
-
-	for _,target in ipairs(Players:GetPlayers()) do
-		if target~=player then
-			task.spawn(addPlayerESP,target)
-		end
-	end
-end
-
---========================================================
--- BERRY ESP
---========================================================
-
-local BerryCache={}
-local BerryESPObjects={}
-
---========================================================
--- BERRY NAME READER
---========================================================
-
-local function getBerryNames(config)
-	local names={}
-
-	if not config then
-		return names
-	end
-
-	for i=1,4 do
-		local value=config:GetAttribute("_BerryCFrame"..i)
-
-		if typeof(value)=="string" and value~="" then
-			names[i]=value
-		end
-	end
-
-	return names
-end
-
---========================================================
--- CACHE BERRY BUSH
---========================================================
-
-local function cacheBerryBush(config)
-	if not config
-		or not config:IsA("Configuration")
-		or config.Name~="Berries" then
-		return
-	end
-
-	local bush=config.Parent
-
-	if not bush or not bush:IsA("Model") then
-		return
-	end
-
-	local entry=BerryCache[config]
-
-	if not entry then
-		entry={
-			config=config,
-			bush=bush,
-			slots={}
-		}
-
-		BerryCache[config]=entry
-	end
-
-	local bushCFrame=bush:GetPivot()
-
-	entry.bush=bush
-	entry.bushCFrame=bushCFrame
-
-	local names=getBerryNames(config)
-
-	-- Reset slot data để tránh dữ liệu cũ
-	entry.slots={}
-
-	for _,berry in ipairs(config:GetChildren()) do
-		if berry:IsA("Model") then
-
-			local berryCFrame=berry:GetPivot()
-
-			local relative=
-				bushCFrame:ToObjectSpace(
-					berryCFrame
-				)
-
-			local slotIndex=#entry.slots+1
-
-			if slotIndex<=4 then
-				entry.slots[slotIndex]={
-					name=names[slotIndex] or berry.Name or "Berry",
-					relative=relative
-				}
-			end
-		end
-	end
-end
-
---========================================================
--- SCAN BERRY CACHE
---========================================================
-
-local function scanBerryCache()
-	local map=workspace:FindFirstChild("Map")
-
-	if not map then
-		return
-	end
-
-	for _,object in ipairs(map:GetDescendants()) do
-		if object.Name=="Berries"
-			and object:IsA("Configuration") then
-
-			cacheBerryBush(object)
-		end
-	end
-end
-
---========================================================
--- CREATE BERRY ESP
---========================================================
-
-local function createBerryESP(id,position,name)
-	if not ESP.Berry then
-		return
-	end
-
-	local data=BerryESPObjects[id]
-
-	if not data then
-		local label=Instance.new("TextLabel")
-
-		label.Name="LPT_BerryESP_"..tostring(id)
-		label.Size=UDim2.fromOffset(240,28)
-		label.AnchorPoint=Vector2.new(.5,.5)
-		label.BackgroundTransparency=1
-		label.TextColor3=ESP_COLORS.Berry
-		label.TextStrokeColor3=Color3.new(0,0,0)
-		label.TextStrokeTransparency=.1
-		label.TextSize=15
-		label.Font=Enum.Font.GothamBold
-		label.TextXAlignment=Enum.TextXAlignment.Center
-		label.TextYAlignment=Enum.TextYAlignment.Center
-		label.Visible=false
-		label.ZIndex=100
-		label.Parent=espGui
-
-		data={
-			type="Berry",
-			label=label,
-			position=nil,
-			name="Berry"
-		}
-
-		BerryESPObjects[id]=data
-	end
-
-	data.position=position
-	data.name=name or "Berry"
-	data.label.Text=data.name
-end
-
---========================================================
--- CLEAR BERRY ESP
---========================================================
-
-local function clearBerryESP()
-	for _,data in pairs(BerryESPObjects) do
-		if data and data.label then
-			data.label:Destroy()
-		end
-	end
-
-	table.clear(BerryESPObjects)
-end
-
---========================================================
--- REFRESH BERRY ESP
---========================================================
-
-local function refreshBerryESP()
-	clearBerryESP()
-
-	if not ESP.Berry then
-		return
-	end
-
-	scanBerryCache()
-
-	local id=0
-
-	for _,entry in pairs(BerryCache) do
-		local bush=entry.bush
-
-		if bush and bush.Parent then
-			local bushCFrame=bush:GetPivot()
-
-			for _,slot in ipairs(entry.slots) do
-				if slot and slot.relative then
-
-					id+=1
-
-					local worldCFrame=
-						bushCFrame*slot.relative
-
-					createBerryESP(
-						id,
-						worldCFrame.Position,
-						slot.name or "Berry"
-					)
-				end
-			end
-		end
-	end
-end
-
---========================================================
--- BERRY LIVE UPDATE
---========================================================
-
-workspace.DescendantAdded:Connect(function(object)
-
-	if object.Name=="Berries"
-		and object:IsA("Configuration") then
-
-		task.defer(function()
-			if object.Parent then
-				cacheBerryBush(object)
-
-				if ESP.Berry then
-					refreshBerryESP()
-				end
-			end
-		end)
-
-		return
-	end
-
-	if object:IsA("Model") then
-
-		local parent=object.Parent
-
-		if parent
-			and parent.Name=="Berries"
-			and parent:IsA("Configuration") then
-
-			task.defer(function()
-				if parent.Parent then
-					cacheBerryBush(parent)
-
-					if ESP.Berry then
-						refreshBerryESP()
-					end
-				end
-			end)
-		end
-	end
-end)
-
-workspace.DescendantRemoving:Connect(function(object)
-
-	if not object then
-		return
-	end
-
-	if object:IsA("Configuration")
-		and object.Name=="Berries" then
-
-		BerryCache[object]=nil
-
-		if ESP.Berry then
-			task.defer(refreshBerryESP)
-		end
-
-		return
-	end
-
-	if object:IsA("Model") then
-		local parent=object.Parent
-
-		if parent
-			and parent:IsA("Configuration")
-			and parent.Name=="Berries" then
-
-			task.defer(function()
-
-				if parent.Parent then
-					cacheBerryBush(parent)
-				end
-
-				if ESP.Berry then
-					refreshBerryESP()
-				end
-			end)
-		end
-	end
-end)
-
---========================================================
--- WORLD ESP REFRESH
---========================================================
-
-local function refreshWorldESP()
-
-	-- Island / Fruit
-	clearESPType("Island")
-	clearESPType("Fruit")
-
-	-- Berry
-	if ESP.Berry then
-		refreshBerryESP()
-	else
-		clearBerryESP()
-	end
-
-	-- Island
-	if ESP.Island then
-		scanIslandESP()
-	end
-
-	-- Fruit
-	if ESP.Fruit then
-		scanFruitESP()
-	end
-end
-
---========================================================
--- FULL ESP REFRESH
---========================================================
-
-local function refreshESP()
-	refreshPlayerESP()
-	refreshWorldESP()
-end
-
---========================================================
--- SET ESP
---========================================================
-
-local function setESP(typeName,enabled)
-
-	ESP[typeName]=enabled==true
-
-	if typeName=="Player" then
-		refreshPlayerESP()
-	else
-		refreshWorldESP()
-	end
-end
-
---========================================================
--- ESP SCREEN UPDATE
--- Không bám mép màn hình
---========================================================
-
-RunService.RenderStepped:Connect(function()
-
-	local camera=workspace.CurrentCamera
-
-	if not camera then
-		return
-	end
-
-	local character=player.Character
-	local root=
-		character
-		and character:FindFirstChild("HumanoidRootPart")
-
-	if not root then
-		return
-	end
-
-	local toRemove={}
-
-	--====================================================
-	-- PLAYER / ISLAND / FRUIT
-	--====================================================
-
-	for object,data in pairs(ESPObjects) do
-
-		if not object
-			or not object.Parent
-			or not data.worldPart
-			or not data.worldPart.Parent
-			or not data.label
-			or not data.label.Parent then
-
-			table.insert(toRemove,object)
-			continue
-		end
-
-		local position=data.worldPart.Position
-
-		local distance=math.floor(
-			(root.Position-position).Magnitude+.5
-		)
-
-		local screenPosition,onScreen=
-			camera:WorldToViewportPoint(
-				position+Vector3.new(0,3,0)
-			)
-
-		-- Chỉ hiện trong màn hình.
-		-- Không clamp vào cạnh.
-		if onScreen and screenPosition.Z>0 then
-
-			data.label.Position=
-				UDim2.fromOffset(
-					screenPosition.X,
-					screenPosition.Y
-				)
-
-			data.label.Visible=true
-
-		else
-			data.label.Visible=false
-		end
-
-		--================================================
-		-- PLAYER TEXT
-		--================================================
-
-		if data.type=="Player" then
-
-			local targetPlayer=
-				Players:GetPlayerFromCharacter(object)
-
-			local humanoid=
-				targetPlayer
-				and targetPlayer.Character
-				and targetPlayer.Character:FindFirstChildOfClass("Humanoid")
-
-			local healthText="N/A / N/A"
-
-			if humanoid then
-				healthText=string.format(
-					"%d / %d",
-					math.max(
-						0,
-						math.floor(humanoid.Health+.5)
-					),
-					math.floor(humanoid.MaxHealth+.5)
-				)
-			end
-
-			data.label.Text=string.format(
-				"%s [%dm]\n%s",
-				data.name,
-				distance,
-				healthText
-			)
-
-		else
-
-			data.label.Text=string.format(
-				"%s [%dm]",
-				data.name,
-				distance
-			)
-
-		end
-	end
-
-	-- Xóa ESP object lỗi
-	for _,object in ipairs(toRemove) do
-		removeESP(object)
-	end
-
-	--====================================================
-	-- BERRY TEXT
-	--====================================================
-
-	if ESP.Berry then
-
-		for id,data in pairs(BerryESPObjects) do
-
-			if not data
-				or not data.label
-				or not data.label.Parent
-				or not data.position then
-
-				if data and data.label then
-					data.label:Destroy()
-				end
-
-				BerryESPObjects[id]=nil
-				continue
-			end
-
-			local position=data.position
-
-			local screenPosition,onScreen=
-				camera:WorldToViewportPoint(
-					position+Vector3.new(0,3,0)
-				)
-
-			if onScreen and screenPosition.Z>0 then
-
-				data.label.Position=
-					UDim2.fromOffset(
-						screenPosition.X,
-						screenPosition.Y
-					)
-
-				data.label.Visible=true
-
-				local distance=math.floor(
-					(root.Position-position).Magnitude+.5
-				)
-
-				data.label.Text=string.format(
-					"%s [%dm]",
-					data.name,
-					distance
-				)
-
-			else
-				data.label.Visible=false
-			end
-		end
-
-	else
-
-		for _,data in pairs(BerryESPObjects) do
-			if data.label then
-				data.label.Visible=false
-			end
-		end
-
-	end
-end)
-
---========================================================
--- PLAYER AUTO UPDATE
---========================================================
-
-local function watchESPPlayer(target)
-	if target==player then
-		return
-	end
-
-	target.CharacterAdded:Connect(function()
-		if ESP.Player then
-			task.spawn(function()
-				addPlayerESP(target)
-			end)
-		end
-	end)
-
-	target.CharacterRemoving:Connect(function(character)
-		removeESP(character)
-	end)
-end
-
-for _,target in ipairs(Players:GetPlayers()) do
-	watchESPPlayer(target)
-end
-
-Players.PlayerAdded:Connect(function(target)
-	watchESPPlayer(target)
-
-	if ESP.Player then
-		task.spawn(function()
-			addPlayerESP(target)
-		end)
-	end
-end)
-
-Players.PlayerRemoving:Connect(function(target)
-	if target.Character then
-		removeESP(target.Character)
-	end
-end)
-
---========================================================
--- ESP INITIAL SCAN
---========================================================
-
-refreshESP()
-
-createCheckbox(
-	espPage,
-	"ESP Berry",
-	60,
-	false,
-	function(enabled)
-		setESP("Berry",enabled)
-	end
-)
-
-createCheckbox(
-	espPage,
-	"ESP Island",
-	126,
-	false,
-	function(enabled)
-		setESP("Island",enabled)
-	end
-)
-
-createCheckbox(
-	espPage,
-	"ESP Fruit",
-	192,
-	false,
-	function(enabled)
-		setESP("Fruit",enabled)
-	end
-)
-
-createCheckbox(
-	espPage,
-	"ESP Player",
-	258,
-	false,
-	function(enabled)
-		setESP("Player",enabled)
-	end
-)
-
-espPage.CanvasSize=UDim2.fromOffset(0,325)
-
---========================================================
 -- SIDEBAR
 --========================================================
 
@@ -2760,7 +2068,8 @@ local menuItems={
 	{"Setting Farm","SettingFarm"},
 	{"Hold and Select Skill","HoldAndSelectSkill"},
 	{"Farming","Farming"},
-	{"ESP","ESP"}
+	{"ESP","ESP"},
+	{"Settings","Settings"}
 }
 
 local sidebarButtons={}
@@ -3046,26 +2355,24 @@ UserInputService.InputChanged:Connect(function(input)
 	)
 end)
 
---========================================================
--- CLOSE
---========================================================
-
-local function clearAllESP()
-	local objects={}
-
-	for object in pairs(ESPObjects) do
-		table.insert(objects,object)
-	end
-
-	for _,object in ipairs(objects) do
-		removeESP(object)
-	end
-end
-
 close.MouseButton1Click:Connect(function()
 	stopFarm()
-	clearAllESP()
-	gui:Destroy()
+
+	saveConfig()
+
+	if ESPModule then
+		ESPModule:Destroy()
+		ESPModule=nil
+	end
+
+	if SettingsModule then
+		SettingsModule:Destroy()
+		SettingsModule=nil
+	end
+
+	if gui and gui.Parent then
+		gui:Destroy()
+	end
 end)
 
 selectPage("Shop")
