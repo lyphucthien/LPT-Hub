@@ -89,13 +89,39 @@ end
 -- KEY FILE
 --============================================================
 
+local LPT_HUB_FOLDER="LPT Hub"
+local KEY_FILE=LPT_HUB_FOLDER.."/LPT_Hub_Key.json"
+
+local function ensureLPTFolder()
+	if type(isfolder)=="function" and type(makefolder)=="function" then
+		local ok,exists=pcall(function()
+			return isfolder(LPT_HUB_FOLDER)
+		end)
+
+		if ok and not exists then
+			pcall(function()
+				makefolder(LPT_HUB_FOLDER)
+			end)
+		end
+	end
+end
+
+ensureLPTFolder()
+
 local function getSavedKey()
-	if type(isfile)~="function" then return nil end
+	if type(isfile)~="function" then
+		return nil
+	end
+
+	ensureLPTFolder()
 
 	local ok,result=pcall(function()
-		if not isfile(KEY_FILE) then return nil end
+		if not isfile(KEY_FILE) then
+			return nil
+		end
 
 		local data=readfile(KEY_FILE)
+
 		if data and data~="" then
 			return tostring(data)
 		end
@@ -107,14 +133,15 @@ local function getSavedKey()
 end
 
 local function saveKey(key)
-	if type(writefile)~="function" then return end
+	if type(writefile)~="function" then
+		return
+	end
+
+	ensureLPTFolder()
+
 	pcall(function()
 		writefile(KEY_FILE,tostring(key))
 	end)
-end
-
-local function checkKey(key)
-	return VALID_KEYS[key]==true
 end
 
 --============================================================

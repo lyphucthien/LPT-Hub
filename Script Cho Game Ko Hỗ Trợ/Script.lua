@@ -21,6 +21,8 @@ local State={
 	JumpPowerEnabled=false,
 	NoClip=false,
 	Fly=false,
+	ESPPlayerEnabled=false,
+	AimEnabled=false,
 }
 
 local Connections={}
@@ -31,10 +33,34 @@ local FlyConnection=nil
 -- SETTINGS STORAGE
 --========================================================
 
-local SETTINGS_FILE="LPT_Hub_Settings.json"
+local LPT_HUB_FOLDER="LPT Hub"
+
+local function ensureLPTFolder()
+	if type(isfolder)~="function" or type(makefolder)~="function" then
+		return false
+	end
+
+	local ok,exists=pcall(function()
+		return isfolder(LPT_HUB_FOLDER)
+	end)
+
+	if ok and not exists then
+		pcall(function()
+			makefolder(LPT_HUB_FOLDER)
+		end)
+	end
+
+	return true
+end
+
+ensureLPTFolder()
+
+local SETTINGS_FILE=LPT_HUB_FOLDER.."/Universal.json"
 
 local function loadSettings()
 	if type(isfile)~="function" or type(readfile)~="function" then return end
+
+	ensureLPTFolder()
 
 	local ok,exists=pcall(function()
 		return isfile(SETTINGS_FILE)
@@ -54,7 +80,9 @@ local function loadSettings()
 	State.WalkSpeedEnabled=data.WalkSpeedEnabled==true
 	State.JumpPowerEnabled=data.JumpPowerEnabled==true
 	State.NoClip=data.NoClip==true
-	State.Fly=false
+	State.Fly=data.Fly==true
+	State.ESPPlayerEnabled=data.ESPPlayerEnabled==true
+	State.AimEnabled=data.AimEnabled==true
 end
 
 local function saveSettings()
@@ -67,7 +95,9 @@ local function saveSettings()
 		WalkSpeedEnabled=State.WalkSpeedEnabled,
 		JumpPowerEnabled=State.JumpPowerEnabled,
 		NoClip=State.NoClip,
-		Fly=false,
+		Fly=State.Fly,
+		ESPPlayerEnabled=State.ESPPlayerEnabled,
+		AimEnabled=State.AimEnabled,
 	}
 
 	pcall(function()
@@ -1229,11 +1259,15 @@ local setNoClipUI=createToggle(mainPage,"No Clip",227,function(enabled)
 end)
 
 local setFlyUI=createToggle(mainPage,"Fly",293,function(enabled)
+	State.Fly=enabled
+
 	if enabled then
 		startFly()
 	else
 		stopFly()
 	end
+
+	saveSettings()
 end)
 
 mainPage.CanvasSize=UDim2.new(0,0,0,420)
@@ -1883,25 +1917,31 @@ local setESPPlayerUI = createToggle(
     "ESP Player",
     95,
     function(enabled)
+        State.ESPPlayerEnabled=enabled
         setESPEnabled(enabled)
+        saveSettings()
     end
 )
 
 local setAimEnabledUI=createToggle(
 	aimPage,
-	"Aim Assist",
+	"Aim Bot",
 	161,
 	function(enabled)
+		State.AimEnabled=enabled
+
 		AimState.Enabled=enabled
+		AimState.VisibleCheck=enabled
 
 		if enabled then
 			startAim()
 		else
 			stopAim()
 		end
+
+		saveSettings()
 	end
 )
-
 local setTeamCheckUI=createToggle(
 	aimPage,
 	"Team Check",
@@ -1913,15 +1953,6 @@ local setTeamCheckUI=createToggle(
 		if ESPState.Enabled then
 			updateESP()
 		end
-	end
-)
-
-local setVisibleCheckUI=createToggle(
-	aimPage,
-	"Visible Check",
-	293,
-	function(enabled)
-		AimState.VisibleCheck=enabled
 	end
 )
 
@@ -2348,6 +2379,9 @@ task.defer(function()
 	setWalkSpeedUI(State.WalkSpeedEnabled,false)
 	setJumpPowerUI(State.JumpPowerEnabled,false)
 	setNoClipUI(State.NoClip,false)
+	setFlyUI(State.Fly,true)
+	setESPPlayerUI(State.ESPPlayerEnabled,true)
+	setAimEnabledUI(State.AimEnabled,true)
 
 	if State.NoClip then
 		rememberCollision(getCharacter())
