@@ -12,10 +12,6 @@ local playerGui=player:WaitForChild("PlayerGui")
 local GET_KEY_LINK="https://link4sub.com/owycAYxKdu"
 local KEY_FILE="LPT_Hub_Key.txt"
 
-local VALID_KEYS={
-	["LPT-HUB"]=true,
-}
-
 local UNIVERSAL_SCRIPT="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Script%20Cho%20Game%20Ko%20H%E1%BB%97%20Tr%E1%BB%A3/Script.lua"
 
 local GAME_HO_TRO={
@@ -1094,6 +1090,39 @@ local function loadMainUI()
 
 	keyFrame.Visible=false
 	State.Loading=false
+end
+
+--============================================================
+-- KEY VERIFICATION (LPT HUB)
+--============================================================
+
+local KEY_API_URL="https://lyphucthien.vercel.app/api/get-key"
+
+function checkKey(key)
+	if type(key)~="string" or key=="" then
+		return false
+	end
+
+	local ok,response=pcall(function()
+		return game:HttpGet(
+			KEY_API_URL.."?type=lpthub&key="..HttpService:UrlEncode(key)
+		)
+	end)
+
+	if not ok or not response then
+		showNotification("Server Error","Không kết nối được server xác thực.","error")
+		return false
+	end
+
+	local decodeOk,data=pcall(function()
+		return HttpService:JSONDecode(response)
+	end)
+
+	if not decodeOk or type(data)~="table" then
+		return false
+	end
+
+	return data.valid==true
 end
 
 --============================================================
