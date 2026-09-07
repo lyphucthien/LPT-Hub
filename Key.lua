@@ -1093,7 +1093,7 @@ local function loadMainUI()
 end
 
 --============================================================
--- KEY VERIFICATION (LPT HUB)
+-- KEY VERIFICATION
 --============================================================
 
 local KEY_API_URL="https://lyphucthien.vercel.app/api/get-key"
@@ -1104,9 +1104,7 @@ function checkKey(key)
 	end
 
 	local ok,response=pcall(function()
-		return game:HttpGet(
-			KEY_API_URL.."?type=lpthub&key="..HttpService:UrlEncode(key)
-		)
+		return game:HttpGet(KEY_API_URL.."?type=lpthub&key="..HttpService:UrlEncode(key))
 	end)
 
 	if not ok or not response then
