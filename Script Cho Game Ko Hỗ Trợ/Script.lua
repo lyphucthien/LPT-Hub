@@ -758,7 +758,8 @@ createPageTitle(aimPage,"Aim","Các thiết lập hỗ trợ ngắm.")
 -- TOGGLE
 --========================================================
 
-local function createToggle(parent,text,y,callback)
+local function createToggle(parent,text,y,callback,default)
+
 	local row=Instance.new("Frame")
 	row.Size=UDim2.new(1,-56,0,56)
 	row.Position=UDim2.fromOffset(28,y)
@@ -770,11 +771,11 @@ local function createToggle(parent,text,y,callback)
 	corner.CornerRadius=UDim.new(0,14)
 	corner.Parent=row
 
-	local stroke=Instance.new("UIStroke")
-	stroke.Color=COLORS.Border
-	stroke.Thickness=1
-	stroke.Transparency=.15
-	stroke.Parent=row
+	local rowStroke=Instance.new("UIStroke")
+	rowStroke.Color=COLORS.Border
+	rowStroke.Thickness=1
+	rowStroke.Transparency=.15
+	rowStroke.Parent=row
 
 	local label=Instance.new("TextLabel")
 	label.Size=UDim2.new(1,-90,1,0)
@@ -787,71 +788,149 @@ local function createToggle(parent,text,y,callback)
 	label.TextXAlignment=Enum.TextXAlignment.Left
 	label.Parent=row
 
-	local button=Instance.new("TextButton")
-	button.Name="Toggle"
-	button.Size=UDim2.fromOffset(50,26)
-	button.Position=UDim2.new(1,-68,.5,-13)
-	button.BackgroundColor3=Color3.fromRGB(120,120,125)
-	button.BackgroundTransparency=.35
-	button.BorderSizePixel=0
-	button.Text=""
-	button.AutoButtonColor=false
-	button.Parent=row
+	local toggleFrame=Instance.new("Frame")
+	toggleFrame.Name="ToggleButton"
+	toggleFrame.Size=UDim2.fromOffset(24,24)
+	toggleFrame.Position=UDim2.new(1,-48,.5,-12)
+	toggleFrame.BackgroundColor3=Color3.fromRGB(20,20,25)
+	toggleFrame.BorderSizePixel=0
+	toggleFrame.Parent=row
 
-	local buttonCorner=Instance.new("UICorner")
-	buttonCorner.CornerRadius=UDim.new(1,0)
-	buttonCorner.Parent=button
+	local toggleCorner=Instance.new("UICorner")
+	toggleCorner.CornerRadius=UDim.new(0,4)
+	toggleCorner.Parent=toggleFrame
 
-	local knob=Instance.new("Frame")
-	knob.Size=UDim2.fromOffset(22,22)
-	knob.Position=UDim2.fromOffset(3,2)
-	knob.BackgroundColor3=Color3.fromRGB(230,230,235)
-	knob.BorderSizePixel=0
-	knob.Parent=button
+	local toggleStroke=Instance.new("UIStroke")
+	toggleStroke.Color=Color3.fromRGB(70,140,255)
+	toggleStroke.Thickness=2.5
+	toggleStroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+	toggleStroke.Parent=toggleFrame
 
-	local knobCorner=Instance.new("UICorner")
-	knobCorner.CornerRadius=UDim.new(1,0)
-	knobCorner.Parent=knob
+	local fill=Instance.new("Frame")
+	fill.Name="Fill"
+	fill.AnchorPoint=Vector2.new(.5,.5)
+	fill.Position=UDim2.new(.5,0,.5,0)
+	fill.Size=UDim2.fromOffset(0,0)
+	fill.BackgroundColor3=Color3.fromRGB(70,140,255)
+	fill.BorderSizePixel=0
+	fill.ZIndex=2
+	fill.Parent=toggleFrame
 
-	local enabled=false
+	local fillCorner=Instance.new("UICorner")
+	fillCorner.CornerRadius=UDim.new(0,2)
+	fillCorner.Parent=fill
+
+	local clickButton=Instance.new("TextButton")
+	clickButton.Name="ClickButton"
+	clickButton.Size=UDim2.fromScale(1,1)
+	clickButton.BackgroundTransparency=1
+	clickButton.BorderSizePixel=0
+	clickButton.AutoButtonColor=false
+	clickButton.Text=""
+	clickButton.ZIndex=3
+	clickButton.Parent=toggleFrame
+
+	local enabled=default==true
+
+	local function updateVisual()
+
+		local goalSize
+
+		if enabled then
+			goalSize=UDim2.new(
+				1,-4.8,
+				1,-4.8
+			)
+		else
+			goalSize=UDim2.fromOffset(0,0)
+		end
+
+		tween(
+			fill,
+			{
+				Size=goalSize
+			},
+			.18,
+			Enum.EasingStyle.Quad
+		)
+
+	end
 
 	local function setEnabled(value,fire)
+
 		enabled=value==true
 
-		tween(button,{
-			BackgroundColor3=enabled and COLORS.Success or Color3.fromRGB(120,120,125),
-			BackgroundTransparency=enabled and 0 or .35
-		},.2)
-
-		tween(knob,{
-			Position=enabled and UDim2.new(1,-25,0,2) or UDim2.fromOffset(3,2),
-			BackgroundColor3=enabled and Color3.fromRGB(15,20,18) or Color3.fromRGB(230,230,235)
-		},.2)
+		updateVisual()
 
 		if fire~=false and callback then
 			callback(enabled)
 		end
+
 	end
 
-	button.MouseButton1Click:Connect(function()
-		setEnabled(not enabled,true)
+	clickButton.MouseButton1Click:Connect(function()
+
+		setEnabled(
+			not enabled,
+			true
+		)
+
 	end)
 
-	row.MouseEnter:Connect(function()
+	clickButton.MouseEnter:Connect(function()
+
+		tween(
+			toggleStroke,
+			{
+				Thickness=3
+			},
+			.12,
+			Enum.EasingStyle.Quad
+		)
+
 		if not enabled then
-			tween(row,{BackgroundColor3=COLORS.CardHover},.15)
+			tween(
+				row,
+				{
+					BackgroundColor3=COLORS.CardHover
+				},
+				.15,
+				Enum.EasingStyle.Quad
+			)
 		end
+
 	end)
 
-	row.MouseLeave:Connect(function()
+	clickButton.MouseLeave:Connect(function()
+
+		tween(
+			toggleStroke,
+			{
+				Thickness=2.5
+			},
+			.12,
+			Enum.EasingStyle.Quad
+		)
+
 		if not enabled then
-			tween(row,{BackgroundColor3=COLORS.Card},.15)
+			tween(
+				row,
+				{
+					BackgroundColor3=COLORS.Card
+				},
+				.15,
+				Enum.EasingStyle.Quad
+			)
 		end
+
 	end)
+
+	setEnabled(enabled,false)
 
 	return setEnabled,function()
 		return enabled
 	end
+
 end
 
 --========================================================
