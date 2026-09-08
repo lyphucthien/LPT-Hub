@@ -10,7 +10,6 @@ local playerGui=player:WaitForChild("PlayerGui")
 --============================================================
 
 local GET_KEY_LINK="https://link4sub.com/owycAYxKdu"
-local KEY_FILE="LPT_Hub_Key.txt"
 
 local UNIVERSAL_SCRIPT="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Script%20Cho%20Game%20Ko%20H%E1%BB%97%20Tr%E1%BB%A3/Script.lua"
 
@@ -21,6 +20,13 @@ local GAME_HO_TRO={
 		UniverseId={9584852943},
 		WaitForDataLoaded=false,
 		MainUI="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/%2B1%20Speed%20Keyboard%20Escape/MainUI.lua",
+	},
+	["Blox Fruits"]={
+		Name="Blox Fruits",
+		PlaceId={85211729168715},
+		UniverseId={994732206},
+		WaitForDataLoaded=false,
+		MainUI="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/Main.lua",
 	},
 }
 
