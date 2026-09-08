@@ -2,22 +2,46 @@ local Players=game:GetService("Players")
 local RunService=game:GetService("RunService")
 local Lighting=game:GetService("Lighting")
 local CoreGui=game:GetService("CoreGui")
+local HttpService=game:GetService("HttpService")
 
 local player=Players.LocalPlayer
 local playerGui=player:WaitForChild("PlayerGui")
 
 local SettingsModule={}
 
+--========================================================
+-- SETTINGS
+--========================================================
+
 local Settings={
 	WhiteScreen=false,
 	BlackScreen=false,
 	RemoveNotifications=false,
 	AutoLoadScript=false,
-	BoostFPS=false
+	BoostFPS=false,
+
+	-- WEBHOOK
+	WebhookURL="",
+	WebhookPing="",
+	WebhookPingEnabled=false,
+
+	WebhookNotiProfile=false,
+	WebhookStoreFruit=false,
+	WebhookFindPrehistoricIsland=false,
+	WebhookFindLeviathan=false,
+	WebhookDestroyIDK=false,
+	WebhookFindMirage=false,
+
+	-- Rarity tối thiểu
+	WebhookRarity="Common"
 }
 
 local Connections={}
 local CreatedObjects={}
+
+--========================================================
+-- HELPERS
+--========================================================
 
 local function disconnect(connection)
 	if connection then
@@ -47,6 +71,14 @@ local function destroyCreatedObjects()
 		destroyObject(object)
 		CreatedObjects[i]=nil
 	end
+end
+
+local function safeString(value,default)
+	if value==nil then
+		return default or ""
+	end
+
+	return tostring(value)
 end
 
 --========================================================
@@ -190,25 +222,24 @@ local function setRemoveNotifications(enabled)
 		hideNotifications(CoreGui)
 	end)
 
-	notificationConnection=
-		playerGui.DescendantAdded:Connect(function(object)
+	notificationConnection=playerGui.DescendantAdded:Connect(function(object)
 
-			if not Settings.RemoveNotifications then
-				return
+		if not Settings.RemoveNotifications then
+			return
+		end
+
+		if not object:IsA("GuiObject") then
+			return
+		end
+
+		for _,name in ipairs(notificationNames) do
+
+			if string.lower(object.Name)==string.lower(name) then
+				object.Visible=false
+				break
 			end
-
-			if not object:IsA("GuiObject") then
-				return
-			end
-
-			for _,name in ipairs(notificationNames) do
-
-				if string.lower(object.Name)==string.lower(name) then
-					object.Visible=false
-					break
-				end
-			end
-		end)
+		end
+	end)
 
 	table.insert(
 		Connections,
@@ -221,13 +252,11 @@ end
 --========================================================
 
 local originalLighting={
-
 	GlobalShadows=Lighting.GlobalShadows,
 	FogEnd=Lighting.FogEnd,
 	FogStart=Lighting.FogStart,
 	EnvironmentDiffuseScale=Lighting.EnvironmentDiffuseScale,
 	EnvironmentSpecularScale=Lighting.EnvironmentSpecularScale
-
 }
 
 local fpsConnection=nil
@@ -237,7 +266,6 @@ local function optimizeLighting()
 	pcall(function()
 
 		Lighting.GlobalShadows=false
-
 		Lighting.EnvironmentDiffuseScale=0
 		Lighting.EnvironmentSpecularScale=0
 
@@ -280,21 +308,19 @@ local function setBoostFPS(enabled)
 	end
 
 	if not Settings.BoostFPS then
-
 		restoreLighting()
 		return
 	end
 
 	optimizeLighting()
 
-	fpsConnection=
-		RunService.RenderStepped:Connect(function()
+	fpsConnection=RunService.RenderStepped:Connect(function()
 
-			if Settings.BoostFPS then
-				optimizeLighting()
-			end
+		if Settings.BoostFPS then
+			optimizeLighting()
+		end
 
-		end)
+	end)
 
 	table.insert(
 		Connections,
@@ -306,14 +332,484 @@ end
 -- AUTO LOAD SCRIPT
 --========================================================
 
+local AutoLoadCallback=nil
+
 local function setAutoLoadScript(enabled)
-
 	Settings.AutoLoadScript=enabled==true
+end
 
-	-- Chỉ lưu trạng thái.
-	-- Việc load script cụ thể có thể được
-	-- xử lý bởi Main.lua hoặc module riêng.
+function SettingsModule:RegisterAutoLoad(callback)
+	if type(callback)=="function" then
+		AutoLoadCallback=callback
+	end
+end
 
+function SettingsModule:RunAutoLoad()
+
+	if not Settings.AutoLoadScript then
+		return false
+	end
+
+	if type(AutoLoadCallback)~="function" then
+		return false
+	end
+
+	local success,result=pcall(AutoLoadCallback)
+
+	if not success then
+		warn("[LPT Settings] Auto Load failed:",result)
+		return false
+	end
+
+	return true
+end
+
+--========================================================
+-- WEBHOOK REQUEST
+--========================================================
+
+local function getRequestFunction()
+
+	if type(syn)=="table" and type(syn.request)=="function" then
+		return syn.request
+	end
+
+	if type(request)=="function" then
+		return request
+	end
+
+	if type(http_request)=="function" then
+		return http_request
+	end
+
+	if type(http)=="table" and type(http.request)=="function" then
+		return http.request
+	end
+
+	return nil
+end
+
+local function sendHttpRequest(url,body)
+
+	local requestFunction=getRequestFunction()
+
+	if not requestFunction then
+		return false,"Request function not available"
+	end
+
+	local success,response=pcall(function()
+		return requestFunction({
+			Url=url,
+			Method="POST",
+			Headers={
+				["Content-Type"]="application/json"
+			},
+			Body=body
+		})
+	end)
+
+	if not success then
+		return false,response
+	end
+
+	if type(response)=="table" then
+
+		local status=response.StatusCode
+
+		if status then
+			if status>=200 and status<300 then
+				return true,response
+			end
+
+			return false,"HTTP "..tostring(status)
+		end
+	end
+
+	return true,response
+end
+
+--========================================================
+-- WEBHOOK PING
+--========================================================
+
+local function getPingData()
+
+	if not Settings.WebhookPingEnabled then
+		return nil,nil
+	end
+
+	local ping=safeString(Settings.WebhookPing)
+
+	if ping=="" then
+		return nil,nil
+	end
+
+	local lower=string.lower(ping)
+
+	if lower=="everyone"
+		or lower=="@everyone" then
+
+		return "@everyone",{
+			parse={"everyone"}
+		}
+	end
+
+	local id=ping:match("(%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d)$")
+
+	if id then
+
+		return "<@"..id..">",{
+			users={id}
+		}
+	end
+
+	local mentionId=ping:match("<@!?([0-9]+)>")
+
+	if mentionId then
+
+		return "<@"..mentionId..">",{
+			users={mentionId}
+		}
+	end
+
+	return ping,nil
+end
+
+--========================================================
+-- SEND WEBHOOK
+--========================================================
+
+function SettingsModule:SendWebhook(title,description,fields)
+
+	if not Settings.WebhookURL
+		or Settings.WebhookURL=="" then
+
+		return false,"Webhook URL empty"
+	end
+
+	local ping,allowedMentions=getPingData()
+
+	local embed={
+		title=safeString(title,"LPT Hub"),
+		description=safeString(description,""),
+		color=5793266,
+		fields={},
+		footer={
+			text="LPT Hub • "..player.Name
+		},
+		timestamp=os.date("!%Y-%m-%dT%H:%M:%SZ")
+	}
+
+	if type(fields)=="table" then
+		for _,field in ipairs(fields) do
+			if type(field)=="table" then
+				table.insert(embed.fields,{
+					name=safeString(field.name,"Info"),
+					value=safeString(field.value,"N/A"),
+					inline=field.inline==true
+				})
+			end
+		end
+	end
+
+	local payload={
+		username="LPT Hub",
+		embeds={embed}
+	}
+
+	if ping then
+		payload.content=ping
+	end
+
+	if allowedMentions then
+		payload.allowed_mentions=allowedMentions
+	end
+
+	local success,json=pcall(function()
+		return HttpService:JSONEncode(payload)
+	end)
+
+	if not success then
+		return false,json
+	end
+
+	return sendHttpRequest(Settings.WebhookURL,json)
+end
+
+--========================================================
+-- RARITY
+--========================================================
+
+local rarityPower={
+	Common=1,
+	Uncommon=2,
+	Rare=3,
+	Legendary=4,
+	Mythical=5
+}
+
+function SettingsModule:IsRarityAllowed(rarity)
+
+	rarity=safeString(rarity,"Common")
+
+	local selected=Settings.WebhookRarity or "Common"
+
+	local fruitPower=rarityPower[rarity] or 1
+	local selectedPower=rarityPower[selected] or 1
+
+	return fruitPower>=selectedPower
+end
+
+function SettingsModule:SetRarity(rarity)
+
+	rarity=safeString(rarity,"Common")
+
+	if rarityPower[rarity] then
+		Settings.WebhookRarity=rarity
+		return true
+	end
+
+	return false
+end
+
+function SettingsModule:GetRarity()
+	return Settings.WebhookRarity
+end
+
+--========================================================
+-- PROFILE
+--========================================================
+
+function SettingsModule:NotifyProfile(data)
+
+	if not Settings.WebhookNotiProfile then
+		return false
+	end
+
+	data=data or {}
+
+	local name=safeString(data.Name,player.Name)
+	local level=safeString(data.Level,"Unknown")
+	local race=safeString(data.Race,"Unknown")
+	local bounty=safeString(data.Bounty,"Unknown")
+	local money=safeString(data.Money,"Unknown")
+
+	return self:SendWebhook(
+		"👤 Profile",
+		"Profile information detected.",
+		{
+			{
+				name="Player",
+				value=name,
+				inline=true
+			},
+			{
+				name="Level",
+				value=level,
+				inline=true
+			},
+			{
+				name="Race",
+				value=race,
+				inline=true
+			},
+			{
+				name="Bounty",
+				value=bounty,
+				inline=true
+			},
+			{
+				name="Money",
+				value=money,
+				inline=true
+			}
+		}
+	)
+end
+
+--========================================================
+-- STORE FRUIT
+--========================================================
+
+function SettingsModule:NotifyStoreFruit(data)
+
+	if not Settings.WebhookStoreFruit then
+		return false
+	end
+
+	data=data or {}
+
+	local fruitName=safeString(data.FruitName,data.Name)
+	local rarity=safeString(data.Rarity,"Common")
+	local location=safeString(data.Location,"Unknown")
+
+	if fruitName=="" then
+		fruitName="Unknown Fruit"
+	end
+
+	if not self:IsRarityAllowed(rarity) then
+		return false,"Rarity filtered"
+	end
+
+	return self:SendWebhook(
+		"🍎 Fruit Stored",
+		"A fruit matching your webhook filter was stored.",
+		{
+			{
+				name="Fruit",
+				value=fruitName,
+				inline=true
+			},
+			{
+				name="Rarity",
+				value=rarity,
+				inline=true
+			},
+			{
+				name="Location",
+				value=location,
+				inline=true
+			}
+		}
+	)
+end
+
+--========================================================
+-- PREHISTORIC ISLAND
+--========================================================
+
+function SettingsModule:NotifyPrehistoricIsland(data)
+
+	if not Settings.WebhookFindPrehistoricIsland then
+		return false
+	end
+
+	data=data or {}
+
+	local islandName=safeString(data.Name,"Prehistoric Island")
+	local location=safeString(data.Location,"Unknown")
+
+	return self:SendWebhook(
+		"🏝️ Prehistoric Island",
+		"Prehistoric Island detected.",
+		{
+			{
+				name="Island",
+				value=islandName,
+				inline=true
+			},
+			{
+				name="Location",
+				value=location,
+				inline=true
+			}
+		}
+	)
+end
+
+--========================================================
+-- LEVIATHAN
+--========================================================
+
+function SettingsModule:NotifyLeviathan(data)
+
+	if not Settings.WebhookFindLeviathan then
+		return false
+	end
+
+	data=data or {}
+
+	local name=safeString(data.Name,"Leviathan")
+	local location=safeString(data.Location,"Unknown")
+	local health=safeString(data.Health,"Unknown")
+
+	return self:SendWebhook(
+		"🐋 Leviathan",
+		"Leviathan detected.",
+		{
+			{
+				name="Target",
+				value=name,
+				inline=true
+			},
+			{
+				name="Health",
+				value=health,
+				inline=true
+			},
+			{
+				name="Location",
+				value=location,
+				inline=true
+			}
+		}
+	)
+end
+
+--========================================================
+-- DESTROY IDK
+--========================================================
+
+function SettingsModule:NotifyDestroyIDK(data)
+
+	if not Settings.WebhookDestroyIDK then
+		return false
+	end
+
+	data=data or {}
+
+	local name=safeString(data.Name,"Unknown")
+	local location=safeString(data.Location,"Unknown")
+
+	return self:SendWebhook(
+		"💥 Destroy IDK",
+		"Destroy IDK event detected.",
+		{
+			{
+				name="Object",
+				value=name,
+				inline=true
+			},
+			{
+				name="Location",
+				value=location,
+				inline=true
+			}
+		}
+	)
+end
+
+--========================================================
+-- MIRAGE
+--========================================================
+
+function SettingsModule:NotifyMirage(data)
+
+	if not Settings.WebhookFindMirage then
+		return false
+	end
+
+	data=data or {}
+
+	local name=safeString(data.Name,"Mirage Island")
+	local location=safeString(data.Location,"Unknown")
+
+	return self:SendWebhook(
+		"🌌 Mirage Island",
+		"Mirage Island detected.",
+		{
+			{
+				name="Island",
+				value=name,
+				inline=true
+			},
+			{
+				name="Location",
+				value=location,
+				inline=true
+			}
+		}
+	)
 end
 
 --========================================================
@@ -347,6 +843,11 @@ function SettingsModule:Set(name,enabled)
 		setBoostFPS(enabled)
 		return
 
+	elseif Settings[name]~=nil then
+
+		Settings[name]=enabled
+		return
+
 	end
 
 	warn(
@@ -375,6 +876,10 @@ function SettingsModule:GetAll()
 	return result
 end
 
+--========================================================
+-- DESTROY
+--========================================================
+
 function SettingsModule:Destroy()
 
 	Settings.WhiteScreen=false
@@ -382,6 +887,20 @@ function SettingsModule:Destroy()
 	Settings.RemoveNotifications=false
 	Settings.AutoLoadScript=false
 	Settings.BoostFPS=false
+
+	Settings.WebhookURL=""
+	Settings.WebhookPing=""
+	Settings.WebhookPingEnabled=false
+
+	Settings.WebhookNotiProfile=false
+	Settings.WebhookStoreFruit=false
+	Settings.WebhookFindPrehistoricIsland=false
+	Settings.WebhookFindLeviathan=false
+	Settings.WebhookDestroyIDK=false
+	Settings.WebhookFindMirage=false
+	Settings.WebhookRarity="Common"
+
+	AutoLoadCallback=nil
 
 	disconnectAll()
 
@@ -396,7 +915,6 @@ function SettingsModule:Destroy()
 	end
 
 	restoreLighting()
-
 	destroyCreatedObjects()
 
 	screenGui=nil
