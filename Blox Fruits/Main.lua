@@ -1807,91 +1807,100 @@ local function createCard(parent,text,y,height)
 end
 
 --========================================================
--- UNIFIED TOGGLE / CHECKBOX
+-- SHARED TOGGLE UI
 --========================================================
 
+local function createToggleUI(parent,default,callback)
+
+	local toggleFrame=Instance.new("Frame")
+	toggleFrame.Name="ToggleButton"
+	toggleFrame.Size=UDim2.fromOffset(24,24)
+	toggleFrame.Position=UDim2.new(1,-48,.5,-12)
+	toggleFrame.BackgroundColor3=Color3.fromRGB(20,20,25)
+	toggleFrame.BorderSizePixel=0
+	toggleFrame.Parent=parent
+
+	createCorner(toggleFrame,4)
+
+	local stroke=Instance.new("UIStroke")
+	stroke.Color=SIDEBAR_ACCENT
+	stroke.Thickness=2.5
+	stroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+	stroke.Parent=toggleFrame
+
+	local fill=Instance.new("Frame")
+	fill.Name="Fill"
+	fill.AnchorPoint=Vector2.new(.5,.5)
+	fill.Position=UDim2.new(.5,0,.5,0)
+	fill.Size=UDim2.fromOffset(0,0)
+	fill.BackgroundColor3=SIDEBAR_ACCENT
+	fill.BorderSizePixel=0
+	fill.ZIndex=2
+	fill.Parent=toggleFrame
+
+	createCorner(fill,2)
+
+	local clickButton=Instance.new("TextButton")
+	clickButton.Name="ClickButton"
+	clickButton.Size=UDim2.fromScale(1,1)
+	clickButton.BackgroundTransparency=1
+	clickButton.BorderSizePixel=0
+	clickButton.AutoButtonColor=false
+	clickButton.Text=""
+	clickButton.ZIndex=3
+	clickButton.Parent=toggleFrame
+
+	local enabled=default==true
+
+	local function updateVisual()
+
+		local goalSize=enabled and UDim2.new(1,-4.8,1,-4.8) or UDim2.fromOffset(0,0)
+
+		tween(fill,{Size=goalSize},.18,Enum.EasingStyle.Quad)
+
+	end
+
+	local function setEnabled(value,fire)
+
+		enabled=value==true
+
+		updateVisual()
+
+		if fire~=false and callback then
+			callback(enabled)
+		end
+
+	end
+
+	clickButton.MouseButton1Click:Connect(function()
+
+		setEnabled(not enabled,true)
+
+	end)
+
+	clickButton.MouseEnter:Connect(function()
+
+		tween(stroke,{Thickness=3},.12)
+
+	end)
+
+	clickButton.MouseLeave:Connect(function()
+
+		tween(stroke,{Thickness=2.5},.12)
+
+	end)
+
+	setEnabled(enabled,false)
+
+	return setEnabled
+end
+
 local function createUnifiedToggle(parent,text,y,default,callback)
-    local row=createCard(parent,text,y,58)
 
-    local toggleFrame=Instance.new("Frame")
-    toggleFrame.Name="ToggleButton"
-    toggleFrame.Size=UDim2.fromOffset(24,24)
-    toggleFrame.Position=UDim2.new(1,-48,.5,-12)
-    toggleFrame.BackgroundColor3=Color3.fromRGB(20,20,25)
-    toggleFrame.BorderSizePixel=0
-    toggleFrame.Parent=row
+	local row=createCard(parent,text,y,58)
 
-    createCorner(toggleFrame,4)
+	return createToggleUI(row,default,callback)
 
-    local stroke=Instance.new("UIStroke")
-    stroke.Color=SIDEBAR_ACCENT
-    stroke.Thickness=2.5
-    stroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
-    stroke.Parent=toggleFrame
-
-    local fill=Instance.new("Frame")
-    fill.Name="Fill"
-    fill.AnchorPoint=Vector2.new(.5,.5)
-    fill.Position=UDim2.new(.5,0,.5,0)
-    fill.Size=UDim2.fromOffset(0,0)
-    fill.BackgroundColor3=SIDEBAR_ACCENT
-    fill.BorderSizePixel=0
-    fill.ZIndex=2
-    fill.Parent=toggleFrame
-
-    createCorner(fill,2)
-
-    local clickButton=Instance.new("TextButton")
-    clickButton.Name="ClickButton"
-    clickButton.Size=UDim2.fromScale(1,1)
-    clickButton.BackgroundTransparency=1
-    clickButton.BorderSizePixel=0
-    clickButton.AutoButtonColor=false
-    clickButton.Text=""
-    clickButton.ZIndex=3
-    clickButton.Parent=toggleFrame
-
-    local enabled=default==true
-
-    local function updateVisual()
-        local goalSize=enabled
-            and UDim2.new(1,-4.8,1,-4.8)
-            or UDim2.fromOffset(0,0)
-
-        tween(fill,{
-            Size=goalSize
-        },.18,Enum.EasingStyle.Quad)
-    end
-
-    local function setEnabled(value,fire)
-        enabled=value==true
-
-        updateVisual()
-
-        if fire~=false and callback then
-            callback(enabled)
-        end
-    end
-
-    clickButton.MouseButton1Click:Connect(function()
-        setEnabled(not enabled,true)
-    end)
-
-    clickButton.MouseEnter:Connect(function()
-        tween(stroke,{
-            Thickness=3
-        },.12)
-    end)
-
-    clickButton.MouseLeave:Connect(function()
-        tween(stroke,{
-            Thickness=2.5
-        },.12)
-    end)
-
-    setEnabled(enabled,false)
-
-    return setEnabled
 end
 
 local createToggle=createUnifiedToggle
@@ -2038,7 +2047,7 @@ settingsPage.CanvasSize=UDim2.fromOffset(0,560)
 -- WEBHOOK
 --========================================================
 
-local function createInputCard(parent,text,y,value,callback)
+local function createInputCard(parent,text,y,value,callback,showToggle,toggleDefault,toggleCallback)
 
 	local card=Instance.new("Frame")
 	card.Size=UDim2.new(1,-56,0,72)
@@ -2050,18 +2059,26 @@ local function createInputCard(parent,text,y,value,callback)
 	createCorner(card,14)
 	createStroke(card,COLORS.Border,.15,1)
 
+	--====================================================
+	-- TITLE
+	--====================================================
+
 	createLabel(
 		card,
 		text,
-		UDim2.new(1,-24,0,24),
+		UDim2.new(1,-60,0,24),
 		UDim2.fromOffset(12,3),
 		Enum.Font.GothamBold,
 		13,
 		COLORS.Text
 	)
 
+	--====================================================
+	-- INPUT
+	--====================================================
+
 	local input=Instance.new("TextBox")
-	input.Size=UDim2.new(1,-24,0,27)
+	input.Size=UDim2.new(1,showToggle and -70 or -24,0,27)
 	input.Position=UDim2.fromOffset(12,32)
 	input.BackgroundColor3=Color3.fromRGB(29,30,38)
 	input.BorderSizePixel=0
@@ -2084,6 +2101,91 @@ local function createInputCard(parent,text,y,value,callback)
 		end
 	end)
 
+	--====================================================
+	-- CHECKBOX
+	--====================================================
+
+	if showToggle then
+
+		local toggleFrame=Instance.new("Frame")
+		toggleFrame.Name="ToggleButton"
+		toggleFrame.Size=UDim2.fromOffset(24,24)
+		toggleFrame.Position=UDim2.new(1,-48,.5,-12)
+		toggleFrame.BackgroundColor3=Color3.fromRGB(20,20,25)
+		toggleFrame.BorderSizePixel=0
+		toggleFrame.Parent=card
+
+		createCorner(toggleFrame,4)
+
+		local stroke=Instance.new("UIStroke")
+		stroke.Color=SIDEBAR_ACCENT
+		stroke.Thickness=2.5
+		stroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+		stroke.Parent=toggleFrame
+
+		local fill=Instance.new("Frame")
+		fill.Name="Fill"
+		fill.AnchorPoint=Vector2.new(.5,.5)
+		fill.Position=UDim2.new(.5,0,.5,0)
+		fill.Size=UDim2.fromOffset(0,0)
+		fill.BackgroundColor3=SIDEBAR_ACCENT
+		fill.BorderSizePixel=0
+		fill.ZIndex=2
+		fill.Parent=toggleFrame
+
+		createCorner(fill,2)
+
+		local clickButton=Instance.new("TextButton")
+		clickButton.Name="ClickButton"
+		clickButton.Size=UDim2.fromScale(1,1)
+		clickButton.BackgroundTransparency=1
+		clickButton.BorderSizePixel=0
+		clickButton.AutoButtonColor=false
+		clickButton.Text=""
+		clickButton.ZIndex=3
+		clickButton.Parent=toggleFrame
+
+		local enabled=toggleDefault==true
+
+		local function updateVisual()
+			local goalSize=enabled
+				and UDim2.new(1,-4.8,1,-4.8)
+				or UDim2.fromOffset(0,0)
+
+			tween(
+				fill,
+				{Size=goalSize},
+				.18,
+				Enum.EasingStyle.Quad
+			)
+		end
+
+		clickButton.MouseButton1Click:Connect(function()
+
+			enabled=not enabled
+
+			updateVisual()
+
+			if toggleCallback then
+				toggleCallback(enabled)
+			end
+		end)
+
+		clickButton.MouseEnter:Connect(function()
+			tween(stroke,{
+				Thickness=3
+			},.12)
+		end)
+
+		clickButton.MouseLeave:Connect(function()
+			tween(stroke,{
+				Thickness=2.5
+			},.12)
+		end)
+
+		updateVisual()
+	end
+
 	return input
 end
 
@@ -2100,19 +2202,14 @@ local webhookUrlInput=createInputCard(
 
 local webhookPingInput=createInputCard(
 	settingsPage,
-	"Input Discord Ping (Everyone/ID)",
+	"Input Discord Ping (Everyone/ID Role)",
 	505,
 	Config.WebhookPing,
 	function(text)
 		Config.WebhookPing=text
 		saveConfig()
-	end
-)
-
-createCheckbox(
-	settingsPage,
-	"Ping Everyone/Id Discord",
-	585,
+	end,
+	true,
 	Config.WebhookPingEnabled,
 	function(enabled)
 		Config.WebhookPingEnabled=enabled
@@ -2123,7 +2220,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Noti Profile",
-	651,
+	585,
 	Config.WebhookNotiProfile,
 	function(enabled)
 		Config.WebhookNotiProfile=enabled
@@ -2137,7 +2234,7 @@ createCheckbox(
 
 local rarityCard=createCard(
 	settingsPage,
-	"Select Rarity Fruit:                         ›",
+	"Select Rarity Fruit:                                ›",
 	717,
 	58
 )
@@ -2197,7 +2294,7 @@ end
 createCheckbox(
 	settingsPage,
 	"Webhook Store Fruit",
-	783,
+	651,
 	Config.WebhookStoreFruit,
 	function(enabled)
 		Config.WebhookStoreFruit=enabled
@@ -2208,7 +2305,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Webhook Find Prehistoric Island",
-	849,
+	783,
 	Config.WebhookFindPrehistoricIsland,
 	function(enabled)
 		Config.WebhookFindPrehistoricIsland=enabled
@@ -2219,7 +2316,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Webhook Find Leviathan",
-	915,
+	849,
 	Config.WebhookFindLeviathan,
 	function(enabled)
 		Config.WebhookFindLeviathan=enabled
@@ -2230,7 +2327,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Webhook Destroy IDK",
-	981,
+	915,
 	Config.WebhookDestroyIDK,
 	function(enabled)
 		Config.WebhookDestroyIDK=enabled
@@ -2241,7 +2338,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Webhook Find Mirage",
-	1047,
+	981,
 	Config.WebhookFindMirage,
 	function(enabled)
 		Config.WebhookFindMirage=enabled
