@@ -222,46 +222,10 @@ end
 
 loadConfig()
 
---========================================================
--- AUTO LOAD SCRIPT
---========================================================
-
-local function setupAutoLoad()
-
-	if not Config.AutoLoadScript then
-		return
-	end
-
-	local queueFunc =
-		(type(queue_on_teleport)=="function" and queue_on_teleport)
-		or (type(queueonteleport)=="function" and queueonteleport)
-		or (syn and type(syn.queue_on_teleport)=="function" and syn.queue_on_teleport)
-
-	if not queueFunc then
-		warn("[LPT Hub] queue_on_teleport is not supported")
-		return
-	end
-
-	local scriptURL="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Key.lua"
-
-	local code=
-	[[task.wait(2)
-
-		local success,err=pcall(function()
-			loadstring(game:HttpGet("]]..scriptURL..[["))()
-		end)
-
-		if not success then
-			warn("[LPT Hub] Auto Load failed:",err)
-		end
-	]]
-
-	pcall(function()
-		queueFunc(code)
-	end)
-end
-
-setupAutoLoad()
+SettingsModule:Set(
+	"AutoLoadScript",
+	Config.AutoLoadScript
+)
 
 local oldGui=playerGui:FindFirstChild("LPTHub")
 if oldGui then oldGui:Destroy() end
@@ -2049,10 +2013,6 @@ createCheckbox(
 		end
 
 		saveConfig()
-
-		if enabled then
-			setupAutoLoad()
-		end
 	end
 )
 
