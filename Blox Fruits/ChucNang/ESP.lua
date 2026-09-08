@@ -78,41 +78,9 @@ local function getHumanoidFrom(object)
 		or object:FindFirstChildWhichIsA("Humanoid", true)
 end
 
-local function isAlive(object)
-	if not object or not object.Parent then
-		return false
-	end
-
-	local humanoid = getHumanoidFrom(object)
-
-	return humanoid
-		and humanoid.Health > 0
-end
-
 --========================================================
 -- WORLD ROOT
 --========================================================
-
-local function getRoot(object)
-	if not object then
-		return nil
-	end
-
-	if object:IsA("BasePart") then
-		return object
-	end
-
-	if object:IsA("Model") then
-		return object:FindFirstChild("HumanoidRootPart", true)
-			or object:FindFirstChild("Head", true)
-			or object:FindFirstChild("Handle", true)
-			or object:FindFirstChild("RootPart", true)
-			or object.PrimaryPart
-			or object:FindFirstChildWhichIsA("BasePart", true)
-	end
-
-	return object:FindFirstChildWhichIsA("BasePart", true)
-end
 
 local function getESPModelPart(object)
 	if not object or not object.Parent then
@@ -836,18 +804,6 @@ renderConnection =
 			--============================================
 			-- WORLD PART UPDATE
 			--============================================
-
-			if data.Type == "Player" then
-
-				local character = object
-
-				if character ~= data.Character
-					and data.Character then
-
-					data.Character = character
-				end
-
-			end
 
 			local worldPart = data.WorldPart
 

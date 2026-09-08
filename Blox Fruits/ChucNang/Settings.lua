@@ -32,7 +32,6 @@ local Settings={
 	WebhookDestroyIDK=false,
 	WebhookFindMirage=false,
 
-	-- Rarity tối thiểu
 	WebhookRarity="Common"
 }
 
@@ -332,36 +331,71 @@ end
 -- AUTO LOAD SCRIPT
 --========================================================
 
-local AutoLoadCallback=nil
+local AUTO_LOAD_URL="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/Key.lua"
 
-local function setAutoLoadScript(enabled)
-	Settings.AutoLoadScript=enabled==true
+local function getQueueFunction()
+
+	if type(queue_on_teleport)=="function" then
+		return queue_on_teleport
+	end
+
+	if type(queueonteleport)=="function" then
+		return queueonteleport
+	end
+
+	if type(syn)=="table"
+		and type(syn.queue_on_teleport)=="function" then
+
+		return syn.queue_on_teleport
+	end
+
+	return nil
 end
 
-function SettingsModule:RegisterAutoLoad(callback)
-	if type(callback)=="function" then
-		AutoLoadCallback=callback
-	end
-end
+function SettingsModule:SetupAutoLoad()
 
-function SettingsModule:RunAutoLoad()
-
-	if not Settings.AutoLoadScript then
-		return false
+	if Settings.AutoLoadScript~=true then
+		return false,"Disabled"
 	end
 
-	if type(AutoLoadCallback)~="function" then
-		return false
+	local queueFunction=getQueueFunction()
+
+	if not queueFunction then
+		warn("[LPT Settings] queue_on_teleport is not supported")
+		return false,"Unsupported"
 	end
 
-	local success,result=pcall(AutoLoadCallback)
+	local code=[[
+		task.wait(2)
+
+		local success,err=pcall(function()
+			loadstring(game:HttpGet("]]..AUTO_LOAD_URL..[["))()
+		end)
+
+		if not success then
+			warn("[LPT Settings] Auto Load failed:",err)
+		end
+	]]
+
+	local success,err=pcall(function()
+		queueFunction(code)
+	end)
 
 	if not success then
-		warn("[LPT Settings] Auto Load failed:",result)
-		return false
+		warn("[LPT Settings] Auto Load queue failed:",err)
+		return false,err
 	end
 
 	return true
+end
+
+local function setAutoLoadScript(enabled)
+
+	Settings.AutoLoadScript=enabled==true
+
+	if Settings.AutoLoadScript then
+		SettingsModule:SetupAutoLoad()
+	end
 end
 
 --========================================================
@@ -454,7 +488,7 @@ local function getPingData()
 		}
 	end
 
-	local id=ping:match("(%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d)$")
+	local id=ping:match("^%d+$")
 
 	if id then
 
@@ -900,19 +934,10 @@ function SettingsModule:Destroy()
 	Settings.WebhookFindMirage=false
 	Settings.WebhookRarity="Common"
 
-	AutoLoadCallback=nil
-
 	disconnectAll()
 
-	if notificationConnection then
-		disconnect(notificationConnection)
-		notificationConnection=nil
-	end
-
-	if fpsConnection then
-		disconnect(fpsConnection)
-		fpsConnection=nil
-	end
+	notificationConnection=nil
+	fpsConnection=nil
 
 	restoreLighting()
 	destroyCreatedObjects()
