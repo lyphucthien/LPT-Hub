@@ -79,7 +79,20 @@ local DefaultConfig={
 	WhiteScreen=false,
 	BlackScreen=false,
 	RemoveNotifications=false,
-	BoostFPS=false
+	AutoLoadScript=false,
+	BoostFPS=false,
+
+	-- WEBHOOK
+	WebhookURL="",
+	WebhookPing="",
+	WebhookPingEnabled=false,
+	WebhookNotiProfile=false,
+	WebhookStoreFruit=false,
+	WebhookFindPrehistoricIsland=false,
+	WebhookFindLeviathan=false,
+	WebhookDestroyIDK=false,
+	WebhookFindMirage=false,
+	WebhookRarity="Common"
 }
 
 local Config={}
@@ -149,7 +162,7 @@ local function loadConfig()
 
 	for key in pairs(DefaultConfig) do
 		if decoded[key]~=nil then
-			Config[key]=decoded[key]==true
+			Config[key]=decoded[key]
 		end
 	end
 end
@@ -208,6 +221,47 @@ local function saveConfig()
 end
 
 loadConfig()
+
+--========================================================
+-- AUTO LOAD SCRIPT
+--========================================================
+
+local function setupAutoLoad()
+
+	if not Config.AutoLoadScript then
+		return
+	end
+
+	local queueFunc =
+		(type(queue_on_teleport)=="function" and queue_on_teleport)
+		or (type(queueonteleport)=="function" and queueonteleport)
+		or (syn and type(syn.queue_on_teleport)=="function" and syn.queue_on_teleport)
+
+	if not queueFunc then
+		warn("[LPT Hub] queue_on_teleport is not supported")
+		return
+	end
+
+	local scriptURL="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Key.lua"
+
+	local code=
+	[[task.wait(2)
+
+		local success,err=pcall(function()
+			loadstring(game:HttpGet("]]..scriptURL..[["))()
+		end)
+
+		if not success then
+			warn("[LPT Hub] Auto Load failed:",err)
+		end
+	]]
+
+	pcall(function()
+		queueFunc(code)
+	end)
+end
+
+setupAutoLoad()
 
 local oldGui=playerGui:FindFirstChild("LPTHub")
 if oldGui then oldGui:Destroy() end
@@ -1983,8 +2037,29 @@ createCheckbox(
 
 createCheckbox(
 	settingsPage,
-	"Boost FPS",
+	"Auto Load Script",
 	293,
+	Config.AutoLoadScript,
+	function(enabled)
+
+		Config.AutoLoadScript=enabled
+
+		if SettingsModule then
+			SettingsModule:Set("AutoLoadScript",enabled)
+		end
+
+		saveConfig()
+
+		if enabled then
+			setupAutoLoad()
+		end
+	end
+)
+
+createCheckbox(
+	settingsPage,
+	"Boost FPS",
+	359,
 	Config.BoostFPS,
 	function(enabled)
 		Config.BoostFPS=enabled
@@ -1998,6 +2073,223 @@ createCheckbox(
 )
 
 settingsPage.CanvasSize=UDim2.fromOffset(0,560)
+
+--========================================================
+-- WEBHOOK
+--========================================================
+
+local function createInputCard(parent,text,y,value,callback)
+
+	local card=Instance.new("Frame")
+	card.Size=UDim2.new(1,-56,0,72)
+	card.Position=UDim2.fromOffset(28,y)
+	card.BackgroundColor3=COLORS.Card
+	card.BorderSizePixel=0
+	card.Parent=parent
+
+	createCorner(card,14)
+	createStroke(card,COLORS.Border,.15,1)
+
+	createLabel(
+		card,
+		text,
+		UDim2.new(1,-24,0,24),
+		UDim2.fromOffset(12,3),
+		Enum.Font.GothamBold,
+		13,
+		COLORS.Text
+	)
+
+	local input=Instance.new("TextBox")
+	input.Size=UDim2.new(1,-24,0,27)
+	input.Position=UDim2.fromOffset(12,32)
+	input.BackgroundColor3=Color3.fromRGB(29,30,38)
+	input.BorderSizePixel=0
+	input.Text=value or ""
+	input.PlaceholderText="Type here"
+	input.PlaceholderColor3=COLORS.TextDim
+	input.TextColor3=COLORS.Text
+	input.TextSize=13
+	input.Font=Enum.Font.Gotham
+	input.ClearTextOnFocus=false
+	input.TextXAlignment=Enum.TextXAlignment.Left
+	input.Parent=card
+
+	createCorner(input,6)
+	createStroke(input,COLORS.Border,.3,1)
+
+	input.FocusLost:Connect(function()
+		if callback then
+			callback(input.Text)
+		end
+	end)
+
+	return input
+end
+
+local webhookUrlInput=createInputCard(
+	settingsPage,
+	"Input Url Webhook",
+	425,
+	Config.WebhookURL,
+	function(text)
+		Config.WebhookURL=text
+		saveConfig()
+	end
+)
+
+local webhookPingInput=createInputCard(
+	settingsPage,
+	"Input Discord Ping (Everyone/ID)",
+	505,
+	Config.WebhookPing,
+	function(text)
+		Config.WebhookPing=text
+		saveConfig()
+	end
+)
+
+createCheckbox(
+	settingsPage,
+	"Ping Everyone/Id Discord",
+	585,
+	Config.WebhookPingEnabled,
+	function(enabled)
+		Config.WebhookPingEnabled=enabled
+		saveConfig()
+	end
+)
+
+createCheckbox(
+	settingsPage,
+	"Noti Profile",
+	651,
+	Config.WebhookNotiProfile,
+	function(enabled)
+		Config.WebhookNotiProfile=enabled
+		saveConfig()
+	end
+)
+
+--========================================================
+-- SELECT RARITY
+--========================================================
+
+local rarityCard=createCard(
+	settingsPage,
+	"Select Rarity Fruit:                         ›",
+	717,
+	58
+)
+
+local rarityButton=Instance.new("TextButton")
+rarityButton.Size=UDim2.fromScale(1,1)
+rarityButton.BackgroundTransparency=1
+rarityButton.BorderSizePixel=0
+rarityButton.Text=""
+rarityButton.Parent=rarityCard
+
+rarityButton.MouseButton1Click:Connect(function()
+
+	local rarities={
+		"Common",
+		"Uncommon",
+		"Rare",
+		"Legendary",
+		"Mythical"
+	}
+
+	local current=Config.WebhookRarity or "Common"
+	local index=1
+
+	for i,name in ipairs(rarities) do
+		if name==current then
+			index=i
+			break
+		end
+	end
+
+	index=index+1
+
+	if index>#rarities then
+		index=1
+	end
+
+	Config.WebhookRarity=rarities[index]
+
+	rarityCard:FindFirstChildWhichIsA("TextLabel").Text=
+		"Select Rarity Fruit:  "..Config.WebhookRarity.."                                      ›"
+
+	saveConfig()
+end)
+
+local rarityLabel=rarityCard:FindFirstChildWhichIsA("TextLabel")
+
+if rarityLabel then
+	rarityLabel.Text=
+		"Select Rarity Fruit:  "..tostring(Config.WebhookRarity).."                                      ›"
+end
+
+--========================================================
+-- WEBHOOK OPTIONS
+--========================================================
+
+createCheckbox(
+	settingsPage,
+	"Webhook Store Fruit",
+	783,
+	Config.WebhookStoreFruit,
+	function(enabled)
+		Config.WebhookStoreFruit=enabled
+		saveConfig()
+	end
+)
+
+createCheckbox(
+	settingsPage,
+	"Webhook Find Prehistoric Island",
+	849,
+	Config.WebhookFindPrehistoricIsland,
+	function(enabled)
+		Config.WebhookFindPrehistoricIsland=enabled
+		saveConfig()
+	end
+)
+
+createCheckbox(
+	settingsPage,
+	"Webhook Find Leviathan",
+	915,
+	Config.WebhookFindLeviathan,
+	function(enabled)
+		Config.WebhookFindLeviathan=enabled
+		saveConfig()
+	end
+)
+
+createCheckbox(
+	settingsPage,
+	"Webhook Destroy IDK",
+	981,
+	Config.WebhookDestroyIDK,
+	function(enabled)
+		Config.WebhookDestroyIDK=enabled
+		saveConfig()
+	end
+)
+
+createCheckbox(
+	settingsPage,
+	"Webhook Find Mirage",
+	1047,
+	Config.WebhookFindMirage,
+	function(enabled)
+		Config.WebhookFindMirage=enabled
+		saveConfig()
+	end
+)
+
+settingsPage.CanvasSize=UDim2.fromOffset(0,1150)
 
 --========================================================
 -- PAGES CONTENT
