@@ -5,317 +5,395 @@ local player = Players.LocalPlayer
 
 local PVPModule = {}
 
-local State = {
-    WalkSpeed = 16,
-    JumpPower = 50,
+--========================================================
+-- PVP
+--========================================================
 
-    ChangeWalkSpeed = false,
-    ChangeJumpPower = false,
-    WalkOnWater = true
+local PVP = {
+	WalkSpeed = 16,
+	JumpPower = 50,
+
+	ChangeWalkSpeed = false,
+	ChangeJumpPower = false,
+
+	WalkOnWater = true
 }
 
 local Connections = {}
+local CreatedObjects = {}
+
+--========================================================
+-- HELPERS
+--========================================================
 
 local function disconnect(connection)
-    if connection then
-        pcall(function()
-            connection:Disconnect()
-        end)
-    end
+	if connection then
+		pcall(function()
+			connection:Disconnect()
+		end)
+	end
 end
 
 local function disconnectAll()
-    for i, connection in pairs(Connections) do
-        disconnect(connection)
-        Connections[i] = nil
-    end
+	for i, connection in ipairs(Connections) do
+		disconnect(connection)
+		Connections[i] = nil
+	end
+end
+
+local function destroyObject(object)
+	if object then
+		pcall(function()
+			object:Destroy()
+		end)
+	end
+end
+
+local function destroyCreatedObjects()
+	for i, object in ipairs(CreatedObjects) do
+		destroyObject(object)
+		CreatedObjects[i] = nil
+	end
 end
 
 local function getCharacter()
-    return player.Character
+	return player.Character
 end
 
 local function getHumanoid()
-    local character = getCharacter()
+	local character = getCharacter()
 
-    if not character then
-        return nil
-    end
+	if not character then
+		return nil
+	end
 
-    return character:FindFirstChildOfClass("Humanoid")
+	return character:FindFirstChildOfClass("Humanoid")
 end
 
 local function getRoot()
-    local character = getCharacter()
+	local character = getCharacter()
 
-    if not character then
-        return nil
-    end
+	if not character then
+		return nil
+	end
 
-    return character:FindFirstChild("HumanoidRootPart")
+	return character:FindFirstChild("HumanoidRootPart")
 end
 
---============================================================
--- WALK SPEED
---============================================================
+--========================================================
+-- WALKSPEED
+--========================================================
 
 local function applyWalkSpeed()
-    local humanoid = getHumanoid()
 
-    if not humanoid then
-        return
-    end
+	local humanoid = getHumanoid()
 
-    if State.ChangeWalkSpeed then
-        humanoid.WalkSpeed = State.WalkSpeed
-    else
-        humanoid.WalkSpeed = 16
-    end
+	if not humanoid then
+		return
+	end
+
+	if PVP.ChangeWalkSpeed then
+		humanoid.WalkSpeed = PVP.WalkSpeed
+	else
+		humanoid.WalkSpeed = 16
+	end
 end
 
---============================================================
+--========================================================
 -- JUMP POWER
---============================================================
+--========================================================
 
 local function applyJumpPower()
-    local humanoid = getHumanoid()
 
-    if not humanoid then
-        return
-    end
+	local humanoid = getHumanoid()
 
-    humanoid.UseJumpPower = true
+	if not humanoid then
+		return
+	end
 
-    if State.ChangeJumpPower then
-        humanoid.JumpPower = State.JumpPower
-    else
-        humanoid.JumpPower = 50
-    end
+	humanoid.UseJumpPower = true
+
+	if PVP.ChangeJumpPower then
+		humanoid.JumpPower = PVP.JumpPower
+	else
+		humanoid.JumpPower = 50
+	end
 end
 
---============================================================
--- CHARACTER RESPAWN
---============================================================
+--========================================================
+-- CHARACTER
+--========================================================
 
-local characterConnection = player.CharacterAdded:Connect(function(character)
-    local humanoid = character:WaitForChild("Humanoid", 5)
+local characterConnection =
+	player.CharacterAdded:Connect(function(character)
 
-    if not humanoid then
-        return
-    end
+		local humanoid =
+			character:WaitForChild("Humanoid", 10)
 
-    task.wait(0.1)
+		if not humanoid then
+			return
+		end
 
-    applyWalkSpeed()
-    applyJumpPower()
-end)
+		task.wait(0.1)
 
-table.insert(Connections, characterConnection)
+		applyWalkSpeed()
+		applyJumpPower()
 
---============================================================
+		if PVP.WalkOnWater then
+			setupWaterWalk()
+		end
+	end)
+
+table.insert(
+	Connections,
+	characterConnection
+)
+
+--========================================================
 -- WALK ON WATER
---============================================================
+--========================================================
 
 local waterConnection = nil
 local waterPlatform = nil
 
 local function removeWaterPlatform()
-    if waterPlatform then
-        pcall(function()
-            waterPlatform:Destroy()
-        end)
 
-        waterPlatform = nil
-    end
+	if waterPlatform then
+
+		destroyObject(waterPlatform)
+
+		waterPlatform = nil
+	end
 end
 
 local function createWaterPlatform()
-    removeWaterPlatform()
 
-    local root = getRoot()
+	removeWaterPlatform()
 
-    if not root then
-        return
-    end
+	local root = getRoot()
 
-    local part = Instance.new("Part")
+	if not root then
+		return
+	end
 
-    part.Name = "LPT_WaterWalk"
-    part.Size = Vector3.new(8, 1, 8)
-    part.Anchored = true
-    part.CanCollide = true
-    part.CanTouch = false
-    part.CanQuery = false
-    part.Transparency = 1
+	local part = Instance.new("Part")
 
-    part.Parent = workspace
+	part.Name = "LPT_WaterWalk"
+	part.Size = Vector3.new(8, 1, 8)
+	part.Anchored = true
+	part.CanCollide = true
+	part.CanTouch = false
+	part.CanQuery = false
+	part.Transparency = 1
 
-    waterPlatform = part
+	part.Parent = workspace
+
+	waterPlatform = part
+
+	table.insert(
+		CreatedObjects,
+		part
+	)
 end
 
 local function updateWaterPlatform()
-    if not State.WalkOnWater then
-        removeWaterPlatform()
-        return
-    end
 
-    local root = getRoot()
+	if not PVP.WalkOnWater then
+		removeWaterPlatform()
+		return
+	end
 
-    if not root then
-        removeWaterPlatform()
-        return
-    end
+	local root = getRoot()
 
-    if not waterPlatform or not waterPlatform.Parent then
-        createWaterPlatform()
-    end
+	if not root then
+		removeWaterPlatform()
+		return
+	end
 
-    if not waterPlatform then
-        return
-    end
+	if not waterPlatform
+		or not waterPlatform.Parent then
 
-    waterPlatform.CFrame = CFrame.new(
-        root.Position.X,
-        root.Position.Y - 3,
-        root.Position.Z
-    )
+		createWaterPlatform()
+	end
+
+	if not waterPlatform then
+		return
+	end
+
+	waterPlatform.CFrame =
+		CFrame.new(
+			root.Position.X,
+			root.Position.Y - 3,
+			root.Position.Z
+		)
 end
 
-local function setupWaterWalk()
-    disconnect(waterConnection)
-    waterConnection = nil
+function setupWaterWalk()
 
-    removeWaterPlatform()
+	disconnect(waterConnection)
 
-    if not State.WalkOnWater then
-        return
-    end
+	waterConnection = nil
 
-    createWaterPlatform()
+	removeWaterPlatform()
 
-    waterConnection = RunService.Heartbeat:Connect(function()
-        updateWaterPlatform()
-    end)
+	if not PVP.WalkOnWater then
+		return
+	end
 
-    table.insert(Connections, waterConnection)
+	createWaterPlatform()
+
+	waterConnection =
+		RunService.Heartbeat:Connect(function()
+
+			updateWaterPlatform()
+
+		end)
+
+	table.insert(
+		Connections,
+		waterConnection
+	)
 end
 
---============================================================
--- SET
---============================================================
+--========================================================
+-- PUBLIC SET
+--========================================================
 
 function PVPModule:Set(name, value)
 
-    if name == "WalkSpeed" then
+	if name == "WalkSpeed" then
 
-        local number = tonumber(value)
+		local number = tonumber(value)
 
-        if not number then
-            return false
-        end
+		if not number then
+			return false
+		end
 
-        State.WalkSpeed = math.clamp(number, 0, 500)
+		PVP.WalkSpeed =
+			math.clamp(
+				number,
+				0,
+				500
+			)
 
-        if State.ChangeWalkSpeed then
-            applyWalkSpeed()
-        end
+		if PVP.ChangeWalkSpeed then
+			applyWalkSpeed()
+		end
 
-        return true
-    end
+		return true
 
-    if name == "JumpPower" then
+	elseif name == "JumpPower" then
 
-        local number = tonumber(value)
+		local number = tonumber(value)
 
-        if not number then
-            return false
-        end
+		if not number then
+			return false
+		end
 
-        State.JumpPower = math.clamp(number, 0, 500)
+		PVP.JumpPower =
+			math.clamp(
+				number,
+				0,
+				500
+			)
 
-        if State.ChangeJumpPower then
-            applyJumpPower()
-        end
+		if PVP.ChangeJumpPower then
+			applyJumpPower()
+		end
 
-        return true
-    end
+		return true
 
-    if name == "ChangeWalkSpeed" then
+	elseif name == "ChangeWalkSpeed" then
 
-        State.ChangeWalkSpeed = value == true
+		PVP.ChangeWalkSpeed =
+			value == true
 
-        applyWalkSpeed()
+		applyWalkSpeed()
 
-        return true
-    end
+		return true
 
-    if name == "ChangeJumpPower" then
+	elseif name == "ChangeJumpPower" then
 
-        State.ChangeJumpPower = value == true
+		PVP.ChangeJumpPower =
+			value == true
 
-        applyJumpPower()
+		applyJumpPower()
 
-        return true
-    end
+		return true
 
-    if name == "WalkOnWater" then
+	elseif name == "WalkOnWater" then
 
-        State.WalkOnWater = value == true
+		PVP.WalkOnWater =
+			value == true
 
-        setupWaterWalk()
+		setupWaterWalk()
 
-        return true
-    end
+		return true
 
-    warn("[LPT PVP] Unknown setting:", name)
+	end
 
-    return false
+	warn(
+		"[LPT PVP] Unknown setting:",
+		name
+	)
+
+	return false
 end
 
---============================================================
+--========================================================
 -- GET
---============================================================
+--========================================================
 
 function PVPModule:Get(name)
-    return State[name]
+
+	if PVP[name] ~= nil then
+		return PVP[name]
+	end
+
+	return false
 end
 
 function PVPModule:GetAll()
-    local result = {}
 
-    for name, value in pairs(State) do
-        result[name] = value
-    end
+	local result = {}
 
-    return result
+	for name, value in pairs(PVP) do
+		result[name] = value
+	end
+
+	return result
 end
 
---============================================================
+--========================================================
 -- DESTROY
---============================================================
+--========================================================
 
 function PVPModule:Destroy()
 
-    disconnectAll()
+	PVP.WalkSpeed = 16
+	PVP.JumpPower = 50
 
-    waterConnection = nil
+	PVP.ChangeWalkSpeed = false
+	PVP.ChangeJumpPower = false
+	PVP.WalkOnWater = false
 
-    removeWaterPlatform()
+	disconnectAll()
 
-    -- Reset character
-    local humanoid = getHumanoid()
+	waterConnection = nil
 
-    if humanoid then
-        humanoid.WalkSpeed = 16
-        humanoid.UseJumpPower = true
-        humanoid.JumpPower = 50
-    end
+	removeWaterPlatform()
 
-    State.WalkSpeed = 16
-    State.JumpPower = 50
-    State.ChangeWalkSpeed = false
-    State.ChangeJumpPower = false
-    State.WalkOnWater = false
+	local humanoid = getHumanoid()
+
+	if humanoid then
+
+		humanoid.WalkSpeed = 16
+
+		humanoid.UseJumpPower = true
+		humanoid.JumpPower = 50
+	end
+
+	destroyCreatedObjects()
 end
 
 return PVPModule
