@@ -279,20 +279,11 @@ local function restoreLighting()
 
 	pcall(function()
 
-		Lighting.GlobalShadows=
-			originalLighting.GlobalShadows
-
-		Lighting.FogEnd=
-			originalLighting.FogEnd
-
-		Lighting.FogStart=
-			originalLighting.FogStart
-
-		Lighting.EnvironmentDiffuseScale=
-			originalLighting.EnvironmentDiffuseScale
-
-		Lighting.EnvironmentSpecularScale=
-			originalLighting.EnvironmentSpecularScale
+		Lighting.GlobalShadows=originalLighting.GlobalShadows
+		Lighting.FogEnd=originalLighting.FogEnd
+		Lighting.FogStart=originalLighting.FogStart
+		Lighting.EnvironmentDiffuseScale=originalLighting.EnvironmentDiffuseScale
+		Lighting.EnvironmentSpecularScale=originalLighting.EnvironmentSpecularScale
 
 	end)
 end
@@ -331,7 +322,7 @@ end
 -- AUTO LOAD SCRIPT
 --========================================================
 
-local AUTO_LOAD_URL="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/Key.lua"
+local AUTO_LOAD_URL="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Key.lua"
 
 local function getQueueFunction()
 
