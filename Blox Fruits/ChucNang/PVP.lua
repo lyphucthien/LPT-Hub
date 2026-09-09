@@ -5,10 +5,6 @@ local player=Players.LocalPlayer
 
 local PVPModule={}
 
---========================================================
--- CONFIG
---========================================================
-
 local PVP={
 	WalkSpeed=16,
 	JumpPower=50,
@@ -21,10 +17,6 @@ local PVP={
 
 local Connections={}
 local CreatedObjects={}
-
---========================================================
--- HELPERS
---========================================================
 
 local function disconnect(connection)
 
@@ -40,13 +32,17 @@ end
 
 local function disconnectAll()
 
-	for i,connection in ipairs(Connections) do
+	for i=#Connections,1,-1 do
+
+		local connection=Connections[i]
 
 		disconnect(connection)
 
 		Connections[i]=nil
 
 	end
+
+	table.clear(Connections)
 
 end
 
@@ -64,7 +60,9 @@ end
 
 local function destroyCreatedObjects()
 
-	for i,object in ipairs(CreatedObjects) do
+	for i=#CreatedObjects,1,-1 do
+
+		local object=CreatedObjects[i]
 
 		destroyObject(object)
 
@@ -144,7 +142,8 @@ local function toBoolean(value)
 
 		value=value:lower()
 
-		return value=="true"
+		return
+			value=="true"
 			or value=="1"
 			or value=="yes"
 
@@ -153,6 +152,14 @@ local function toBoolean(value)
 	return false
 
 end
+
+--========================================================
+-- MOVEMENT
+--========================================================
+
+local movementConnection=nil
+local walkSpeedChangedConnection=nil
+local jumpPowerChangedConnection=nil
 
 --========================================================
 -- WALK SPEED
@@ -166,13 +173,27 @@ local function applyWalkSpeed()
 		return
 	end
 
-	local target=16
-
 	if PVP.ChangeWalkSpeed then
-		target=getWalkSpeed()
+
+		humanoid.WalkSpeed=getWalkSpeed()
+
+	else
+
+		humanoid.WalkSpeed=16
+
 	end
 
-	humanoid.WalkSpeed=target
+end
+
+local function resetWalkSpeed()
+
+	local humanoid=getHumanoid()
+
+	if not humanoid then
+		return
+	end
+
+	humanoid.WalkSpeed=16
 
 end
 
@@ -190,13 +211,28 @@ local function applyJumpPower()
 
 	humanoid.UseJumpPower=true
 
-	local target=50
-
 	if PVP.ChangeJumpPower then
-		target=getJumpPower()
+
+		humanoid.JumpPower=getJumpPower()
+
+	else
+
+		humanoid.JumpPower=50
+
 	end
 
-	humanoid.JumpPower=target
+end
+
+local function resetJumpPower()
+
+	local humanoid=getHumanoid()
+
+	if not humanoid then
+		return
+	end
+
+	humanoid.UseJumpPower=true
+	humanoid.JumpPower=50
 
 end
 
@@ -208,51 +244,229 @@ local function applyMovement()
 end
 
 --========================================================
--- MOVEMENT LOOP
+-- HUMANOID PROPERTY WATCH
 --========================================================
 
-local movementConnection=
+local function disconnectHumanoidConnections()
 
-RunService.Heartbeat:Connect(function()
+	if walkSpeedChangedConnection then
 
-	local humanoid=getHumanoid()
+		disconnect(
+			walkSpeedChangedConnection
+		)
+
+		walkSpeedChangedConnection=nil
+
+	end
+
+	if jumpPowerChangedConnection then
+
+		disconnect(
+			jumpPowerChangedConnection
+		)
+
+		jumpPowerChangedConnection=nil
+
+	end
+
+end
+
+local function connectHumanoid(humanoid)
+
+	disconnectHumanoidConnections()
 
 	if not humanoid then
 		return
 	end
 
-	-- WalkSpeed
+	--============================================
+	-- WATCH WALKSPEED
+	--============================================
 
-	if PVP.ChangeWalkSpeed then
+	walkSpeedChangedConnection=
+		humanoid:GetPropertyChangedSignal(
+			"WalkSpeed"
+		):Connect(function()
 
-		local target=getWalkSpeed()
+			if not PVP.ChangeWalkSpeed then
+				return
+			end
 
-		if humanoid.WalkSpeed~=target then
-			humanoid.WalkSpeed=target
+			local target=getWalkSpeed()
+
+			if humanoid.WalkSpeed~=target then
+
+				humanoid.WalkSpeed=target
+
+			end
+
+		end)
+
+	table.insert(
+		Connections,
+		walkSpeedChangedConnection
+	)
+
+	--============================================
+	-- WATCH JUMPPOWER
+	--============================================
+
+	jumpPowerChangedConnection=
+		humanoid:GetPropertyChangedSignal(
+			"JumpPower"
+		):Connect(function()
+
+			if not PVP.ChangeJumpPower then
+				return
+			end
+
+			humanoid.UseJumpPower=true
+
+			local target=getJumpPower()
+
+			if humanoid.JumpPower~=target then
+
+				humanoid.JumpPower=target
+
+			end
+
+		end)
+
+	table.insert(
+		Connections,
+		jumpPowerChangedConnection
+	)
+
+	applyMovement()
+
+end
+
+--========================================================
+-- FORCE MOVEMENT
+--========================================================
+
+movementConnection=
+	RunService.RenderStepped:Connect(function()
+
+		local humanoid=getHumanoid()
+
+		if not humanoid then
+			return
 		end
 
-	end
+		--============================================
+		-- WALK SPEED
+		--============================================
 
-	-- JumpPower
+		if PVP.ChangeWalkSpeed then
 
-	if PVP.ChangeJumpPower then
+			local target=getWalkSpeed()
 
-		humanoid.UseJumpPower=true
+			if humanoid.WalkSpeed~=target then
 
-		local target=getJumpPower()
+				humanoid.WalkSpeed=target
 
-		if humanoid.JumpPower~=target then
-			humanoid.JumpPower=target
+			end
+
 		end
 
-	end
+		--============================================
+		-- JUMP POWER
+		--============================================
 
-end)
+		if PVP.ChangeJumpPower then
+
+			humanoid.UseJumpPower=true
+
+			local target=getJumpPower()
+
+			if humanoid.JumpPower~=target then
+
+				humanoid.JumpPower=target
+
+			end
+
+		end
+
+	end)
 
 table.insert(
 	Connections,
 	movementConnection
 )
+
+--========================================================
+-- CHARACTER
+--========================================================
+
+local characterConnection=
+
+	player.CharacterAdded:Connect(function(character)
+
+		disconnectHumanoidConnections()
+
+		local humanoid=
+			character:WaitForChild(
+				"Humanoid",
+				10
+			)
+
+		if not humanoid then
+			return
+		end
+
+		task.wait(0.15)
+
+		connectHumanoid(humanoid)
+
+		-- Re-enable water walk after respawn
+		if PVP.WalkOnWater then
+
+			setupWaterWalk()
+
+		end
+
+	end)
+
+table.insert(
+	Connections,
+	characterConnection
+)
+
+--========================================================
+-- INITIAL HUMANOID
+--========================================================
+
+task.spawn(function()
+
+	local character=player.Character
+
+	if not character then
+		return
+	end
+
+	local humanoid=
+		character:FindFirstChildOfClass(
+			"Humanoid"
+		)
+
+	if not humanoid then
+
+		humanoid=
+			character:WaitForChild(
+				"Humanoid",
+				10
+			)
+
+	end
+
+	if humanoid then
+
+		connectHumanoid(humanoid)
+
+	end
+
+end)
 
 --========================================================
 -- WALK ON WATER
@@ -261,7 +475,10 @@ table.insert(
 local waterConnection=nil
 local waterPlatform=nil
 
-local WATER_SIZE=Vector3.new(12,1,12)
+local WATER_SIZE=
+	Vector3.new(24,1,24)
+
+local WATER_OFFSET=0.05
 
 --========================================================
 -- REMOVE WATER PLATFORM
@@ -273,19 +490,26 @@ local function removeWaterPlatform()
 		return
 	end
 
-	local oldPlatform=waterPlatform
+	local oldPlatform=
+		waterPlatform
 
 	waterPlatform=nil
 
-	pcall(function()
-		oldPlatform:Destroy()
-	end)
+	destroyObject(
+		oldPlatform
+	)
 
 	for i=#CreatedObjects,1,-1 do
 
 		if CreatedObjects[i]==oldPlatform then
-			table.remove(CreatedObjects,i)
+
+			table.remove(
+				CreatedObjects,
+				i
+			)
+
 			break
+
 		end
 
 	end
@@ -306,9 +530,11 @@ local function createWaterPlatform()
 		return nil
 	end
 
-	local part=Instance.new("Part")
+	local part=
+		Instance.new("Part")
 
-	part.Name="LPT_WaterWalk"
+	part.Name=""
+
 	part.Size=WATER_SIZE
 
 	part.Anchored=true
@@ -318,9 +544,11 @@ local function createWaterPlatform()
 
 	part.Transparency=1
 
-	part.Parent=workspace
+	part.Parent=
+		workspace
 
-	waterPlatform=part
+	waterPlatform=
+		part
 
 	table.insert(
 		CreatedObjects,
@@ -332,18 +560,22 @@ local function createWaterPlatform()
 end
 
 --========================================================
--- FIND WATER
+-- FIND WATER BASE
 --========================================================
 
 local function findWaterBase()
 
-	local map=workspace:FindFirstChild("Map")
+	local map=
+		workspace:FindFirstChild("Map")
 
 	if not map then
 		return nil
 	end
 
-	local waterBase=map:FindFirstChild("WaterBase-Plane")
+	local waterBase=
+		map:FindFirstChild(
+			"WaterBase-Plane"
+		)
 
 	if waterBase
 		and waterBase:IsA("BasePart") then
@@ -356,16 +588,63 @@ local function findWaterBase()
 
 end
 
+--========================================================
+-- FIND WATER LEVEL
+--========================================================
+
 local function findWaterLevel()
 
-	local waterBase=findWaterBase()
+	local waterBase=
+		findWaterBase()
 
 	if not waterBase then
 		return nil
 	end
 
-	return waterBase.Position.Y+
+	return
+		waterBase.Position.Y+
 		(waterBase.Size.Y/2)
+
+end
+
+--========================================================
+-- CHECK WATER AREA
+--========================================================
+
+local function isInsideWaterBase(
+	root,
+	waterBase
+)
+
+	if not root
+		or not waterBase then
+
+		return false
+
+	end
+
+	local halfX=
+		waterBase.Size.X/2
+
+	local halfZ=
+		waterBase.Size.Z/2
+
+	local dx=
+		math.abs(
+			root.Position.X-
+			waterBase.Position.X
+		)
+
+	local dz=
+		math.abs(
+			root.Position.Z-
+			waterBase.Position.Z
+		)
+
+	return
+		dx<=halfX
+		and
+		dz<=halfZ
 
 end
 
@@ -393,7 +672,8 @@ local function updateWaterPlatform()
 
 	end
 
-	local waterBase=findWaterBase()
+	local waterBase=
+		findWaterBase()
 
 	if not waterBase then
 
@@ -403,29 +683,21 @@ local function updateWaterPlatform()
 
 	end
 
+	if not isInsideWaterBase(
+		root,
+		waterBase
+	) then
+
+		removeWaterPlatform()
+
+		return
+
+	end
+
 	local waterY=
-		waterBase.Position.Y+
-		(waterBase.Size.Y/2)
+		findWaterLevel()
 
-	-- Chỉ tạo platform khi nhân vật đang nằm
-	-- trong phạm vi của WaterBase-Plane
-
-	local halfX=waterBase.Size.X/2
-	local halfZ=waterBase.Size.Z/2
-
-	local dx=
-		math.abs(
-			root.Position.X-
-			waterBase.Position.X
-		)
-
-	local dz=
-		math.abs(
-			root.Position.Z-
-			waterBase.Position.Z
-		)
-
-	if dx>halfX or dz>halfZ then
+	if not waterY then
 
 		removeWaterPlatform()
 
@@ -444,10 +716,12 @@ local function updateWaterPlatform()
 		return
 	end
 
+	waterPlatform.Size=WATER_SIZE
+
 	waterPlatform.CFrame=
 		CFrame.new(
 			root.Position.X,
-			waterY-0.5,
+			waterY+WATER_OFFSET,
 			root.Position.Z
 		)
 
@@ -457,9 +731,11 @@ end
 -- SETUP WATER WALK
 --========================================================
 
-local function setupWaterWalk()
+function setupWaterWalk()
 
-	disconnect(waterConnection)
+	disconnect(
+		waterConnection
+	)
 
 	waterConnection=nil
 
@@ -470,12 +746,13 @@ local function setupWaterWalk()
 	end
 
 	waterConnection=
+		RunService.RenderStepped:Connect(
+			function()
 
-		RunService.Heartbeat:Connect(function()
+				updateWaterPlatform()
 
-			updateWaterPlatform()
-
-		end)
+			end
+		)
 
 	table.insert(
 		Connections,
@@ -483,39 +760,6 @@ local function setupWaterWalk()
 	)
 
 end
-
---========================================================
--- CHARACTER
---========================================================
-
-local characterConnection=
-
-	player.CharacterAdded:Connect(function(character)
-
-		local humanoid=
-			character:WaitForChild(
-				"Humanoid",
-				10
-			)
-
-		if not humanoid then
-			return
-		end
-
-		task.wait(.1)
-
-		applyMovement()
-
-		if PVP.WalkOnWater then
-			setupWaterWalk()
-		end
-
-	end)
-
-table.insert(
-	Connections,
-	characterConnection
-)
 
 --========================================================
 -- PUBLIC SET
@@ -529,7 +773,8 @@ function PVPModule:Set(name,value)
 
 	if name=="WalkSpeed" then
 
-		local number=tonumber(value)
+		local number=
+			tonumber(value)
 
 		if not number then
 			return false
@@ -543,7 +788,9 @@ function PVPModule:Set(name,value)
 			)
 
 		if PVP.ChangeWalkSpeed then
+
 			applyWalkSpeed()
+
 		end
 
 		return true
@@ -554,7 +801,8 @@ function PVPModule:Set(name,value)
 
 	elseif name=="JumpPower" then
 
-		local number=tonumber(value)
+		local number=
+			tonumber(value)
 
 		if not number then
 			return false
@@ -568,7 +816,9 @@ function PVPModule:Set(name,value)
 			)
 
 		if PVP.ChangeJumpPower then
+
 			applyJumpPower()
+
 		end
 
 		return true
@@ -582,7 +832,15 @@ function PVPModule:Set(name,value)
 		PVP.ChangeWalkSpeed=
 			toBoolean(value)
 
-		applyWalkSpeed()
+		if PVP.ChangeWalkSpeed then
+
+			applyWalkSpeed()
+
+		else
+
+			resetWalkSpeed()
+
+		end
 
 		return true
 
@@ -595,7 +853,15 @@ function PVPModule:Set(name,value)
 		PVP.ChangeJumpPower=
 			toBoolean(value)
 
-		applyJumpPower()
+		if PVP.ChangeJumpPower then
+
+			applyJumpPower()
+
+		else
+
+			resetJumpPower()
+
+		end
 
 		return true
 
@@ -623,23 +889,17 @@ function PVPModule:Set(name,value)
 
 end
 
---========================================================
--- GET
---========================================================
-
 function PVPModule:Get(name)
 
 	if PVP[name]~=nil then
+
 		return PVP[name]
+
 	end
 
 	return false
 
 end
-
---========================================================
--- GET ALL
---========================================================
 
 function PVPModule:GetAll()
 
@@ -668,6 +928,8 @@ function PVPModule:Destroy()
 	PVP.ChangeJumpPower=false
 	PVP.WalkOnWater=false
 
+	disconnectHumanoidConnections()
+
 	disconnectAll()
 
 	movementConnection=nil
@@ -675,7 +937,8 @@ function PVPModule:Destroy()
 
 	removeWaterPlatform()
 
-	local humanoid=getHumanoid()
+	local humanoid=
+		getHumanoid()
 
 	if humanoid then
 
