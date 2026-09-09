@@ -178,11 +178,21 @@ local function removeWaterPlatform()
 
 	if waterPlatform then
 
+		local oldPlatform=waterPlatform
+		waterPlatform=nil
+
 		pcall(function()
-			waterPlatform:Destroy()
+			oldPlatform:Destroy()
 		end)
 
-		waterPlatform=nil
+		for i,object in ipairs(CreatedObjects) do
+
+			if object==oldPlatform then
+				table.remove(CreatedObjects,i)
+				break
+			end
+
+		end
 
 	end
 
@@ -224,99 +234,22 @@ end
 
 local function findWaterLevel()
 
-	local root=getRoot()
+	local map=workspace:FindFirstChild("Map")
 
-	if not root then
-		return nil
-	end
+	if map then
 
-	local terrain=workspace:FindFirstChildOfClass("Terrain")
+		local waterBase=map:FindFirstChild("WaterBase-Plane")
 
-	if terrain then
+		if waterBase and waterBase:IsA("BasePart") then
 
-		local offsets={
-
-			Vector3.new(0,0,0),
-			Vector3.new(6,0,0),
-			Vector3.new(-6,0,0),
-			Vector3.new(0,0,6),
-			Vector3.new(0,0,-6)
-
-		}
-
-		for _,offset in ipairs(offsets) do
-
-			local position=root.Position+offset
-			local regionSize=Vector3.new(4,16,4)
-			local min=position-regionSize/2
-			local max=position+regionSize/2
-			local region=Region3.new(min,max):ExpandToGrid(4)
-			local materials,occupancy=terrain:ReadVoxels(region,4)
-			local size=materials.Size
-
-			for x=1,size.X do
-				for y=1,size.Y do
-					for z=1,size.Z do
-
-						if materials[x][y][z]
-							==Enum.Material.Water
-							and occupancy[x][y][z]>0.05 then
-
-							local voxelCenter=
-								min+
-								Vector3.new(
-									(x-.5)*4,
-									(y-.5)*4,
-									(z-.5)*4
-								)
-
-							return voxelCenter.Y+2
-
-						end
-					end
-				end
-			end
-		end
-	end
-
-	local rayParams=RaycastParams.new()
-
-	rayParams.FilterType=Enum.RaycastFilterType.Exclude
-
-	local ignore={}
-
-    if player.Character then
-        table.insert(ignore,player.Character)
-    end
-
-    if waterPlatform then
-        table.insert(ignore,waterPlatform)
-    end
-
-	rayParams.FilterDescendantsInstances=ignore
-
-	local origin=root.Position+Vector3.new(0,50,0)
-	local direction=Vector3.new(0,-120,0)
-	local result=workspace:Raycast(origin,direction,rayParams)
-
-	if result then
-
-		local hit=result.Instance
-
-		if hit
-			and (
-				hit.Name:lower():find("water")
-				or hit.Name:lower():find("sea")
-				or hit.Name:lower():find("ocean")
-			) then
-
-			return result.Position.Y
+			return waterBase.Position.Y+(waterBase.Size.Y/2)
 
 		end
 
 	end
 
 	return nil
+
 end
 
 --========================================================
@@ -364,13 +297,12 @@ local function updateWaterPlatform()
 		return
 	end
 
-	waterPlatform.CFrame=
-		CFrame.new(
-			root.Position.X,
-			waterY-0.5,
-			root.Position.Z
-		)
-
+    waterPlatform.CFrame=
+        CFrame.new(
+            root.Position.X,
+            waterY-0.5,
+            root.Position.Z
+        )
 end
 
 local function setupWaterWalk()
