@@ -1,427 +1,321 @@
-local Players=game:GetService("Players")
-local RunService=game:GetService("RunService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
-local player=Players.LocalPlayer
+local player = Players.LocalPlayer
 
-local PVPModule={}
+local PVPModule = {}
 
-local State={
-	WalkSpeed=16,
-	JumpPower=50,
+local State = {
+    WalkSpeed = 16,
+    JumpPower = 50,
 
-	ChangeWalkSpeed=false,
-	ChangeJumpPower=false,
-	WalkOnWater=true
+    ChangeWalkSpeed = false,
+    ChangeJumpPower = false,
+    WalkOnWater = true
 }
 
-
-local Connections={}
-local CreatedObjects={}
+local Connections = {}
 
 local function disconnect(connection)
-
-	if connection then
-		pcall(function()
-			connection:Disconnect()
-		end)
-	end
-
+    if connection then
+        pcall(function()
+            connection:Disconnect()
+        end)
+    end
 end
 
 local function disconnectAll()
-
-	for i,connection in ipairs(Connections) do
-
-		disconnect(connection)
-		Connections[i]=nil
-
-	end
-
+    for i, connection in pairs(Connections) do
+        disconnect(connection)
+        Connections[i] = nil
+    end
 end
-
-local function destroyObject(object)
-
-	if object then
-		pcall(function()
-			object:Destroy()
-		end)
-	end
-
-end
-
-local function destroyObjects()
-
-	for i,object in ipairs(CreatedObjects) do
-
-		destroyObject(object)
-		CreatedObjects[i]=nil
-
-	end
-
-end
-
---========================================================
--- CHARACTER
---========================================================
-
-local characterConnection=nil
 
 local function getCharacter()
-
-	return player.Character
-
+    return player.Character
 end
 
 local function getHumanoid()
+    local character = getCharacter()
 
-	local character=getCharacter()
+    if not character then
+        return nil
+    end
 
-	if not character then
-		return nil
-	end
-
-	return character:FindFirstChildOfClass("Humanoid")
-
+    return character:FindFirstChildOfClass("Humanoid")
 end
 
 local function getRoot()
+    local character = getCharacter()
 
-	local character=getCharacter()
+    if not character then
+        return nil
+    end
 
-	if not character then
-		return nil
-	end
-
-	return character:FindFirstChild("HumanoidRootPart")
-
+    return character:FindFirstChild("HumanoidRootPart")
 end
 
---========================================================
--- APPLY WALK SPEED
---========================================================
+--============================================================
+-- WALK SPEED
+--============================================================
 
 local function applyWalkSpeed()
+    local humanoid = getHumanoid()
 
-	local humanoid=getHumanoid()
+    if not humanoid then
+        return
+    end
 
-	if not humanoid then
-		return
-	end
-
-	if State.ChangeWalkSpeed then
-
-		humanoid.WalkSpeed=State.WalkSpeed
-
-	else
-
-		humanoid.WalkSpeed=16
-
-	end
-
+    if State.ChangeWalkSpeed then
+        humanoid.WalkSpeed = State.WalkSpeed
+    else
+        humanoid.WalkSpeed = 16
+    end
 end
 
---========================================================
--- APPLY JUMP POWER
---========================================================
+--============================================================
+-- JUMP POWER
+--============================================================
 
 local function applyJumpPower()
+    local humanoid = getHumanoid()
 
-	local humanoid=getHumanoid()
+    if not humanoid then
+        return
+    end
 
-	if not humanoid then
-		return
-	end
+    humanoid.UseJumpPower = true
 
-	humanoid.UseJumpPower=true
-
-	if State.ChangeJumpPower then
-
-		humanoid.JumpPower=State.JumpPower
-
-	else
-
-		humanoid.JumpPower=50
-
-	end
-
+    if State.ChangeJumpPower then
+        humanoid.JumpPower = State.JumpPower
+    else
+        humanoid.JumpPower = 50
+    end
 end
 
---========================================================
+--============================================================
 -- CHARACTER RESPAWN
---========================================================
+--============================================================
 
-local function setupCharacterListener()
+local characterConnection = player.CharacterAdded:Connect(function(character)
+    local humanoid = character:WaitForChild("Humanoid", 5)
 
-	if characterConnection then
-		disconnect(characterConnection)
-		characterConnection=nil
-	end
+    if not humanoid then
+        return
+    end
 
-	characterConnection=player.CharacterAdded:Connect(function(character)
+    task.wait(0.1)
 
-		local humanoid=character:WaitForChild(
-			"Humanoid",
-			5
-		)
+    applyWalkSpeed()
+    applyJumpPower()
+end)
 
-		if not humanoid then
-			return
-		end
+table.insert(Connections, characterConnection)
 
-		task.wait(.1)
-
-		applyWalkSpeed()
-		applyJumpPower()
-
-	end)
-
-	table.insert(
-		Connections,
-		characterConnection
-	)
-
-end
-
---========================================================
+--============================================================
 -- WALK ON WATER
---========================================================
+--============================================================
 
-local waterConnection=nil
-local waterPlatform=nil
+local waterConnection = nil
+local waterPlatform = nil
 
 local function removeWaterPlatform()
+    if waterPlatform then
+        pcall(function()
+            waterPlatform:Destroy()
+        end)
 
-	if waterPlatform then
-
-		destroyObject(waterPlatform)
-		waterPlatform=nil
-
-	end
-
+        waterPlatform = nil
+    end
 end
 
 local function createWaterPlatform()
+    removeWaterPlatform()
 
-	removeWaterPlatform()
+    local root = getRoot()
 
-	local root=getRoot()
+    if not root then
+        return
+    end
 
-	if not root then
-		return
-	end
+    local part = Instance.new("Part")
 
-	local part=Instance.new("Part")
+    part.Name = "LPT_WaterWalk"
+    part.Size = Vector3.new(8, 1, 8)
+    part.Anchored = true
+    part.CanCollide = true
+    part.CanTouch = false
+    part.CanQuery = false
+    part.Transparency = 1
 
-	part.Name="LPT_WaterWalk"
-	part.Size=Vector3.new(8,1,8)
-	part.Anchored=true
-	part.CanCollide=true
-	part.CanTouch=false
-	part.CanQuery=false
-	part.Transparency=1
+    part.Parent = workspace
 
-	part.Parent=workspace
-
-	waterPlatform=part
-
-	table.insert(
-		CreatedObjects,
-		part
-	)
-
+    waterPlatform = part
 end
 
 local function updateWaterPlatform()
+    if not State.WalkOnWater then
+        removeWaterPlatform()
+        return
+    end
 
-	if not State.WalkOnWater then
+    local root = getRoot()
 
-		removeWaterPlatform()
-		return
+    if not root then
+        removeWaterPlatform()
+        return
+    end
 
-	end
+    if not waterPlatform or not waterPlatform.Parent then
+        createWaterPlatform()
+    end
 
-	local root=getRoot()
+    if not waterPlatform then
+        return
+    end
 
-	if not root then
-		removeWaterPlatform()
-		return
-	end
-
-	if not waterPlatform
-		or not waterPlatform.Parent then
-
-		createWaterPlatform()
-
-	end
-
-	if not waterPlatform then
-		return
-	end
-
-	waterPlatform.CFrame=CFrame.new(
-		root.Position.X,
-		root.Position.Y-3,
-		root.Position.Z
-	)
-
+    waterPlatform.CFrame = CFrame.new(
+        root.Position.X,
+        root.Position.Y - 3,
+        root.Position.Z
+    )
 end
 
 local function setupWaterWalk()
+    disconnect(waterConnection)
+    waterConnection = nil
 
-	if waterConnection then
+    removeWaterPlatform()
 
-		disconnect(waterConnection)
-		waterConnection=nil
+    if not State.WalkOnWater then
+        return
+    end
 
-	end
+    createWaterPlatform()
 
-	removeWaterPlatform()
+    waterConnection = RunService.Heartbeat:Connect(function()
+        updateWaterPlatform()
+    end)
 
-	if not State.WalkOnWater then
-		return
-	end
-
-	createWaterPlatform()
-
-	waterConnection=RunService.Heartbeat:Connect(function()
-
-		if not State.WalkOnWater then
-			return
-		end
-
-		updateWaterPlatform()
-
-	end)
-
-	table.insert(
-		Connections,
-		waterConnection
-	)
-
+    table.insert(Connections, waterConnection)
 end
 
---========================================================
--- PUBLIC SET
---========================================================
+--============================================================
+-- SET
+--============================================================
 
-function PVPModule:Set(name,value)
+function PVPModule:Set(name, value)
 
-	if name=="WalkSpeed" then
+    if name == "WalkSpeed" then
 
-		local number=tonumber(value)
+        local number = tonumber(value)
 
-		if not number then
-			return false
-		end
+        if not number then
+            return false
+        end
 
-		State.WalkSpeed=math.clamp(
-			number,
-			0,
-			500
-		)
+        State.WalkSpeed = math.clamp(number, 0, 500)
 
-		if State.ChangeWalkSpeed then
-			applyWalkSpeed()
-		end
+        if State.ChangeWalkSpeed then
+            applyWalkSpeed()
+        end
 
-		return true
+        return true
+    end
 
-	elseif name=="JumpPower" then
+    if name == "JumpPower" then
 
-		local number=tonumber(value)
+        local number = tonumber(value)
 
-		if not number then
-			return false
-		end
+        if not number then
+            return false
+        end
 
-		State.JumpPower=math.clamp(
-			number,
-			0,
-			500
-		)
+        State.JumpPower = math.clamp(number, 0, 500)
 
-		if State.ChangeJumpPower then
-			applyJumpPower()
-		end
+        if State.ChangeJumpPower then
+            applyJumpPower()
+        end
 
-		return true
+        return true
+    end
 
-	elseif name=="ChangeWalkSpeed" then
+    if name == "ChangeWalkSpeed" then
 
-		State.ChangeWalkSpeed=value==true
+        State.ChangeWalkSpeed = value == true
 
-		applyWalkSpeed()
+        applyWalkSpeed()
 
-		return true
+        return true
+    end
 
-	elseif name=="ChangeJumpPower" then
+    if name == "ChangeJumpPower" then
 
-		State.ChangeJumpPower=value==true
+        State.ChangeJumpPower = value == true
 
-		applyJumpPower()
+        applyJumpPower()
 
-		return true
+        return true
+    end
 
-	elseif name=="WalkOnWater" then
+    if name == "WalkOnWater" then
 
-		State.WalkOnWater=value==true
+        State.WalkOnWater = value == true
 
-		setupWaterWalk()
+        setupWaterWalk()
 
-		return true
+        return true
+    end
 
-	end
+    warn("[LPT PVP] Unknown setting:", name)
 
-	warn(
-		"[LPT PVP] Unknown setting:",
-		name
-	)
-
-	return false
-
+    return false
 end
+
+--============================================================
+-- GET
+--============================================================
 
 function PVPModule:Get(name)
-
-	if State[name]~=nil then
-		return State[name]
-	end
-
-	return nil
-
+    return State[name]
 end
 
 function PVPModule:GetAll()
+    local result = {}
 
-	local result={}
+    for name, value in pairs(State) do
+        result[name] = value
+    end
 
-	for name,value in pairs(State) do
-		result[name]=value
-	end
-
-	return result
-
+    return result
 end
 
-setupCharacterListener()
+--============================================================
+-- DESTROY
+--============================================================
 
 function PVPModule:Destroy()
 
-	disconnectAll()
+    disconnectAll()
 
-	characterConnection=nil
-	waterConnection=nil
+    waterConnection = nil
 
-	removeWaterPlatform()
-	destroyObjects()
+    removeWaterPlatform()
 
-	State.WalkSpeed=16
-	State.JumpPower=50
+    -- Reset character
+    local humanoid = getHumanoid()
 
-	State.ChangeWalkSpeed=false
-	State.ChangeJumpPower=false
-	State.WalkOnWater=false
+    if humanoid then
+        humanoid.WalkSpeed = 16
+        humanoid.UseJumpPower = true
+        humanoid.JumpPower = 50
+    end
 
+    State.WalkSpeed = 16
+    State.JumpPower = 50
+    State.ChangeWalkSpeed = false
+    State.ChangeJumpPower = false
+    State.WalkOnWater = false
 end
 
 return PVPModule
