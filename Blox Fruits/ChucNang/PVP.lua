@@ -1,14 +1,9 @@
-```lua
 local Players=game:GetService("Players")
 local RunService=game:GetService("RunService")
 
 local player=Players.LocalPlayer
 
 local PVPModule={}
-
---========================================================
--- PVP
---========================================================
 
 local PVP={
 	WalkSpeed=16,
@@ -22,10 +17,6 @@ local PVP={
 
 local Connections={}
 local CreatedObjects={}
-
---========================================================
--- HELPERS
---========================================================
 
 local function disconnect(connection)
 
@@ -163,10 +154,6 @@ local function applyJumpPower()
 
 end
 
---========================================================
--- APPLY ALL
---========================================================
-
 local function applyMovement()
 
 	applyWalkSpeed()
@@ -181,18 +168,9 @@ end
 local waterConnection=nil
 local waterPlatform=nil
 
-local WATER_PLATFORM_SIZE=
-	Vector3.new(
-		10,
-		1,
-		10
-	)
+local WATER_PLATFORM_SIZE=Vector3.new(10,1,10)
 
 local WATER_DETECT_DISTANCE=12
-
---========================================================
--- REMOVE WATER PLATFORM
---========================================================
 
 local function removeWaterPlatform()
 
@@ -205,10 +183,6 @@ local function removeWaterPlatform()
 	end
 
 end
-
---========================================================
--- CREATE WATER PLATFORM
---========================================================
 
 local function createWaterPlatform()
 
@@ -246,10 +220,6 @@ local function createWaterPlatform()
 	return part
 
 end
-
---========================================================
--- FIND WATER SURFACE
---========================================================
 
 local function getWaterSurfaceY()
 
@@ -319,7 +289,6 @@ local function getWaterSurfaceY()
 
 	end
 
-	-- Kiểm tra thêm ngay dưới nhân vật.
 	local origin2=
 		root.Position+
 		Vector3.new(
@@ -352,10 +321,6 @@ local function getWaterSurfaceY()
 	return nil
 
 end
-
---========================================================
--- UPDATE WATER PLATFORM
---========================================================
 
 local function updateWaterPlatform()
 
@@ -399,7 +364,6 @@ local function updateWaterPlatform()
 		return
 	end
 
-	-- Đặt mặt trên của platform ngang mặt nước.
 	local platformY=
 		waterY-
 		(
@@ -642,4 +606,3 @@ function PVPModule:Destroy()
 end
 
 return PVPModule
-```
