@@ -18,6 +18,10 @@ local PVP={
 local Connections={}
 local CreatedObjects={}
 
+--========================================================
+-- HELPERS
+--========================================================
+
 local function disconnect(connection)
 
 	if connection then
@@ -168,15 +172,15 @@ end
 local waterConnection=nil
 local waterPlatform=nil
 
-local WATER_PLATFORM_SIZE=Vector3.new(10,1,10)
-
-local WATER_DETECT_DISTANCE=12
+local WATER_SIZE=Vector3.new(12,1,12)
 
 local function removeWaterPlatform()
 
 	if waterPlatform then
 
-		destroyObject(waterPlatform)
+		pcall(function()
+			waterPlatform:Destroy()
+		end)
 
 		waterPlatform=nil
 
@@ -197,31 +201,28 @@ local function createWaterPlatform()
 	local part=Instance.new("Part")
 
 	part.Name="LPT_WaterWalk"
-
-	part.Size=
-		WATER_PLATFORM_SIZE
+	part.Size=WATER_SIZE
 
 	part.Anchored=true
 	part.CanCollide=true
 	part.CanTouch=false
 	part.CanQuery=false
-
 	part.Transparency=1
-
 	part.Parent=workspace
 
 	waterPlatform=part
 
-	table.insert(
-		CreatedObjects,
-		part
-	)
+	table.insert(CreatedObjects,part)
 
 	return part
 
 end
 
-local function getWaterSurfaceY()
+--========================================================
+-- FIND WATER LEVEL
+--========================================================
+
+local function findWaterLevel()
 
 	local root=getRoot()
 
@@ -229,98 +230,96 @@ local function getWaterSurfaceY()
 		return nil
 	end
 
-	local terrain=
-		workspace:FindFirstChildOfClass("Terrain")
+	local terrain=workspace:FindFirstChildOfClass("Terrain")
 
-	if not terrain then
-		return nil
+	if terrain then
+
+		local offsets={
+
+			Vector3.new(0,0,0),
+			Vector3.new(6,0,0),
+			Vector3.new(-6,0,0),
+			Vector3.new(0,0,6),
+			Vector3.new(0,0,-6)
+
+		}
+
+		for _,offset in ipairs(offsets) do
+
+			local position=root.Position+offset
+			local regionSize=Vector3.new(4,16,4)
+			local min=position-regionSize/2
+			local max=position+regionSize/2
+			local region=Region3.new(min,max):ExpandToGrid(4)
+			local materials,occupancy=terrain:ReadVoxels(region,4)
+			local size=materials.Size
+
+			for x=1,size.X do
+				for y=1,size.Y do
+					for z=1,size.Z do
+
+						if materials[x][y][z]
+							==Enum.Material.Water
+							and occupancy[x][y][z]>0.05 then
+
+							local voxelCenter=
+								min+
+								Vector3.new(
+									(x-.5)*4,
+									(y-.5)*4,
+									(z-.5)*4
+								)
+
+							return voxelCenter.Y+2
+
+						end
+					end
+				end
+			end
+		end
 	end
 
-	local origin=
-		root.Position+
-		Vector3.new(
-			0,
-			6,
-			0
-		)
+	local rayParams=RaycastParams.new()
 
-	local direction=
-		Vector3.new(
-			0,
-			-WATER_DETECT_DISTANCE,
-			0
-		)
-
-	local params=
-		RaycastParams.new()
-
-	params.FilterType=
-		Enum.RaycastFilterType.Exclude
+	rayParams.FilterType=Enum.RaycastFilterType.Exclude
 
 	local ignore={}
 
-	if player.Character then
-		table.insert(
-			ignore,
-			player.Character
-		)
+	if player.Character thentable.insert(ignore,player.Character)
 	end
 
-	if waterPlatform then
-		table.insert(
-			ignore,
-			waterPlatform
-		)
+	if waterPlatform thentable.insert(ignore,waterPlatform)
 	end
 
-	params.FilterDescendantsInstances=ignore
+	rayParams.FilterDescendantsInstances=ignore
 
-	local result=
-		workspace:Raycast(
-			origin,
-			direction,
-			params
-		)
+	local origin=root.Position+Vector3.new(0,50,0)
+	local direction=Vector3.new(0,-120,0)
+	local result=workspace:Raycast(origin,direction,rayParams)
 
-	if result
-		and result.Material==Enum.Material.Water then
+	if result then
 
-		return result.Position.Y
+		local hit=result.Instance
 
-	end
+		if hit
+			and (
+				hit.Name:lower():find("water")
+				or hit.Name:lower():find("sea")
+				or hit.Name:lower():find("ocean")
+			) then
 
-	local origin2=
-		root.Position+
-		Vector3.new(
-			0,
-			1,
-			0
-		)
+			return result.Position.Y
 
-	local direction2=
-		Vector3.new(
-			0,
-			-8,
-			0
-		)
-
-	local result2=
-		workspace:Raycast(
-			origin2,
-			direction2,
-			params
-		)
-
-	if result2
-		and result2.Material==Enum.Material.Water then
-
-		return result2.Position.Y
+		end
 
 	end
 
 	return nil
-
 end
+
+--========================================================
+-- UPDATE
+--========================================================
 
 local function updateWaterPlatform()
 
@@ -342,8 +341,7 @@ local function updateWaterPlatform()
 
 	end
 
-	local waterY=
-		getWaterSurfaceY()
+	local waterY=findWaterLevel()
 
 	if not waterY then
 
@@ -364,24 +362,14 @@ local function updateWaterPlatform()
 		return
 	end
 
-	local platformY=
-		waterY-
-		(
-			WATER_PLATFORM_SIZE.Y/2
-		)
-
 	waterPlatform.CFrame=
 		CFrame.new(
 			root.Position.X,
-			platformY,
+			waterY-0.5,
 			root.Position.Z
 		)
 
 end
-
---========================================================
--- SETUP WATER WALK
---========================================================
 
 local function setupWaterWalk()
 
