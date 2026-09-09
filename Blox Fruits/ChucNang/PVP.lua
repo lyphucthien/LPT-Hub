@@ -285,11 +285,13 @@ local function findWaterLevel()
 
 	local ignore={}
 
-	if player.Character thentable.insert(ignore,player.Character)
-	end
+    if player.Character then
+        table.insert(ignore,player.Character)
+    end
 
-	if waterPlatform thentable.insert(ignore,waterPlatform)
-	end
+    if waterPlatform then
+        table.insert(ignore,waterPlatform)
+    end
 
 	rayParams.FilterDescendantsInstances=ignore
 
