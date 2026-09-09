@@ -475,50 +475,60 @@ end)
 local waterConnection=nil
 local waterPlatform=nil
 
-local WATER_SIZE=
-	Vector3.new(24,1,24)
+local WATER_SIZE=Vector3.new(30,1,30)
+local WATER_Y_OFFSET=0
 
-local WATER_OFFSET=0.05
+local function findWaterBase()
 
---========================================================
--- REMOVE WATER PLATFORM
---========================================================
+	local map=workspace:FindFirstChild("Map")
+
+	if not map then
+		return nil
+	end
+
+	local waterBase=map:FindFirstChild("WaterBase-Plane")
+
+	if waterBase and waterBase:IsA("BasePart") then
+		return waterBase
+	end
+
+	return nil
+end
+
+local function getWaterTop()
+
+	local waterBase=findWaterBase()
+
+	if not waterBase then
+		return nil
+	end
+
+	return waterBase.Position.Y + waterBase.Size.Y/2
+end
 
 local function removeWaterPlatform()
 
-	if not waterPlatform then
-		return
-	end
+	if waterPlatform then
 
-	local oldPlatform=
-		waterPlatform
+		local old=waterPlatform
+		waterPlatform=nil
 
-	waterPlatform=nil
+		pcall(function()
+			old:Destroy()
+		end)
 
-	destroyObject(
-		oldPlatform
-	)
+		for i=#CreatedObjects,1,-1 do
 
-	for i=#CreatedObjects,1,-1 do
-
-		if CreatedObjects[i]==oldPlatform then
-
-			table.remove(
-				CreatedObjects,
-				i
-			)
-
-			break
+			if CreatedObjects[i]==old then
+				table.remove(CreatedObjects,i)
+				break
+			end
 
 		end
 
 	end
 
 end
-
---========================================================
--- CREATE WATER PLATFORM
---========================================================
 
 local function createWaterPlatform()
 
@@ -530,183 +540,57 @@ local function createWaterPlatform()
 		return nil
 	end
 
-	local part=
-		Instance.new("Part")
+	local part=Instance.new("Part")
 
-	part.Name=""
-
+	part.Name="LPT_WaterWalk"
 	part.Size=WATER_SIZE
-
 	part.Anchored=true
 	part.CanCollide=true
 	part.CanTouch=false
 	part.CanQuery=false
-
 	part.Transparency=1
+	part.Parent=workspace
 
-	part.Parent=
-		workspace
+	waterPlatform=part
 
-	waterPlatform=
-		part
-
-	table.insert(
-		CreatedObjects,
-		part
-	)
+	table.insert(CreatedObjects,part)
 
 	return part
-
 end
-
---========================================================
--- FIND WATER BASE
---========================================================
-
-local function findWaterBase()
-
-	local map=
-		workspace:FindFirstChild("Map")
-
-	if not map then
-		return nil
-	end
-
-	local waterBase=
-		map:FindFirstChild(
-			"WaterBase-Plane"
-		)
-
-	if waterBase
-		and waterBase:IsA("BasePart") then
-
-		return waterBase
-
-	end
-
-	return nil
-
-end
-
---========================================================
--- FIND WATER LEVEL
---========================================================
-
-local function findWaterLevel()
-
-	local waterBase=
-		findWaterBase()
-
-	if not waterBase then
-		return nil
-	end
-
-	return
-		waterBase.Position.Y+
-		(waterBase.Size.Y/2)
-
-end
-
---========================================================
--- CHECK WATER AREA
---========================================================
-
-local function isInsideWaterBase(
-	root,
-	waterBase
-)
-
-	if not root
-		or not waterBase then
-
-		return false
-
-	end
-
-	local halfX=
-		waterBase.Size.X/2
-
-	local halfZ=
-		waterBase.Size.Z/2
-
-	local dx=
-		math.abs(
-			root.Position.X-
-			waterBase.Position.X
-		)
-
-	local dz=
-		math.abs(
-			root.Position.Z-
-			waterBase.Position.Z
-		)
-
-	return
-		dx<=halfX
-		and
-		dz<=halfZ
-
-end
-
---========================================================
--- UPDATE WATER PLATFORM
---========================================================
 
 local function updateWaterPlatform()
 
 	if not PVP.WalkOnWater then
-
 		removeWaterPlatform()
-
 		return
-
 	end
 
 	local root=getRoot()
+	local humanoid=getHumanoid()
 
-	if not root then
-
+	if not root or not humanoid then
 		removeWaterPlatform()
-
 		return
-
 	end
 
-	local waterBase=
-		findWaterBase()
+	local waterBase=findWaterBase()
 
 	if not waterBase then
-
 		removeWaterPlatform()
-
 		return
-
 	end
 
-	if not isInsideWaterBase(
-		root,
-		waterBase
-	) then
+	local halfX=waterBase.Size.X/2
+	local halfZ=waterBase.Size.Z/2
+	local dx=math.abs(root.Position.X-waterBase.Position.X)
+	local dz=math.abs(root.Position.Z-waterBase.Position.Z)
 
+	if dx>halfX or dz>halfZ then
 		removeWaterPlatform()
-
 		return
-
 	end
 
-	local waterY=
-		findWaterLevel()
-
-	if not waterY then
-
-		removeWaterPlatform()
-
-		return
-
-	end
-
-	if not waterPlatform
-		or not waterPlatform.Parent then
+	if not waterPlatform or not waterPlatform.Parent then
 
 		createWaterPlatform()
 
@@ -716,26 +600,25 @@ local function updateWaterPlatform()
 		return
 	end
 
-	waterPlatform.Size=WATER_SIZE
+	local targetY=root.Position.Y-3
 
-	waterPlatform.CFrame=
-		CFrame.new(
-			root.Position.X,
-			waterY+WATER_OFFSET,
-			root.Position.Z
-		)
+	waterPlatform.CFrame=CFrame.new(root.Position.X,targetY,root.Position.Z)
+
+	if humanoid:GetState()==Enum.HumanoidStateType.Swimming then
+
+		humanoid:ChangeState(Enum.HumanoidStateType.Running)
+
+	end
 
 end
 
 --========================================================
--- SETUP WATER WALK
+-- SETUP
 --========================================================
 
-function setupWaterWalk()
+local function setupWaterWalk()
 
-	disconnect(
-		waterConnection
-	)
+	disconnect(waterConnection)
 
 	waterConnection=nil
 
@@ -745,19 +628,14 @@ function setupWaterWalk()
 		return
 	end
 
-	waterConnection=
-		RunService.RenderStepped:Connect(
-			function()
+	waterConnection=RunService.RenderStepped:Connect(function()
 
 				updateWaterPlatform()
 
 			end
 		)
 
-	table.insert(
-		Connections,
-		waterConnection
-	)
+	table.insert(Connections,waterConnection)
 
 end
 
