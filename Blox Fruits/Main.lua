@@ -1,19 +1,15 @@
 local Players=game:GetService("Players")
 local UserInputService=game:GetService("UserInputService")
 local TweenService=game:GetService("TweenService")
-local RunService=game:GetService("RunService")
 
 local player=Players.LocalPlayer
 local playerGui=player:WaitForChild("PlayerGui")
 
 local ESPModule=loadstring(game:HttpGet("https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/ESP.lua"))()
 local SettingsModule=loadstring(game:HttpGet("https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/Settings.lua"))()
+local PVPModule=loadstring(game:HttpGet("https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/PVP.lua"))()
 
 local HttpService=game:GetService("HttpService")
-
---========================================================
--- LPT HUB DATA
---========================================================
 
 local CONFIG_FOLDER="LPT Hub"
 
@@ -72,6 +68,7 @@ local CONFIG_FILE=
 --========================================================
 
 local DefaultConfig={
+	--ESP
 	Island=false,
 	Fruit=false,
 	Player=false,
@@ -81,6 +78,13 @@ local DefaultConfig={
 	RemoveNotifications=false,
 	AutoLoadScript=false,
 	BoostFPS=false,
+
+	-- PVP
+	WalkSpeed=16,
+	JumpPower=50,
+	ChangeWalkSpeed=false,
+	ChangeJumpPower=false,
+	WalkOnWater=true,
 
 	-- WEBHOOK
 	WebhookURL="",
@@ -222,13 +226,28 @@ end
 
 loadConfig()
 
-SettingsModule:Set(
-	"AutoLoadScript",
-	Config.AutoLoadScript
-)
+SettingsModule:Set("AutoLoadScript",Config.AutoLoadScript)
 
 local oldGui=playerGui:FindFirstChild("LPTHub")
 if oldGui then oldGui:Destroy() end
+
+--========================================================
+-- APPLY LOADED MODULE CONFIG
+--========================================================
+
+if ESPModule then
+	ESPModule:Set("Island",Config.Island)
+	ESPModule:Set("Fruit",Config.Fruit)
+	ESPModule:Set("Player",Config.Player)
+end
+
+if PVPModule then
+	PVPModule:Set("WalkSpeed",Config.WalkSpeed)
+	PVPModule:Set("JumpPower",Config.JumpPower)
+	PVPModule:Set("ChangeWalkSpeed",Config.ChangeWalkSpeed)
+	PVPModule:Set("ChangeJumpPower",Config.ChangeJumpPower)
+	PVPModule:Set("WalkOnWater",Config.WalkOnWater)
+end
 
 --========================================================
 -- COLORS
@@ -310,1102 +329,6 @@ local function createLabel(parent,text,size,position,font,textSize,color,alignme
 	label.TextYAlignment=Enum.TextYAlignment.Center
 	label.Parent=parent
 	return label
-end
-
---========================================================
--- FARM ENGINE
--- Stable Auto Farm
--- Roblox Studio / game bạn kiểm soát
---========================================================
-
-local FarmState={
-	Running=false,
-	State="Idle",
-	Level=0,
-	Quest=nil,
-	Target=nil,
-	Session=0,
-	LastQuestAction=0,
-	LastAttack=0,
-	LastTargetScan=0
-}
-
-local FarmConfig={
-	AttackDistance=7,
-	SearchDistance=5000,
-
-	-- Tốc độ bay
-	FlySpeed=100,
-	FlyHeight=18,
-
-	-- Chu kỳ
-	LoopDelay=.12,
-	SearchDelay=.25,
-
-	-- Chống spam
-	QuestActionCooldown=.8,
-	AttackCooldown=.10,
-
-	MoveOffset=Vector3.new(0,0,6)
-}
-
---========================================================
--- BASIC HELPERS
---========================================================
-
-local function getCharacter()
-	return player.Character
-end
-
-local function getHumanoid()
-	local character=getCharacter()
-
-	if not character then
-		return nil
-	end
-
-	return character:FindFirstChildOfClass("Humanoid")
-end
-
-local function getCharacterRoot()
-	local character=getCharacter()
-
-	if not character then
-		return nil
-	end
-
-	return character:FindFirstChild("HumanoidRootPart")
-end
-
-local function getLevel()
-	local containers={
-		player:FindFirstChild("leaderstats"),
-		player:FindFirstChild("Data"),
-		player
-	}
-
-	for _,container in ipairs(containers) do
-		if container then
-			local levelObject=
-				container:FindFirstChild("Level")
-				or container:FindFirstChild("Lv")
-				or container:FindFirstChild("level")
-
-			if levelObject then
-				local value=tonumber(levelObject.Value)
-
-				if value then
-					return value
-				end
-			end
-
-			for _,object in ipairs(container:GetDescendants()) do
-				if object.Name=="Level"
-					or object.Name=="Lv"
-					or object.Name=="level" then
-
-					local value=tonumber(object.Value)
-
-					if value then
-						return value
-					end
-				end
-			end
-		end
-	end
-
-	return 0
-end
-
-local function getRoot(object)
-	if not object then
-		return nil
-	end
-
-	if object:IsA("BasePart") then
-		return object
-	end
-
-	if object:IsA("Model") then
-		return object:FindFirstChild("HumanoidRootPart",true)
-			or object.PrimaryPart
-			or object:FindFirstChildWhichIsA("BasePart",true)
-	end
-
-	return object:FindFirstChildWhichIsA("BasePart",true)
-end
-
-local function getHumanoidFrom(object)
-	if not object then
-		return nil
-	end
-
-	return object:FindFirstChildOfClass("Humanoid")
-		or object:FindFirstChildWhichIsA("Humanoid",true)
-end
-
-local function isAlive(object)
-	if not object or not object.Parent then
-		return false
-	end
-
-	local humanoid=getHumanoidFrom(object)
-
-	return humanoid
-		and humanoid.Health>0
-end
-
---========================================================
--- FARM DATA CONTAINER
---========================================================
-
-local function findFarmContainer()
-	local direct=workspace:FindFirstChild("LPT_Farm")
-
-	if direct then
-		return direct
-	end
-
-	local replicated=game:GetService("ReplicatedStorage"):FindFirstChild("LPT_Farm")
-
-	if replicated then
-		return replicated
-	end
-
-	local playerData=player:FindFirstChild("LPT_Farm")
-
-	if playerData then
-		return playerData
-	end
-
-	local playerGuiData=playerGui:FindFirstChild("LPT_Farm")
-
-	if playerGuiData then
-		return playerGuiData
-	end
-
-	return nil
-end
-
---========================================================
--- VALUE READER
---========================================================
-
-local function readValue(container,names)
-	if not container then
-		return nil
-	end
-
-	for _,name in ipairs(names) do
-		local object=container:FindFirstChild(name,true)
-
-		if object then
-
-			if object:IsA("StringValue")
-				or object:IsA("IntValue")
-				or object:IsA("NumberValue")
-				or object:IsA("BoolValue") then
-
-				return object.Value
-			end
-
-			local attribute=object:GetAttribute("Value")
-
-			if attribute~=nil then
-				return attribute
-			end
-		end
-
-		local attribute=container:GetAttribute(name)
-
-		if attribute~=nil then
-			return attribute
-		end
-	end
-
-	return nil
-end
-
---========================================================
--- QUEST CACHE
---========================================================
-
-local QuestDiscovery={
-	Cache=nil,
-	LastUpdate=0,
-	CacheTime=.1
-}
-
-local function invalidateQuest()
-	QuestDiscovery.Cache=nil
-	QuestDiscovery.LastUpdate=0
-end
-
---========================================================
--- QUEST DISCOVERY
---========================================================
-
-local function discoverQuest()
-	if QuestDiscovery.Cache
-		and os.clock()-QuestDiscovery.LastUpdate<QuestDiscovery.CacheTime then
-
-		return QuestDiscovery.Cache
-	end
-
-	local hooks=findFarmContainer()
-
-	if not hooks then
-		QuestDiscovery.Cache=nil
-		QuestDiscovery.LastUpdate=os.clock()
-
-		return nil
-	end
-
-	local questId=readValue(
-		hooks,
-		{
-			"CurrentQuestId",
-			"QuestId",
-			"QuestID",
-			"QuestName",
-			"CurrentQuest"
-		}
-	)
-
-	local enemyName=readValue(
-		hooks,
-		{
-			"CurrentEnemyName",
-			"EnemyName",
-			"TargetEnemy",
-			"Enemy",
-			"Target"
-		}
-	)
-
-	local kills=readValue(
-		hooks,
-		{
-			"QuestKills",
-			"Kills",
-			"CurrentKills",
-			"Progress",
-			"KillCount"
-		}
-	)
-
-	local required=readValue(
-		hooks,
-		{
-			"QuestRequired",
-			"RequiredKills",
-			"MaxKills",
-			"Required",
-			"Goal",
-			"KillGoal"
-		}
-	)
-
-	local active=readValue(
-		hooks,
-		{
-			"QuestActive",
-			"Active",
-			"HasQuest",
-			"IsQuestActive"
-		}
-	)
-
-	local completed=readValue(
-		hooks,
-		{
-			"QuestCompleted",
-			"Completed",
-			"IsCompleted"
-		}
-	)
-
-	local quest={
-		Id=questId,
-		EnemyName=typeof(enemyName)=="string" and enemyName or nil,
-
-		Kills=tonumber(kills) or 0,
-		Required=tonumber(required) or 0,
-
-		Active=active==true,
-		Completed=completed==true,
-
-		Container=hooks
-	}
-
-	QuestDiscovery.Cache=quest
-	QuestDiscovery.LastUpdate=os.clock()
-
-	return quest
-end
-
---========================================================
--- REMOTE FINDER
---========================================================
-
-local function findRemote(names)
-	local containers={
-		findFarmContainer(),
-		game:GetService("ReplicatedStorage"),
-		workspace,
-		player
-	}
-
-	for _,container in ipairs(containers) do
-		if container then
-			for _,name in ipairs(names) do
-				local object=container:FindFirstChild(name,true)
-
-				if object then
-					if object:IsA("RemoteEvent")
-						or object:IsA("RemoteFunction")
-						or object:IsA("BindableEvent")
-						or object:IsA("BindableFunction") then
-
-						return object
-					end
-				end
-			end
-		end
-	end
-
-	return nil
-end
-
---========================================================
--- SAFE REMOTE CALL
---========================================================
-
-local function invokeRemote(remote,...)
-	if not remote then
-		return false
-	end
-
-	local args={...}
-
-	local success,result=pcall(function()
-
-		if remote:IsA("RemoteEvent") then
-			remote:FireServer(table.unpack(args))
-			return true
-		end
-
-		if remote:IsA("RemoteFunction") then
-			remote:InvokeServer(table.unpack(args))
-			return true
-		end
-
-		if remote:IsA("BindableEvent") then
-			remote:Fire(table.unpack(args))
-			return true
-		end
-
-		if remote:IsA("BindableFunction") then
-			remote:Invoke(table.unpack(args))
-			return true
-		end
-
-		return false
-	end)
-
-	return success and result==true
-end
-
---========================================================
--- QUEST ACCEPT
---========================================================
-
-local function acceptQuest()
-	local now=os.clock()
-
-	if now-FarmState.LastQuestAction<FarmConfig.QuestActionCooldown then
-		return false
-	end
-
-	local remote=findRemote({
-		"AcceptQuest",
-		"StartQuest",
-		"TakeQuest",
-		"GetQuest",
-		"QuestAccept",
-		"Accept"
-	})
-
-	if not remote then
-		return false
-	end
-
-	FarmState.LastQuestAction=now
-
-	local quest=discoverQuest()
-
-	local success=false
-
-	if quest and quest.Id~=nil then
-		success=invokeRemote(remote,quest.Id)
-	end
-
-	if not success then
-		success=invokeRemote(remote)
-	end
-
-	if success then
-		invalidateQuest()
-	end
-
-	return success
-end
-
---========================================================
--- QUEST TURN IN
---========================================================
-
-local function turnInQuest()
-	local now=os.clock()
-
-	if now-FarmState.LastQuestAction<FarmConfig.QuestActionCooldown then
-		return false
-	end
-
-	local remote=findRemote({
-		"TurnInQuest",
-		"CompleteQuest",
-		"FinishQuest",
-		"QuestComplete",
-		"TurnQuest",
-		"Complete"
-	})
-
-	if not remote then
-		return false
-	end
-
-	FarmState.LastQuestAction=now
-
-	local quest=discoverQuest()
-
-	local success=false
-
-	if quest and quest.Id~=nil then
-		success=invokeRemote(remote,quest.Id)
-	end
-
-	if not success then
-		success=invokeRemote(remote)
-	end
-
-	if success then
-		invalidateQuest()
-	end
-
-	return success
-end
-
---========================================================
--- ATTACK
---========================================================
-
-local function attackTarget(target)
-	if not target then
-		return false
-	end
-
-	if not isAlive(target) then
-		return false
-	end
-
-	local now=os.clock()
-
-	if now-FarmState.LastAttack<FarmConfig.AttackCooldown then
-		return false
-	end
-
-	local remote=findRemote({
-		"Attack",
-		"AttackEnemy",
-		"Combat",
-		"Hit",
-		"Damage",
-		"M1",
-		"BasicAttack"
-	})
-
-	if not remote then
-		return false
-	end
-
-	FarmState.LastAttack=now
-
-	local success=false
-
-	-- Cách 1: truyền enemy
-	success=invokeRemote(remote,target)
-
-	-- Cách 2: truyền Model + humanoid nếu game yêu cầu
-	if not success then
-		local humanoid=getHumanoidFrom(target)
-
-		if humanoid then
-			success=invokeRemote(
-				remote,
-				target,
-				humanoid
-			)
-		end
-	end
-
-	return success
-end
-
---========================================================
--- FIND ENEMY
---========================================================
-
-local function findEnemy(quest)
-	if not quest then
-		return nil
-	end
-
-	local enemyName=quest.EnemyName
-
-	if not enemyName
-		or enemyName=="" then
-
-		return nil
-	end
-
-	local characterRoot=getCharacterRoot()
-
-	if not characterRoot then
-		return nil
-	end
-
-	local enemiesFolder=
-		workspace:FindFirstChild("Enemies")
-		or workspace:FindFirstChild("Enemy")
-
-	if not enemiesFolder then
-		return nil
-	end
-
-	local nearest=nil
-	local nearestDistance=math.huge
-
-	for _,enemy in ipairs(enemiesFolder:GetDescendants()) do
-
-		if enemy:IsA("Model") then
-
-			local nameMatch=
-				enemy.Name==enemyName
-				or string.lower(enemy.Name)==string.lower(enemyName)
-
-			if nameMatch then
-
-				local humanoid=getHumanoidFrom(enemy)
-				local enemyRoot=getRoot(enemy)
-
-				if humanoid
-					and humanoid.Health>0
-					and enemyRoot then
-
-					local distance=
-						(characterRoot.Position-enemyRoot.Position).Magnitude
-
-					if distance<=FarmConfig.SearchDistance
-						and distance<nearestDistance then
-
-						nearest=enemy
-						nearestDistance=distance
-					end
-				end
-			end
-		end
-	end
-
-	return nearest
-end
-
---========================================================
--- FLY SYSTEM
---========================================================
-
-local FlyState={
-	Enabled=false,
-
-	Attachment=nil,
-	LinearVelocity=nil,
-	AlignOrientation=nil
-}
-
-local function cleanupFly()
-	if FlyState.LinearVelocity then
-		FlyState.LinearVelocity:Destroy()
-		FlyState.LinearVelocity=nil
-	end
-
-	if FlyState.AlignOrientation then
-		FlyState.AlignOrientation:Destroy()
-		FlyState.AlignOrientation=nil
-	end
-
-	if FlyState.Attachment then
-		FlyState.Attachment:Destroy()
-		FlyState.Attachment=nil
-	end
-
-	local root=getCharacterRoot()
-
-	if root then
-		root.AssemblyLinearVelocity=Vector3.zero
-		root.AssemblyAngularVelocity=Vector3.zero
-	end
-
-	local humanoid=getHumanoid()
-
-	if humanoid then
-		humanoid.PlatformStand=false
-		humanoid.AutoRotate=true
-	end
-end
-
-local function setupFly()
-	cleanupFly()
-
-	local root=getCharacterRoot()
-	local humanoid=getHumanoid()
-
-	if not root or not humanoid then
-		return false
-	end
-
-	local attachment=Instance.new("Attachment")
-
-	attachment.Name="LPT_FlyAttachment"
-	attachment.Parent=root
-
-	local velocity=Instance.new("LinearVelocity")
-
-	velocity.Name="LPT_FlyVelocity"
-	velocity.Attachment0=attachment
-	velocity.RelativeTo=Enum.ActuatorRelativeTo.World
-	velocity.VelocityConstraintMode=Enum.VelocityConstraintMode.Vector
-	velocity.VectorVelocity=Vector3.zero
-	velocity.MaxForce=math.huge
-	velocity.Parent=root
-
-	local orientation=Instance.new("AlignOrientation")
-
-	orientation.Name="LPT_FlyOrientation"
-	orientation.Mode=Enum.OrientationAlignmentMode.OneAttachment
-	orientation.Attachment0=attachment
-	orientation.MaxTorque=math.huge
-	orientation.Responsiveness=40
-	orientation.RigidityEnabled=false
-	orientation.Parent=root
-
-	FlyState.Attachment=attachment
-	FlyState.LinearVelocity=velocity
-	FlyState.AlignOrientation=orientation
-
-	humanoid.PlatformStand=true
-	humanoid.AutoRotate=false
-
-	return true
-end
-
-local function setFly(enabled)
-	FlyState.Enabled=enabled==true
-
-	if not FlyState.Enabled then
-		cleanupFly()
-		return
-	end
-
-	setupFly()
-end
-
---========================================================
--- FLY TO TARGET
---========================================================
-
-local function flyToTarget(target)
-	if not FlyState.Enabled then
-		return false
-	end
-
-	if not target or not target.Parent then
-		return false
-	end
-
-	local root=getCharacterRoot()
-	local targetRoot=getRoot(target)
-
-	if not root or not targetRoot then
-		return false
-	end
-
-	if not FlyState.LinearVelocity
-		or not FlyState.LinearVelocity.Parent
-		or not FlyState.AlignOrientation
-		or not FlyState.AlignOrientation.Parent then
-
-		if not setupFly() then
-			return false
-		end
-	end
-
-	local targetPosition=
-		targetRoot.Position+
-		Vector3.new(
-			FarmConfig.MoveOffset.X,
-			FarmConfig.FlyHeight,
-			FarmConfig.MoveOffset.Z
-		)
-
-	local offset=targetPosition-root.Position
-	local distance=offset.Magnitude
-
-	if distance<=FarmConfig.AttackDistance then
-
-		FlyState.LinearVelocity.VectorVelocity=Vector3.zero
-
-		FlyState.AlignOrientation.CFrame=
-			CFrame.lookAt(
-				root.Position,
-				targetRoot.Position
-			)
-
-		return true
-	end
-
-	if distance<=0.01 then
-		return true
-	end
-
-	local direction=offset.Unit
-
-	FlyState.LinearVelocity.VectorVelocity=
-		direction*FarmConfig.FlySpeed
-
-	FlyState.AlignOrientation.CFrame=
-		CFrame.lookAt(
-			root.Position,
-			targetRoot.Position
-		)
-
-	return false
-end
-
---========================================================
--- TARGET VALIDATION
---========================================================
-
-local function targetStillValid(target,quest)
-	if not target then
-		return false
-	end
-
-	if not target.Parent then
-		return false
-	end
-
-	if not isAlive(target) then
-		return false
-	end
-
-	if quest
-		and quest.EnemyName
-		and target.Name~=quest.EnemyName then
-
-		return false
-	end
-
-	return true
-end
-
---========================================================
--- STOP
---========================================================
-
-local function stopFarm()
-	FarmState.Running=false
-	FarmState.State="Idle"
-	FarmState.Level=0
-	FarmState.Quest=nil
-	FarmState.Target=nil
-
-	FarmState.Session+=1
-	FarmState.LastQuestAction=0
-	FarmState.LastAttack=0
-	FarmState.LastTargetScan=0
-
-	invalidateQuest()
-
-	setFly(false)
-end
-
---========================================================
--- CHARACTER RESPAWN
---========================================================
-
-player.CharacterAdded:Connect(function()
-	if not FarmState.Running then
-		return
-	end
-
-	FarmState.State="Waiting Character"
-	FarmState.Target=nil
-	FarmState.Quest=nil
-
-	invalidateQuest()
-
-	task.wait(.7)
-
-	if FarmState.Running then
-		setFly(true)
-	end
-end)
-
---========================================================
--- START FARM
---========================================================
-
-local gui
-
-local function startFarm()
-	if FarmState.Running then
-		return
-	end
-
-	FarmState.Running=true
-	FarmState.Session+=1
-
-	local session=FarmState.Session
-
-	FarmState.State="Starting"
-
-	setFly(true)
-
-	task.spawn(function()
-
-		while
-			FarmState.Running
-			and FarmState.Session==session
-			and gui
-			and gui.Parent
-		do
-
-			--================================================
-			-- CHARACTER CHECK
-			--================================================
-
-			local character=getCharacter()
-			local humanoid=getHumanoid()
-			local root=getCharacterRoot()
-
-			if not character
-				or not humanoid
-				or not root
-				or humanoid.Health<=0 then
-
-				FarmState.State="Waiting Character"
-
-				task.wait(.35)
-
-				continue
-			end
-
-			--================================================
-			-- LEVEL
-			--================================================
-
-			FarmState.State="Reading Level"
-
-			local level=getLevel()
-
-			FarmState.Level=level
-
-			if level<=0 then
-				task.wait(FarmConfig.SearchDelay)
-				continue
-			end
-
-			--================================================
-			-- QUEST
-			--================================================
-
-			FarmState.State="Detecting Quest"
-
-			local quest=discoverQuest()
-
-			-- Không có quest dữ liệu
-			if not quest then
-
-				FarmState.State="Searching Quest"
-
-				local accepted=acceptQuest()
-
-				if accepted then
-					task.wait(.35)
-				else
-					task.wait(FarmConfig.SearchDelay)
-				end
-
-				continue
-			end
-
-			FarmState.Quest=quest
-
-			--================================================
-			-- COMPLETED CHECK
-			--================================================
-
-			local completed=
-				quest.Completed
-				or (
-					quest.Required>0
-					and quest.Kills>=quest.Required
-				)
-
-			if completed then
-
-				FarmState.State="Turning In Quest"
-
-				local turnedIn=turnInQuest()
-
-				if turnedIn then
-					FarmState.Target=nil
-					FarmState.Quest=nil
-					invalidateQuest()
-
-					task.wait(.35)
-				else
-					task.wait(FarmConfig.SearchDelay)
-				end
-
-				continue
-			end
-
-			--================================================
-			-- ACTIVE QUEST CHECK
-			--================================================
-
-			if not quest.Active then
-
-				FarmState.State="Accepting Quest"
-
-				local accepted=acceptQuest()
-
-				if accepted then
-					FarmState.Target=nil
-					invalidateQuest()
-
-					task.wait(.35)
-				else
-					task.wait(FarmConfig.SearchDelay)
-				end
-
-				continue
-			end
-
-			--================================================
-			-- ENEMY NAME CHECK
-			--================================================
-
-			if not quest.EnemyName
-				or quest.EnemyName=="" then
-
-				FarmState.State="Waiting Quest Target"
-
-				task.wait(FarmConfig.SearchDelay)
-
-				continue
-			end
-
-			--================================================
-			-- CURRENT TARGET
-			--================================================
-
-			local target=FarmState.Target
-
-			if not targetStillValid(target,quest) then
-
-				local now=os.clock()
-
-				if now-FarmState.LastTargetScan>=FarmConfig.SearchDelay then
-
-					FarmState.LastTargetScan=now
-
-					FarmState.State=
-						"Searching "..tostring(quest.EnemyName)
-
-					target=findEnemy(quest)
-
-					FarmState.Target=target
-				end
-			end
-
-			--================================================
-			-- NO TARGET
-			--================================================
-
-			if not targetStillValid(target,quest) then
-
-				FarmState.State=
-					"Waiting "..tostring(quest.EnemyName)
-
-				task.wait(FarmConfig.SearchDelay)
-
-				continue
-			end
-
-			--================================================
-			-- FLY
-			--================================================
-
-			FarmState.Target=target
-			FarmState.State="Flying"
-
-			local reached=flyToTarget(target)
-
-			--================================================
-			-- ATTACK
-			--================================================
-
-			if reached
-				and targetStillValid(target,quest) then
-
-				FarmState.State="Combat"
-
-				attackTarget(target)
-			end
-
-			--================================================
-			-- TARGET DEAD
-			--================================================
-
-			if not isAlive(target) then
-
-				FarmState.Target=nil
-
-				invalidateQuest()
-			end
-
-			task.wait(FarmConfig.LoopDelay)
-		end
-
-		setFly(false)
-
-		if FarmState.Session==session then
-			FarmState.State="Idle"
-			FarmState.Target=nil
-		end
-	end)
 end
 
 --========================================================
@@ -1705,7 +628,8 @@ local function createPage(name,titleText,description)
 		UDim2.fromOffset(28,18),
 		Enum.Font.GothamBold,
 		28,
-		COLORS.Text
+		COLORS.Text,
+		Enum.TextXAlignment.Center
 	)
 
 	if description then
@@ -1723,51 +647,19 @@ local function createPage(name,titleText,description)
 	return page
 end
 
-local shopPage=createPage(
-	"Shop",
-	"Shop",
-	"Shop and available items."
-)
-
-local statusPage=createPage(
-	"StatusAndServer",
-	"Status And Server",
-	"Server information and status."
-)
-
-local localPlayerPage=createPage(
-	"LocalPlayer",
-	"LocalPlayer",
-	"Player movement and character settings."
-)
-
-local settingFarmPage=createPage(
-	"SettingFarm",
-	"Setting Farm",
-	"Farm configuration."
-)
-
-local holdSkillPage=createPage(
-	"HoldAndSelectSkill",
-	"Hold and Select Skill",
-	"Skill selection and hold settings."
-)
-
-local farmingPage=createPage(
-	"Farming",
-	"Farming",
-	"Main farming functions."
-)
-
 local espPage=createPage(
 	"ESP",
 	"ESP"
 )
 
+local pvpPage=createPage(
+	"PVP",
+	"PVP"
+)
+
 local settingsPage=createPage(
 	"Settings",
-	"Settings",
-	"General script settings and utilities."
+	"Settings"
 )
 
 --========================================================
@@ -1807,7 +699,7 @@ local function createCard(parent,text,y,height)
 end
 
 --========================================================
--- SHARED TOGGLE UI
+-- ESP PAGE
 --========================================================
 
 local function createToggleUI(parent,default,callback)
@@ -1957,7 +849,362 @@ createCheckbox(
 espPage.CanvasSize=UDim2.fromOffset(0,300)
 
 --========================================================
--- SETTINGS
+-- PVP PAGE
+--========================================================
+
+local function createValueSlider(
+	parent,
+	titleText,
+	y,
+	minValue,
+	maxValue,
+	defaultValue,
+	callback
+)
+
+	local card=Instance.new("Frame")
+	card.Size=UDim2.new(1,-56,0,86)
+	card.Position=UDim2.fromOffset(28,y)
+	card.BackgroundColor3=COLORS.Card
+	card.BorderSizePixel=0
+	card.Parent=parent
+
+	createCorner(card,14)
+	createStroke(card,COLORS.Border,.15,1)
+
+	createLabel(
+		card,
+		titleText,
+		UDim2.new(1,-100,0,24),
+		UDim2.fromOffset(14,5),
+		Enum.Font.GothamBold,
+		13,
+		COLORS.Text
+	)
+
+	local valueBox=Instance.new("TextBox")
+	valueBox.Size=UDim2.fromOffset(70,27)
+	valueBox.Position=UDim2.new(1,-84,0,4)
+	valueBox.BackgroundColor3=Color3.fromRGB(29,30,38)
+	valueBox.BorderSizePixel=0
+	valueBox.Text=tostring(defaultValue)
+	valueBox.PlaceholderText=tostring(defaultValue)
+	valueBox.TextColor3=COLORS.Text
+	valueBox.TextSize=13
+	valueBox.Font=Enum.Font.GothamBold
+	valueBox.ClearTextOnFocus=false
+	valueBox.TextXAlignment=Enum.TextXAlignment.Center
+	valueBox.Parent=card
+
+	createCorner(valueBox,7)
+	createStroke(valueBox,COLORS.Border,.25,1)
+
+	local slider=Instance.new("Frame")
+	slider.Size=UDim2.new(1,-28,0,6)
+	slider.Position=UDim2.fromOffset(14,58)
+	slider.BackgroundColor3=Color3.fromRGB(24,26,34)
+	slider.BorderSizePixel=0
+	slider.Parent=card
+
+	createCorner(slider,20)
+
+	local fill=Instance.new("Frame")
+	fill.Size=UDim2.fromScale(0,1)
+	fill.BackgroundColor3=SIDEBAR_ACCENT
+	fill.BorderSizePixel=0
+	fill.Parent=slider
+
+	createCorner(fill,20)
+
+	local knob=Instance.new("Frame")
+	knob.Size=UDim2.fromOffset(14,14)
+	knob.AnchorPoint=Vector2.new(.5,.5)
+	knob.Position=UDim2.new(0,0,.5,0)
+	knob.BackgroundColor3=SIDEBAR_ACCENT
+	knob.BorderSizePixel=0
+	knob.Parent=slider
+
+	createCorner(knob,50)
+
+	local dragButton=Instance.new("TextButton")
+	dragButton.Size=UDim2.new(1,20,1,20)
+	dragButton.Position=UDim2.fromOffset(-10,-10)
+	dragButton.BackgroundTransparency=1
+	dragButton.BorderSizePixel=0
+	dragButton.Text=""
+	dragButton.AutoButtonColor=false
+	dragButton.Parent=slider
+
+	local value=math.clamp(
+		tonumber(defaultValue) or minValue,
+		minValue,
+		maxValue
+	)
+
+	local dragging=false
+
+	local function updateVisual()
+
+		local alpha=
+			(value-minValue)
+			/
+			(maxValue-minValue)
+
+		alpha=math.clamp(alpha,0,1)
+
+		fill.Size=UDim2.new(alpha,0,1,0)
+		knob.Position=UDim2.new(alpha,0,.5,0)
+		valueBox.Text=tostring(value)
+
+	end
+
+	local function setValue(newValue,fire)
+
+		newValue=tonumber(newValue)
+
+		if not newValue then
+			updateVisual()
+			return
+		end
+
+		newValue=math.clamp(
+			newValue,
+			minValue,
+			maxValue
+		)
+
+		newValue=math.floor(newValue+0.5)
+
+		value=newValue
+
+		updateVisual()
+
+		if fire~=false and callback then
+			callback(value)
+		end
+
+	end
+
+	local function setFromMouse(x)
+
+		local startX=slider.AbsolutePosition.X
+		local width=slider.AbsoluteSize.X
+
+		if width<=0 then
+			return
+		end
+
+		local alpha=(x-startX)/width
+		alpha=math.clamp(alpha,0,1)
+
+		local newValue=
+			minValue+
+			(maxValue-minValue)*alpha
+
+		setValue(newValue,true)
+
+	end
+
+	dragButton.InputBegan:Connect(function(input)
+
+		if input.UserInputType==Enum.UserInputType.MouseButton1
+			or input.UserInputType==Enum.UserInputType.Touch then
+
+			dragging=true
+			setFromMouse(input.Position.X)
+
+		end
+
+	end)
+
+	dragButton.InputEnded:Connect(function(input)
+
+		if input.UserInputType==Enum.UserInputType.MouseButton1
+			or input.UserInputType==Enum.UserInputType.Touch then
+
+			dragging=false
+
+		end
+
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+
+		if not dragging then
+			return
+		end
+
+		if input.UserInputType~=Enum.UserInputType.MouseMovement
+			and input.UserInputType~=Enum.UserInputType.Touch then
+
+			return
+		end
+
+		setFromMouse(input.Position.X)
+
+	end)
+
+	valueBox.FocusLost:Connect(function()
+
+		local number=tonumber(valueBox.Text)
+
+		if number then
+			setValue(number,true)
+		else
+			updateVisual()
+		end
+
+	end)
+
+	updateVisual()
+
+	return setValue
+end
+
+local pvpTitle=createLabel(
+	pvpPage,
+	"PVP",
+	UDim2.new(1,-56,0,34),
+	UDim2.fromOffset(28,95),
+	Enum.Font.GothamBold,
+	22,
+	COLORS.Text,
+	Enum.TextXAlignment.Center
+)
+
+local pvpSeparator=Instance.new("Frame")
+pvpSeparator.Size=UDim2.new(1,-56,0,1)
+pvpSeparator.Position=UDim2.fromOffset(28,133)
+pvpSeparator.BackgroundColor3=COLORS.Border
+pvpSeparator.BorderSizePixel=0
+pvpSeparator.Parent=pvpPage
+
+local otherTitle=createLabel(
+	pvpPage,
+	"Other",
+	UDim2.new(1,-56,0,34),
+	UDim2.fromOffset(28,180),
+	Enum.Font.GothamBold,
+	22,
+	COLORS.Text,
+	Enum.TextXAlignment.Center
+)
+
+local otherSeparator=Instance.new("Frame")
+otherSeparator.Size=UDim2.new(1,-56,0,1)
+otherSeparator.Position=UDim2.fromOffset(28,218)
+otherSeparator.BackgroundColor3=COLORS.Border
+otherSeparator.BorderSizePixel=0
+otherSeparator.Parent=pvpPage
+
+createValueSlider(
+	pvpPage,
+	"Input WalkSpeed",
+	235,
+	0,
+	500,
+	Config.WalkSpeed,
+	function(value)
+
+		Config.WalkSpeed=value
+
+		if PVPModule then
+			PVPModule:Set(
+				"WalkSpeed",
+				value
+			)
+		end
+
+		saveConfig()
+	end
+)
+
+createValueSlider(
+	pvpPage,
+	"Input JumpPower",
+	331,
+	0,
+	500,
+	Config.JumpPower,
+	function(value)
+
+		Config.JumpPower=value
+
+		if PVPModule then
+			PVPModule:Set(
+				"JumpPower",
+				value
+			)
+		end
+
+		saveConfig()
+	end
+)
+
+createCheckbox(
+	pvpPage,
+	"Change WalkSpeed",
+	427,
+	Config.ChangeWalkSpeed,
+	function(enabled)
+
+		Config.ChangeWalkSpeed=enabled
+
+		if PVPModule then
+			PVPModule:Set(
+				"ChangeWalkSpeed",
+				enabled
+			)
+		end
+
+		saveConfig()
+	end
+)
+
+createCheckbox(
+	pvpPage,
+	"Change JumpPower",
+	493,
+	Config.ChangeJumpPower,
+	function(enabled)
+
+		Config.ChangeJumpPower=enabled
+
+		if PVPModule then
+			PVPModule:Set(
+				"ChangeJumpPower",
+				enabled
+			)
+		end
+
+		saveConfig()
+	end
+)
+
+createCheckbox(
+	pvpPage,
+	"Walk On Water",
+	559,
+	Config.WalkOnWater,
+	function(enabled)
+
+		Config.WalkOnWater=enabled
+
+		if PVPModule then
+			PVPModule:Set(
+				"WalkOnWater",
+				enabled
+			)
+		end
+
+		saveConfig()
+	end
+)
+
+pvpPage.CanvasSize=UDim2.fromOffset(0,650)
+
+--========================================================
+-- SETTINGS PAGE
 --========================================================
 
 createCheckbox(
@@ -2014,7 +1261,6 @@ createCheckbox(
 	293,
 	Config.AutoLoadScript,
 	function(enabled)
-
 		Config.AutoLoadScript=enabled
 
 		if SettingsModule then
@@ -2041,13 +1287,35 @@ createCheckbox(
 	end
 )
 
-settingsPage.CanvasSize=UDim2.fromOffset(0,560)
-
 --========================================================
--- WEBHOOK
+-- WEBHOOK TITLE
 --========================================================
 
-local function createInputCard(parent,text,y,value,callback,showToggle,toggleDefault,toggleCallback)
+createLabel(
+	settingsPage,
+	"Webhook",
+	UDim2.new(1,-56,0,38),
+	UDim2.fromOffset(28,425),
+	Enum.Font.GothamBold,
+	24,
+	COLORS.Text,
+	Enum.TextXAlignment.Center
+)
+
+--========================================================
+-- INPUT CARD
+--========================================================
+
+local function createInputCard(
+	parent,
+	text,
+	y,
+	value,
+	callback,
+	showToggle,
+	toggleDefault,
+	toggleCallback
+)
 
 	local card=Instance.new("Frame")
 	card.Size=UDim2.new(1,-56,0,72)
@@ -2059,10 +1327,6 @@ local function createInputCard(parent,text,y,value,callback,showToggle,toggleDef
 	createCorner(card,14)
 	createStroke(card,COLORS.Border,.15,1)
 
-	--====================================================
-	-- TITLE
-	--====================================================
-
 	createLabel(
 		card,
 		text,
@@ -2073,12 +1337,14 @@ local function createInputCard(parent,text,y,value,callback,showToggle,toggleDef
 		COLORS.Text
 	)
 
-	--====================================================
-	-- INPUT
-	--====================================================
-
 	local input=Instance.new("TextBox")
-	input.Size=UDim2.new(1,showToggle and -70 or -24,0,27)
+	input.Size=UDim2.new(
+		1,
+		showToggle and -70 or -24,
+		0,
+		27
+	)
+
 	input.Position=UDim2.fromOffset(12,32)
 	input.BackgroundColor3=Color3.fromRGB(29,30,38)
 	input.BorderSizePixel=0
@@ -2101,98 +1367,29 @@ local function createInputCard(parent,text,y,value,callback,showToggle,toggleDef
 		end
 	end)
 
-	--====================================================
-	-- CHECKBOX
-	--====================================================
-
 	if showToggle then
-
-		local toggleFrame=Instance.new("Frame")
-		toggleFrame.Name="ToggleButton"
-		toggleFrame.Size=UDim2.fromOffset(24,24)
-		toggleFrame.Position=UDim2.new(1,-48,.5,-12)
-		toggleFrame.BackgroundColor3=Color3.fromRGB(20,20,25)
-		toggleFrame.BorderSizePixel=0
-		toggleFrame.Parent=card
-
-		createCorner(toggleFrame,4)
-
-		local stroke=Instance.new("UIStroke")
-		stroke.Color=SIDEBAR_ACCENT
-		stroke.Thickness=2.5
-		stroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
-		stroke.Parent=toggleFrame
-
-		local fill=Instance.new("Frame")
-		fill.Name="Fill"
-		fill.AnchorPoint=Vector2.new(.5,.5)
-		fill.Position=UDim2.new(.5,0,.5,0)
-		fill.Size=UDim2.fromOffset(0,0)
-		fill.BackgroundColor3=SIDEBAR_ACCENT
-		fill.BorderSizePixel=0
-		fill.ZIndex=2
-		fill.Parent=toggleFrame
-
-		createCorner(fill,2)
-
-		local clickButton=Instance.new("TextButton")
-		clickButton.Name="ClickButton"
-		clickButton.Size=UDim2.fromScale(1,1)
-		clickButton.BackgroundTransparency=1
-		clickButton.BorderSizePixel=0
-		clickButton.AutoButtonColor=false
-		clickButton.Text=""
-		clickButton.ZIndex=3
-		clickButton.Parent=toggleFrame
-
-		local enabled=toggleDefault==true
-
-		local function updateVisual()
-			local goalSize=enabled
-				and UDim2.new(1,-4.8,1,-4.8)
-				or UDim2.fromOffset(0,0)
-
-			tween(
-				fill,
-				{Size=goalSize},
-				.18,
-				Enum.EasingStyle.Quad
-			)
-		end
-
-		clickButton.MouseButton1Click:Connect(function()
-
-			enabled=not enabled
-
-			updateVisual()
-
-			if toggleCallback then
-				toggleCallback(enabled)
+		createToggleUI(
+			card,
+			toggleDefault,
+			function(enabled)
+				if toggleCallback then
+					toggleCallback(enabled)
+				end
 			end
-		end)
-
-		clickButton.MouseEnter:Connect(function()
-			tween(stroke,{
-				Thickness=3
-			},.12)
-		end)
-
-		clickButton.MouseLeave:Connect(function()
-			tween(stroke,{
-				Thickness=2.5
-			},.12)
-		end)
-
-		updateVisual()
+		)
 	end
 
 	return input
 end
 
+--========================================================
+-- WEBHOOK INPUT
+--========================================================
+
 local webhookUrlInput=createInputCard(
 	settingsPage,
 	"Input Url Webhook",
-	425,
+	480,
 	Config.WebhookURL,
 	function(text)
 		Config.WebhookURL=text
@@ -2203,7 +1400,7 @@ local webhookUrlInput=createInputCard(
 local webhookPingInput=createInputCard(
 	settingsPage,
 	"Input Discord Ping (Everyone/ID Role)",
-	505,
+	560,
 	Config.WebhookPing,
 	function(text)
 		Config.WebhookPing=text
@@ -2217,13 +1414,28 @@ local webhookPingInput=createInputCard(
 	end
 )
 
+--========================================================
+-- WEBHOOK OPTIONS
+--========================================================
+
 createCheckbox(
 	settingsPage,
 	"Noti Profile",
-	585,
+	640,
 	Config.WebhookNotiProfile,
 	function(enabled)
 		Config.WebhookNotiProfile=enabled
+		saveConfig()
+	end
+)
+
+createCheckbox(
+	settingsPage,
+	"Webhook Store Fruit",
+	706,
+	Config.WebhookStoreFruit,
+	function(enabled)
+		Config.WebhookStoreFruit=enabled
 		saveConfig()
 	end
 )
@@ -2235,7 +1447,7 @@ createCheckbox(
 local rarityCard=createCard(
 	settingsPage,
 	"Select Rarity Fruit:                                ›",
-	717,
+	772,
 	58
 )
 
@@ -2274,8 +1486,14 @@ rarityButton.MouseButton1Click:Connect(function()
 
 	Config.WebhookRarity=rarities[index]
 
-	rarityCard:FindFirstChildWhichIsA("TextLabel").Text=
-		"Select Rarity Fruit:  "..Config.WebhookRarity.."                                      ›"
+	local label=rarityCard:FindFirstChildWhichIsA("TextLabel")
+
+	if label then
+		label.Text=
+			"Select Rarity Fruit:  "
+			..Config.WebhookRarity
+			.."                                      ›"
+	end
 
 	saveConfig()
 end)
@@ -2284,28 +1502,15 @@ local rarityLabel=rarityCard:FindFirstChildWhichIsA("TextLabel")
 
 if rarityLabel then
 	rarityLabel.Text=
-		"Select Rarity Fruit:  "..tostring(Config.WebhookRarity).."                                      ›"
+		"Select Rarity Fruit:  "
+		..tostring(Config.WebhookRarity)
+		.."                                      ›"
 end
-
---========================================================
--- WEBHOOK OPTIONS
---========================================================
-
-createCheckbox(
-	settingsPage,
-	"Webhook Store Fruit",
-	651,
-	Config.WebhookStoreFruit,
-	function(enabled)
-		Config.WebhookStoreFruit=enabled
-		saveConfig()
-	end
-)
 
 createCheckbox(
 	settingsPage,
 	"Webhook Find Prehistoric Island",
-	783,
+	838,
 	Config.WebhookFindPrehistoricIsland,
 	function(enabled)
 		Config.WebhookFindPrehistoricIsland=enabled
@@ -2316,7 +1521,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Webhook Find Leviathan",
-	849,
+	904,
 	Config.WebhookFindLeviathan,
 	function(enabled)
 		Config.WebhookFindLeviathan=enabled
@@ -2327,7 +1532,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Webhook Destroy IDK",
-	915,
+	970,
 	Config.WebhookDestroyIDK,
 	function(enabled)
 		Config.WebhookDestroyIDK=enabled
@@ -2338,7 +1543,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Webhook Find Mirage",
-	981,
+	1036,
 	Config.WebhookFindMirage,
 	function(enabled)
 		Config.WebhookFindMirage=enabled
@@ -2346,78 +1551,11 @@ createCheckbox(
 	end
 )
 
-settingsPage.CanvasSize=UDim2.fromOffset(0,1150)
-
---========================================================
--- PAGES CONTENT
---========================================================
-
-createCard(shopPage,"Shop",95)
-createCard(shopPage,"Available Items",161)
-
-shopPage.CanvasSize=UDim2.fromOffset(0,250)
-
-local serverCard=createCard(statusPage,"Server Status",95,105)
-
-createLabel(serverCard,"STATUS",UDim2.fromOffset(100,18),UDim2.fromOffset(18,8),Enum.Font.GothamBold,11,COLORS.TextDim)
-createLabel(serverCard,"Online",UDim2.fromOffset(180,24),UDim2.fromOffset(18,31),Enum.Font.GothamBold,17,COLORS.Success)
-createLabel(serverCard,"SERVER",UDim2.fromOffset(100,18),UDim2.fromOffset(220,8),Enum.Font.GothamBold,11,COLORS.TextDim)
-createLabel(serverCard,"Connected",UDim2.fromOffset(180,24),UDim2.fromOffset(220,31),Enum.Font.GothamMedium,15,COLORS.Text)
-
-createCard(statusPage,"Server Information",218)
-createCard(statusPage,"Players / Server",284)
-
-statusPage.CanvasSize=UDim2.fromOffset(0,370)
-
-createToggle(localPlayerPage,"WalkSpeed",95,false)
-createToggle(localPlayerPage,"JumpPower",161,false)
-createToggle(localPlayerPage,"No Clip",227,false)
-createToggle(localPlayerPage,"Fly",293,false)
-
-localPlayerPage.CanvasSize=UDim2.fromOffset(0,390)
-
-createToggle(settingFarmPage,"Auto Farm Settings",95,false)
-createToggle(settingFarmPage,"Auto Collect",161,false)
-createToggle(settingFarmPage,"Auto Buy",227,false)
-createToggle(settingFarmPage,"Auto Plant",293,false)
-
-settingFarmPage.CanvasSize=UDim2.fromOffset(0,360)
-
-createCard(holdSkillPage,"Select Skill",95)
-createToggle(holdSkillPage,"Hold Skill",161,false)
-createToggle(holdSkillPage,"Auto Select Skill",227,false)
-createToggle(holdSkillPage,"Use Selected Skill",293,false)
-
-holdSkillPage.CanvasSize=UDim2.fromOffset(0,360)
-
-createToggle(
-	farmingPage,
-	"Auto Farm",
-	95,
-	false,
-	function(enabled)
-		if enabled then
-			startFarm()
-		else
-			stopFarm()
-		end
-	end
-)
-
-farmingPage.CanvasSize=UDim2.fromOffset(0,190)
-
---========================================================
--- SIDEBAR
---========================================================
+settingsPage.CanvasSize=UDim2.fromOffset(0,1130)
 
 local menuItems={
-	{"Shop","Shop"},
-	{"Status And Server","StatusAndServer"},
-	{"LocalPlayer","LocalPlayer"},
-	{"Setting Farm","SettingFarm"},
-	{"Hold and Select Skill","HoldAndSelectSkill"},
-	{"Farming","Farming"},
 	{"ESP","ESP"},
+	{"PVP","PVP"},
 	{"Settings","Settings"}
 }
 
@@ -2705,13 +1843,20 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 
 close.MouseButton1Click:Connect(function()
-	stopFarm()
 
 	saveConfig()
 
 	if ESPModule then
 		ESPModule:Destroy()
 		ESPModule=nil
+	end
+
+	if PVPModule then
+		if PVPModule.Destroy then
+			PVPModule:Destroy()
+		end
+
+		PVPModule=nil
 	end
 
 	if SettingsModule then
@@ -2724,5 +1869,5 @@ close.MouseButton1Click:Connect(function()
 	end
 end)
 
-selectPage("Shop")
+selectPage("ESP")
 updateButtons()
