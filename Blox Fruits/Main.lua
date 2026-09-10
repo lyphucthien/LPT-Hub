@@ -1210,7 +1210,7 @@ pvpPage.CanvasSize=UDim2.fromOffset(0,650)
 createCheckbox(
 	settingsPage,
 	"White Screen",
-	95,
+	75,
 	Config.WhiteScreen,
 	function(enabled)
 		Config.WhiteScreen=enabled
@@ -1226,7 +1226,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Black Screen",
-	161,
+	141,
 	Config.BlackScreen,
 	function(enabled)
 		Config.BlackScreen=enabled
@@ -1242,7 +1242,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Remove Notifications",
-	227,
+	207,
 	Config.RemoveNotifications,
 	function(enabled)
 		Config.RemoveNotifications=enabled
@@ -1258,7 +1258,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Auto Load Script",
-	293,
+	273,
 	Config.AutoLoadScript,
 	function(enabled)
 		Config.AutoLoadScript=enabled
@@ -1274,7 +1274,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Boost FPS",
-	359,
+	339,
 	Config.BoostFPS,
 	function(enabled)
 		Config.BoostFPS=enabled
@@ -1297,7 +1297,7 @@ createLabel(
 	UDim2.new(1,-56,0,38),
 	UDim2.fromOffset(28,425),
 	Enum.Font.GothamBold,
-	24,
+	26,
 	COLORS.Text,
 	Enum.TextXAlignment.Center
 )
