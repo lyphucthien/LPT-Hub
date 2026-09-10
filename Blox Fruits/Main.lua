@@ -801,7 +801,7 @@ local createCheckbox=createUnifiedToggle
 createCheckbox(
 	espPage,
 	"ESP Island",
-	95,
+	75,
 	Config.Island,
 	function(enabled)
 		Config.Island=enabled
@@ -817,7 +817,7 @@ createCheckbox(
 createCheckbox(
 	espPage,
 	"ESP Fruit",
-	161,
+	141,
 	Config.Fruit,
 	function(enabled)
 		Config.Fruit=enabled
@@ -833,7 +833,7 @@ createCheckbox(
 createCheckbox(
 	espPage,
 	"ESP Player",
-	227,
+	207,
 	Config.Player,
 	function(enabled)
 		Config.Player=enabled
