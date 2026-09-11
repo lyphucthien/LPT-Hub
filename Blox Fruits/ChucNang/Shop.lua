@@ -1,8 +1,14 @@
 local ShopModule={}
 
 local Players=game:GetService("Players")
+local ReplicatedStorage=game:GetService("ReplicatedStorage")
 
 local player=Players.LocalPlayer
+
+local RemotesFolder=ReplicatedStorage:WaitForChild("ShopRemotes")
+
+local BuyItemRemote=RemotesFolder:WaitForChild("BuyItem")
+local RedeemCodeRemote=RemotesFolder:WaitForChild("RedeemCode")
 
 --========================================================
 -- CONFIG
@@ -10,7 +16,6 @@ local player=Players.LocalPlayer
 
 local ShopConfig={
 
-	-- Misc Shop
 	["Reroll Race"]={
 		Type="Button",
 		Cost=2500,
@@ -35,7 +40,6 @@ local ShopConfig={
 		Currency="Fragments"
 	},
 
-	-- Fighting Shop
 	["Dark Step"]={
 		Type="Toggle"
 	},
@@ -80,7 +84,6 @@ local ShopConfig={
 		Type="Toggle"
 	},
 
-	-- Abilities Shop
 	["Sky Jump"]={
 		Type="Button",
 		Cost=10000,
@@ -111,25 +114,7 @@ local ShopConfig={
 --========================================================
 
 local State={
-
-	RedeemCode="",
-
-	FightingStyleEnabled={
-
-		["Dark Step"]=false,
-		["Electric"]=false,
-		["Water Kung Fu"]=false,
-		["Dragon Breath"]=false,
-		["Superhuman"]=false,
-		["Death Step"]=false,
-		["Sharkman Karate"]=false,
-		["Electric Claw"]=false,
-		["Dragon Talon"]=false,
-		["God Human"]=false,
-		["Sanguine Art"]=false
-
-	}
-
+	FightingStyleEnabled={}
 }
 
 local destroyed=false
@@ -139,52 +124,35 @@ local destroyed=false
 --========================================================
 
 local Callbacks={
-
-	Buy=nil,
-
-	RedeemCode=nil,
-
-	Toggle=nil,
-
+	Success=nil,
+	Failed=nil,
 	Notification=nil
-
 }
 
 --========================================================
 -- HELPERS
 --========================================================
 
-local function isDestroyed()
-
-	return destroyed
-
-end
-
 local function notify(message)
 
-	if isDestroyed() then
+	if destroyed then
 		return
 	end
 
 	if type(Callbacks.Notification)=="function" then
-
 		pcall(
 			Callbacks.Notification,
 			tostring(message)
 		)
-
 	else
-
 		print(
 			"[LPT Hub Shop]",
 			tostring(message)
 		)
-
 	end
-
 end
 
-local function validName(name)
+local function validItem(name)
 
 	return type(name)=="string"
 		and ShopConfig[name]~=nil
@@ -192,16 +160,16 @@ local function validName(name)
 end
 
 --========================================================
--- SET CALLBACK
+-- CALLBACK
 --========================================================
 
-function ShopModule:SetCallback(callbackName,callback)
+function ShopModule:SetCallback(name,callback)
 
-	if isDestroyed() then
+	if destroyed then
 		return false
 	end
 
-	if type(callbackName)~="string" then
+	if Callbacks[name]==nil then
 		return false
 	end
 
@@ -211,38 +179,34 @@ function ShopModule:SetCallback(callbackName,callback)
 		return false
 	end
 
-	if Callbacks[callbackName]==nil then
-		return false
-	end
-
-	Callbacks[callbackName]=callback
+	Callbacks[name]=callback
 
 	return true
 end
 
 --========================================================
--- GET SHOP ITEM
+-- GET
 --========================================================
 
 function ShopModule:Get(name)
 
-	if isDestroyed() then
+	if destroyed then
 		return nil
 	end
 
-	if not validName(name) then
+	if not validItem(name) then
 		return nil
 	end
 
-	local data=ShopConfig[name]
+	local config=ShopConfig[name]
 
 	local result={}
 
-	for key,value in pairs(data) do
+	for key,value in pairs(config) do
 		result[key]=value
 	end
 
-	if data.Type=="Toggle" then
+	if config.Type=="Toggle" then
 		result.Enabled=
 			State.FightingStyleEnabled[name]==true
 	end
@@ -256,148 +220,190 @@ end
 
 function ShopModule:GetState(name)
 
-	if isDestroyed() then
+	if destroyed then
 		return nil
 	end
 
-	if not validName(name) then
+	if not validItem(name) then
 		return nil
 	end
 
-	local data=ShopConfig[name]
-
-	if data.Type=="Toggle" then
-
-		return State.FightingStyleEnabled[name]==true
-
+	if ShopConfig[name].Type~="Toggle" then
+		return nil
 	end
 
-	return nil
+	return State.FightingStyleEnabled[name]==true
 end
 
 --========================================================
--- SET STATE
+-- BUY ITEM
 --========================================================
 
-function ShopModule:Set(name,value,silent)
+function ShopModule:Buy(name)
 
-	if isDestroyed() then
+	if destroyed then
 		return false
 	end
 
-	if not validName(name) then
-		return false
-	end
+	if not validItem(name) then
 
-	local data=ShopConfig[name]
-
-	if data.Type~="Toggle" then
-		return false
-	end
-
-	local enabled=value==true
-
-	State.FightingStyleEnabled[name]=enabled
-
-	if not silent
-		and type(Callbacks.Toggle)=="function" then
-
-		local success=pcall(
-			Callbacks.Toggle,
-			name,
-			enabled
+		notify(
+			"Unknown item: "..tostring(name)
 		)
 
-		if not success then
-			notify(
-				"Toggle callback failed: "..name
+		return false
+	end
+
+	local config=ShopConfig[name]
+
+	if config.Type~="Button" then
+
+		notify(
+			"Item này không phải Button: "..name
+		)
+
+		return false
+	end
+
+	-- Client requests the server.
+	-- The server must perform all validation:
+	-- money, fragments, requirements, ownership, etc.
+
+	local success,result=pcall(function()
+
+		return BuyItemRemote:InvokeServer(
+			name
+		)
+
+	end)
+
+	if not success then
+
+		notify(
+			"Không thể gửi yêu cầu mua: "..name
+		)
+
+		if type(Callbacks.Failed)=="function" then
+			pcall(
+				Callbacks.Failed,
+				name
 			)
 		end
 
+		return false
 	end
 
-	return true
+	if result==true then
+
+		notify(
+			"Mua thành công: "..name
+		)
+
+		if type(Callbacks.Success)=="function" then
+			pcall(
+				Callbacks.Success,
+				name
+			)
+		end
+
+		return true
+	end
+
+	notify(
+		"Mua thất bại: "..name
+	)
+
+	if type(Callbacks.Failed)=="function" then
+		pcall(
+			Callbacks.Failed,
+			name,
+			result
+		)
+	end
+
+	return false
 end
 
 --========================================================
 -- TOGGLE FIGHTING STYLE
 --========================================================
 
-function ShopModule:Toggle(name)
+function ShopModule:Set(name,enabled)
 
-	if isDestroyed() then
+	if destroyed then
 		return false
 	end
 
-	if not validName(name) then
+	if not validItem(name) then
 		return false
 	end
 
-	local data=ShopConfig[name]
-
-	if data.Type~="Toggle" then
+	if ShopConfig[name].Type~="Toggle" then
 		return false
 	end
 
-	local newValue=
-		not State.FightingStyleEnabled[name]
+	enabled=enabled==true
 
-	return self:Set(
-		name,
-		newValue
-	)
+	State.FightingStyleEnabled[name]=enabled
+
+	return true
 end
 
---========================================================
--- BUY
---========================================================
+function ShopModule:Toggle(name)
 
-function ShopModule:Buy(name)
-
-	if isDestroyed() then
+	if destroyed then
 		return false
 	end
 
-	if not validName(name) then
-		notify("Unknown shop item: "..tostring(name))
+	if not validItem(name) then
 		return false
 	end
 
-	local data=ShopConfig[name]
+	if ShopConfig[name].Type~="Toggle" then
+		return false
+	end
 
-	if data.Type~="Button" then
-		notify(
-			"Item này là Toggle: "..name
+	local enabled=
+		not State.FightingStyleEnabled[name]
+
+	State.FightingStyleEnabled[name]=enabled
+
+	-- For an owned game, this can request the server
+	-- to equip/activate the selected fighting style.
+
+	local success,result=pcall(function()
+
+		return BuyItemRemote:InvokeServer(
+			name,
+			"Toggle",
+			enabled
 		)
-		return false
-	end
 
-	if type(Callbacks.Buy)~="function" then
-
-		notify(
-			"Chưa gắn Buy callback: "..name
-		)
-
-		return false
-	end
-
-	local success,result=pcall(
-		Callbacks.Buy,
-		name,
-		data.Cost,
-		data.Currency
-	)
+	end)
 
 	if not success then
 
+		State.FightingStyleEnabled[name]=not enabled
+
 		notify(
-			"Buy callback failed: "..name
+			"Không thể gửi yêu cầu: "..name
 		)
 
 		return false
 	end
 
-	return result~=false
+	if result~=true then
+
+		State.FightingStyleEnabled[name]=not enabled
+
+		notify(
+			"Không thể bật: "..name
+		)
+
+		return false
+	end
+
+	return true
 end
 
 --========================================================
@@ -406,115 +412,81 @@ end
 
 function ShopModule:RedeemCode(code)
 
-	if isDestroyed() then
+	if destroyed then
 		return false
 	end
 
 	code=tostring(code or "")
-	code=code:gsub("^%s+","")
-	code=code:gsub("%s+$","")
+
+	code=code:gsub(
+		"^%s+",
+		""
+	)
+
+	code=code:gsub(
+		"%s+$",
+		""
+	)
 
 	if code=="" then
 
-		notify("Code không được để trống")
-
-		return false
-	end
-
-	State.RedeemCode=code
-
-	if type(Callbacks.RedeemCode)~="function" then
-
 		notify(
-			"Chưa gắn RedeemCode callback"
+			"Code không được để trống"
 		)
 
 		return false
 	end
 
-	local success,result=pcall(
-		Callbacks.RedeemCode,
-		code
-	)
+	local success,result=pcall(function()
+
+		return RedeemCodeRemote:InvokeServer(
+			code
+		)
+
+	end)
 
 	if not success then
 
 		notify(
-			"Redeem callback failed"
+			"Không thể redeem code"
 		)
 
 		return false
 	end
 
-	return result~=false
-end
+	if result==true then
 
---========================================================
--- SET REDEEM CODE
---========================================================
+		notify(
+			"Redeem thành công"
+		)
 
-function ShopModule:SetRedeemCode(code)
-
-	if isDestroyed() then
-		return false
+		return true
 	end
 
-	State.RedeemCode=tostring(code or "")
+	notify(
+		"Code không hợp lệ hoặc đã được sử dụng"
+	)
 
-	return true
+	return false
 end
 
 --========================================================
--- GET REDEEM CODE
---========================================================
-
-function ShopModule:GetRedeemCode()
-
-	if isDestroyed() then
-		return ""
-	end
-
-	return State.RedeemCode
-end
-
---========================================================
--- GET ALL ITEMS
+-- GET ALL
 --========================================================
 
 function ShopModule:GetAll()
 
-	if isDestroyed() then
+	if destroyed then
 		return {}
 	end
 
 	local result={}
 
-	for name,data in pairs(ShopConfig) do
-
+	for name in pairs(ShopConfig) do
 		result[name]=self:Get(name)
-
 	end
 
 	return result
-end
-
---========================================================
--- RESET TOGGLES
---========================================================
-
-function ShopModule:Reset()
-
-	if isDestroyed() then
-		return false
-	end
-
-	for name in pairs(State.FightingStyleEnabled) do
-
-		State.FightingStyleEnabled[name]=false
-
-	end
-
-	return true
 end
 
 --========================================================
@@ -529,86 +501,11 @@ function ShopModule:Destroy()
 
 	destroyed=true
 
-	for name in pairs(State.FightingStyleEnabled) do
-		State.FightingStyleEnabled[name]=false
-	end
-
-	State.RedeemCode=""
+	table.clear(State.FightingStyleEnabled)
 
 	for key in pairs(Callbacks) do
 		Callbacks[key]=nil
 	end
-
-	ShopConfig=nil
-	State=nil
-
-end
-
---========================================================
--- MODULE INFO
---========================================================
-
-function ShopModule:GetInfo()
-
-	return {
-
-		Name="ShopModule",
-
-		Version="1.0.0",
-
-		Player=player and player.Name or "Unknown",
-
-		MiscShop={
-
-			"Reroll Race",
-
-			"Reset Stats",
-
-			"Buy Race Cyborg",
-
-			"Buy Race Ghoul"
-
-		},
-
-		FightingShop={
-
-			"Dark Step",
-
-			"Electric",
-
-			"Water Kung Fu",
-
-			"Dragon Breath",
-
-			"Superhuman",
-
-			"Death Step",
-
-			"Sharkman Karate",
-
-			"Electric Claw",
-
-			"Dragon Talon",
-
-			"God Human",
-
-			"Sanguine Art"
-
-		},
-
-		AbilitiesShop={
-
-			"Sky Jump",
-
-			"Buso Haki",
-
-			"Flash Step",
-
-			"Observation Haki"
-
-		}
-
-	}
 
 end
 
