@@ -73,18 +73,19 @@ local DefaultConfig={
 	Fruit=false,
 	Player=false,
 
+	--PVP
+	WalkSpeed=16,
+	JumpPower=50,
+	ChangeWalkSpeed=false,
+	ChangeJumpPower=false,
+	WalkOnWater=false,
+
+	--Settings
 	WhiteScreen=false,
 	BlackScreen=false,
 	RemoveNotifications=false,
 	AutoLoadScript=false,
 	BoostFPS=false,
-
-	-- PVP
-	WalkSpeed=16,
-	JumpPower=50,
-	ChangeWalkSpeed=false,
-	ChangeJumpPower=false,
-	WalkOnWater=true,
 
 	-- WEBHOOK
 	WebhookURL="",
@@ -335,7 +336,7 @@ end
 -- GUI
 --========================================================
 
-gui=Instance.new("ScreenGui")
+local gui=Instance.new("ScreenGui")
 gui.Name="LPTHub"
 gui.ResetOnSpawn=false
 gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
@@ -465,9 +466,9 @@ local function topButton(name,x,text,size)
 	return b
 end
 
-local minimize=topButton("MinimizeButton", -110, "—", 13)
-local maximize=topButton("MaximizeButton", -76, "", 0)
-local close=topButton("CloseButton", -40, "×", 17)
+local minimize=topButton("MinimizeButton",-110,"—",13)
+local maximize=topButton("MaximizeButton",-76,"",0)
+local close=topButton("CloseButton",-40,"×",17)
 
 local maxIcon=Instance.new("Frame")
 maxIcon.Size=UDim2.fromOffset(20,20)
@@ -621,6 +622,10 @@ local function createPage(name,titleText,description)
 
 	pages[name]=page
 
+	--========================================================
+	-- PAGE TITLE
+	--========================================================
+
 	createLabel(
 		page,
 		titleText,
@@ -631,6 +636,10 @@ local function createPage(name,titleText,description)
 		COLORS.Text,
 		Enum.TextXAlignment.Center
 	)
+
+	--========================================================
+	-- PAGE DESCRIPTION
+	--========================================================
 
 	if description then
 		createLabel(
@@ -643,6 +652,18 @@ local function createPage(name,titleText,description)
 			COLORS.TextDim
 		)
 	end
+
+	--========================================================
+	-- PAGE SEPARATOR
+	--========================================================
+
+	local pageSeparator=Instance.new("Frame")
+	pageSeparator.Name="PageSeparator"
+	pageSeparator.Size=UDim2.new(1,-56,0,1)
+	pageSeparator.Position=UDim2.fromOffset(28,76)
+	pageSeparator.BackgroundColor3=COLORS.Border
+	pageSeparator.BorderSizePixel=0
+	pageSeparator.Parent=page
 
 	return page
 end
@@ -801,7 +822,7 @@ local createCheckbox=createUnifiedToggle
 createCheckbox(
 	espPage,
 	"ESP Island",
-	75,
+	92,
 	Config.Island,
 	function(enabled)
 		Config.Island=enabled
@@ -817,7 +838,7 @@ createCheckbox(
 createCheckbox(
 	espPage,
 	"ESP Fruit",
-	141,
+	158,
 	Config.Fruit,
 	function(enabled)
 		Config.Fruit=enabled
@@ -833,7 +854,7 @@ createCheckbox(
 createCheckbox(
 	espPage,
 	"ESP Player",
-	207,
+	224,
 	Config.Player,
 	function(enabled)
 		Config.Player=enabled
@@ -846,7 +867,7 @@ createCheckbox(
 	end
 )
 
-espPage.CanvasSize=UDim2.fromOffset(0,300)
+espPage.CanvasSize=UDim2.fromOffset(0,320)
 
 --========================================================
 -- PVP PAGE
@@ -1061,38 +1082,20 @@ local function createValueSlider(
 	return setValue
 end
 
-local pvpTitle=createLabel(
-	pvpPage,
-	"PVP",
-	UDim2.new(1,-56,0,34),
-	UDim2.fromOffset(28,95),
-	Enum.Font.GothamBold,
-	22,
-	COLORS.Text,
-	Enum.TextXAlignment.Center
-)
-
-local pvpSeparator=Instance.new("Frame")
-pvpSeparator.Size=UDim2.new(1,-56,0,1)
-pvpSeparator.Position=UDim2.fromOffset(28,133)
-pvpSeparator.BackgroundColor3=COLORS.Border
-pvpSeparator.BorderSizePixel=0
-pvpSeparator.Parent=pvpPage
-
 local otherTitle=createLabel(
 	pvpPage,
 	"Other",
 	UDim2.new(1,-56,0,34),
-	UDim2.fromOffset(28,180),
+	UDim2.fromOffset(28,105),
 	Enum.Font.GothamBold,
-	22,
+	26,
 	COLORS.Text,
 	Enum.TextXAlignment.Center
 )
 
 local otherSeparator=Instance.new("Frame")
 otherSeparator.Size=UDim2.new(1,-56,0,1)
-otherSeparator.Position=UDim2.fromOffset(28,218)
+otherSeparator.Position=UDim2.fromOffset(28,143)
 otherSeparator.BackgroundColor3=COLORS.Border
 otherSeparator.BorderSizePixel=0
 otherSeparator.Parent=pvpPage
@@ -1100,7 +1103,7 @@ otherSeparator.Parent=pvpPage
 createValueSlider(
 	pvpPage,
 	"Input WalkSpeed",
-	235,
+	160,
 	0,
 	500,
 	Config.WalkSpeed,
@@ -1122,7 +1125,7 @@ createValueSlider(
 createValueSlider(
 	pvpPage,
 	"Input JumpPower",
-	331,
+	256,
 	0,
 	500,
 	Config.JumpPower,
@@ -1144,7 +1147,7 @@ createValueSlider(
 createCheckbox(
 	pvpPage,
 	"Change WalkSpeed",
-	427,
+	352,
 	Config.ChangeWalkSpeed,
 	function(enabled)
 
@@ -1164,7 +1167,7 @@ createCheckbox(
 createCheckbox(
 	pvpPage,
 	"Change JumpPower",
-	493,
+	418,
 	Config.ChangeJumpPower,
 	function(enabled)
 
@@ -1184,7 +1187,7 @@ createCheckbox(
 createCheckbox(
 	pvpPage,
 	"Walk On Water",
-	559,
+	484,
 	Config.WalkOnWater,
 	function(enabled)
 
@@ -1201,7 +1204,7 @@ createCheckbox(
 	end
 )
 
-pvpPage.CanvasSize=UDim2.fromOffset(0,650)
+pvpPage.CanvasSize=UDim2.fromOffset(0,575)
 
 --========================================================
 -- SETTINGS PAGE
@@ -1210,7 +1213,7 @@ pvpPage.CanvasSize=UDim2.fromOffset(0,650)
 createCheckbox(
 	settingsPage,
 	"White Screen",
-	75,
+	92,
 	Config.WhiteScreen,
 	function(enabled)
 		Config.WhiteScreen=enabled
@@ -1226,7 +1229,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Black Screen",
-	141,
+	158,
 	Config.BlackScreen,
 	function(enabled)
 		Config.BlackScreen=enabled
@@ -1242,7 +1245,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Remove Notifications",
-	207,
+	224,
 	Config.RemoveNotifications,
 	function(enabled)
 		Config.RemoveNotifications=enabled
@@ -1258,7 +1261,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Auto Load Script",
-	273,
+	290,
 	Config.AutoLoadScript,
 	function(enabled)
 		Config.AutoLoadScript=enabled
@@ -1274,7 +1277,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Boost FPS",
-	339,
+	356,
 	Config.BoostFPS,
 	function(enabled)
 		Config.BoostFPS=enabled
@@ -1295,27 +1298,25 @@ createLabel(
 	settingsPage,
 	"Webhook",
 	UDim2.new(1,-56,0,38),
-	UDim2.fromOffset(28,425),
+	UDim2.fromOffset(28,445),
 	Enum.Font.GothamBold,
 	26,
 	COLORS.Text,
 	Enum.TextXAlignment.Center
 )
 
+local webhookSeparator=Instance.new("Frame")
+webhookSeparator.Size=UDim2.new(1,-56,0,1)
+webhookSeparator.Position=UDim2.fromOffset(28,483)
+webhookSeparator.BackgroundColor3=COLORS.Border
+webhookSeparator.BorderSizePixel=0
+webhookSeparator.Parent=settingsPage
+
 --========================================================
 -- INPUT CARD
 --========================================================
 
-local function createInputCard(
-	parent,
-	text,
-	y,
-	value,
-	callback,
-	showToggle,
-	toggleDefault,
-	toggleCallback
-)
+local function createInputCard(parent,text,y,value,callback,showToggle,toggleDefault,toggleCallback)
 
 	local card=Instance.new("Frame")
 	card.Size=UDim2.new(1,-56,0,72)
@@ -1338,13 +1339,7 @@ local function createInputCard(
 	)
 
 	local input=Instance.new("TextBox")
-	input.Size=UDim2.new(
-		1,
-		showToggle and -70 or -24,
-		0,
-		27
-	)
-
+	input.Size=UDim2.new(1,showToggle and -70 or -24,0,27)
 	input.Position=UDim2.fromOffset(12,32)
 	input.BackgroundColor3=Color3.fromRGB(29,30,38)
 	input.BorderSizePixel=0
@@ -1389,7 +1384,7 @@ end
 local webhookUrlInput=createInputCard(
 	settingsPage,
 	"Input Url Webhook",
-	480,
+	496,
 	Config.WebhookURL,
 	function(text)
 		Config.WebhookURL=text
@@ -1400,7 +1395,7 @@ local webhookUrlInput=createInputCard(
 local webhookPingInput=createInputCard(
 	settingsPage,
 	"Input Discord Ping (Everyone/ID Role)",
-	560,
+	576,
 	Config.WebhookPing,
 	function(text)
 		Config.WebhookPing=text
@@ -1421,7 +1416,7 @@ local webhookPingInput=createInputCard(
 createCheckbox(
 	settingsPage,
 	"Noti Profile",
-	640,
+	656,
 	Config.WebhookNotiProfile,
 	function(enabled)
 		Config.WebhookNotiProfile=enabled
@@ -1432,7 +1427,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Webhook Store Fruit",
-	706,
+	722,
 	Config.WebhookStoreFruit,
 	function(enabled)
 		Config.WebhookStoreFruit=enabled
@@ -1447,7 +1442,7 @@ createCheckbox(
 local rarityCard=createCard(
 	settingsPage,
 	"Select Rarity Fruit:                                ›",
-	772,
+	788,
 	58
 )
 
@@ -1510,7 +1505,7 @@ end
 createCheckbox(
 	settingsPage,
 	"Webhook Find Prehistoric Island",
-	838,
+	854,
 	Config.WebhookFindPrehistoricIsland,
 	function(enabled)
 		Config.WebhookFindPrehistoricIsland=enabled
@@ -1521,7 +1516,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Webhook Find Leviathan",
-	904,
+	920,
 	Config.WebhookFindLeviathan,
 	function(enabled)
 		Config.WebhookFindLeviathan=enabled
@@ -1532,7 +1527,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Webhook Destroy IDK",
-	970,
+	986,
 	Config.WebhookDestroyIDK,
 	function(enabled)
 		Config.WebhookDestroyIDK=enabled
@@ -1543,7 +1538,7 @@ createCheckbox(
 createCheckbox(
 	settingsPage,
 	"Webhook Find Mirage",
-	1036,
+	1052,
 	Config.WebhookFindMirage,
 	function(enabled)
 		Config.WebhookFindMirage=enabled
@@ -1551,7 +1546,11 @@ createCheckbox(
 	end
 )
 
-settingsPage.CanvasSize=UDim2.fromOffset(0,1130)
+settingsPage.CanvasSize=UDim2.fromOffset(0,1146)
+
+--========================================================
+-- SIDEBAR MENU
+--========================================================
 
 local menuItems={
 	{"ESP","ESP"},
@@ -1666,7 +1665,7 @@ local maximizedSize=UDim2.new(1,-40,1,-40)
 local maximizedPosition=UDim2.fromOffset(20,20)
 
 local minimizedSize=UDim2.fromOffset(300,38)
-local minimizedPosition=UDim2.new(.5,-150,0,15)
+local minimizedPosition=UDim2.new(.5,-150,-.060,15)
 
 local savedSize=nil
 local savedPosition=nil
@@ -1827,6 +1826,7 @@ UserInputService.InputChanged:Connect(function(input)
 
 	if input.UserInputType~=Enum.UserInputType.MouseMovement
 		and input.UserInputType~=Enum.UserInputType.Touch then
+
 		return
 	end
 
