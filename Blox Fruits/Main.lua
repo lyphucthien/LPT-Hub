@@ -5,10 +5,31 @@ local TweenService=game:GetService("TweenService")
 local player=Players.LocalPlayer
 local playerGui=player:WaitForChild("PlayerGui")
 
-local ESPModule=loadstring(game:HttpGet("https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/ESP.lua"))()
-local SettingsModule=loadstring(game:HttpGet("https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/Settings.lua"))()
-local PVPModule=loadstring(game:HttpGet("https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/PVP.lua"))()
-local ShopModule=loadstring(game:HttpGet("https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/Shop.lua"))()
+local ESPModule=nil
+local SettingsModule=nil
+local PVPModule=nil
+local ShopModule=nil
+
+local ModuleLoaded={
+	Shop=false,
+	PVP=false,
+	ESP=false,
+	Settings=false
+}
+
+local ModuleFailed={
+	Shop=false,
+	PVP=false,
+	ESP=false,
+	Settings=false
+}
+
+local ModuleURLs={
+	Shop="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/Shop.lua",
+	PVP="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/PVP.lua",
+	ESP="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/ESP.lua",
+	Settings="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/Settings.lua"
+}
 
 local HttpService=game:GetService("HttpService")
 
@@ -234,21 +255,116 @@ local oldGui=playerGui:FindFirstChild("LPTHub")
 if oldGui then oldGui:Destroy() end
 
 --========================================================
--- APPLY LOADED MODULE CONFIG
+-- MODULE LOADER
 --========================================================
 
-if ESPModule then
-	ESPModule:Set("Island",Config.Island)
-	ESPModule:Set("Fruit",Config.Fruit)
-	ESPModule:Set("Player",Config.Player)
+local refreshSidebar=nil
+
+local function assignModule(name,module)
+
+	if name=="Shop" then
+		ShopModule=module
+
+	elseif name=="ESP" then
+		ESPModule=module
+
+	elseif name=="PVP" then
+		PVPModule=module
+
+	elseif name=="Settings" then
+		SettingsModule=module
+	end
+
 end
 
-if PVPModule then
-	PVPModule:Set("WalkSpeed",Config.WalkSpeed)
-	PVPModule:Set("JumpPower",Config.JumpPower)
-	PVPModule:Set("ChangeWalkSpeed",Config.ChangeWalkSpeed)
-	PVPModule:Set("ChangeJumpPower",Config.ChangeJumpPower)
-	PVPModule:Set("WalkOnWater",Config.WalkOnWater)
+local function loadModule(name)
+
+	local url=ModuleURLs[name]
+
+	if not url then
+		ModuleFailed[name]=true
+		return
+	end
+
+	task.spawn(function()
+
+		local success,result=pcall(function()
+
+			local source=game:HttpGet(url)
+
+			local compiled=loadstring(source)
+
+			if type(compiled)~="function" then
+				error("loadstring failed")
+			end
+
+			local module=compiled()
+
+			if not module then
+				error("module returned nil")
+			end
+
+			return module
+
+		end)
+
+		if success and result then
+
+			assignModule(name,result)
+
+			ModuleLoaded[name]=true
+
+			if name=="ESP" and ESPModule then
+
+				ESPModule:Set("Island",Config.Island)
+				ESPModule:Set("Fruit",Config.Fruit)
+				ESPModule:Set("Player",Config.Player)
+
+			elseif name=="PVP" and PVPModule then
+
+				PVPModule:Set("WalkSpeed",Config.WalkSpeed)
+				PVPModule:Set("JumpPower",Config.JumpPower)
+				PVPModule:Set("ChangeWalkSpeed",Config.ChangeWalkSpeed)
+				PVPModule:Set("ChangeJumpPower",Config.ChangeJumpPower)
+				PVPModule:Set("WalkOnWater",Config.WalkOnWater)
+
+			elseif name=="Settings" and SettingsModule then
+
+				SettingsModule:Set("WhiteScreen",Config.WhiteScreen)
+				SettingsModule:Set("BlackScreen",Config.BlackScreen)
+				SettingsModule:Set("RemoveNotifications",Config.RemoveNotifications)
+				SettingsModule:Set("AutoLoadScript",Config.AutoLoadScript)
+				SettingsModule:Set("BoostFPS",Config.BoostFPS)
+
+			end
+
+			task.defer(function()
+
+				if refreshSidebar then
+					refreshSidebar()
+				end
+
+			end)
+
+		else
+
+			ModuleFailed[name]=true
+
+			warn(
+				"[LPT Hub] Failed to load "
+				..name..": ",
+				result
+			)
+
+			task.defer(function()
+
+				if refreshSidebar then
+					refreshSidebar()
+				end
+
+			end)
+		end
+	end)
 end
 
 --========================================================
@@ -2058,6 +2174,10 @@ local sidebarButtons={}
 local currentPage=nil
 local indicator=nil
 
+local function moduleAvailable(name)
+	return ModuleLoaded[name]==true
+end
+
 local function selectPage(name)
 	if not pages[name] then return end
 	if currentPage==name then return end
@@ -2142,8 +2262,72 @@ local function createSidebarButton(text,order,pageName)
 	end)
 end
 
-for order,item in ipairs(menuItems) do
-	createSidebarButton(item[1],order,item[2])
+refreshSidebar=function()
+
+	local oldCurrent=currentPage
+
+	for _,data in pairs(sidebarButtons) do
+
+		if data.button and data.button.Parent then
+			data.button:Destroy()
+		end
+
+	end
+
+	table.clear(sidebarButtons)
+
+	local order=0
+
+	for _,item in ipairs(menuItems) do
+
+		local pageName=item[1]
+		local title=item[2]
+
+		if moduleAvailable(pageName) then
+
+			order+=1
+
+			createSidebarButton(
+				title,
+				order,
+				pageName
+			)
+
+		end
+
+	end
+
+	if oldCurrent
+		and ModuleLoaded[oldCurrent]
+	then
+
+		currentPage=nil
+		selectPage(oldCurrent)
+
+	else
+
+		local firstPage=nil
+
+		for _,item in ipairs(menuItems) do
+
+			if ModuleLoaded[item[1]] then
+				firstPage=item[1]
+				break
+			end
+
+		end
+
+		if firstPage then
+
+			currentPage=nil
+			selectPage(firstPage)
+
+		else
+
+			currentPage=nil
+
+		end
+	end
 end
 
 --========================================================
@@ -2373,5 +2557,10 @@ close.MouseButton1Click:Connect(function()
 	end
 end)
 
-selectPage("Shop")
+loadModule("Shop")
+loadModule("PVP")
+loadModule("ESP")
+loadModule("Settings")
+
+refreshSidebar()
 updateButtons()
