@@ -324,6 +324,8 @@ end
 
 local AUTO_LOAD_URL="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Key.lua"
 
+local ClientStarted=false
+
 local function getQueueFunction()
 
 	if type(queue_on_teleport)=="function" then
@@ -343,7 +345,26 @@ local function getQueueFunction()
 	return nil
 end
 
+function SettingsModule:SetClientStarted(enabled)
+
+	ClientStarted=enabled==true
+
+	if ClientStarted and Settings.AutoLoadScript then
+		return SettingsModule:SetupAutoLoad()
+	end
+
+	return true
+end
+
+function SettingsModule:IsClientStarted()
+	return ClientStarted
+end
+
 function SettingsModule:SetupAutoLoad()
+
+	if not ClientStarted then
+		return false,"Client not started"
+	end
 
 	if Settings.AutoLoadScript~=true then
 		return false,"Disabled"
@@ -386,9 +407,11 @@ local function setAutoLoadScript(enabled)
 
 	Settings.AutoLoadScript=enabled==true
 
-	if Settings.AutoLoadScript then
+	if Settings.AutoLoadScript and ClientStarted then
 		SettingsModule:SetupAutoLoad()
 	end
+
+	return Settings.AutoLoadScript
 end
 
 --========================================================
