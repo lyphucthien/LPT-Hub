@@ -8,6 +8,7 @@ local playerGui=player:WaitForChild("PlayerGui")
 local ESPModule=loadstring(game:HttpGet("https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/ESP.lua"))()
 local SettingsModule=loadstring(game:HttpGet("https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/Settings.lua"))()
 local PVPModule=loadstring(game:HttpGet("https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/PVP.lua"))()
+local ShopModule=loadstring(game:HttpGet("https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Blox%20Fruits/ChucNang/Shop.lua"))()
 
 local HttpService=game:GetService("HttpService")
 
@@ -668,6 +669,11 @@ local function createPage(name,titleText,description)
 	return page
 end
 
+local shopPage=createPage(
+	"Shop",
+	"Shop"
+)
+
 local espPage=createPage(
 	"ESP",
 	"ESP"
@@ -720,7 +726,7 @@ local function createCard(parent,text,y,height)
 end
 
 --========================================================
--- ESP PAGE
+-- TOGGLE UI
 --========================================================
 
 local function createToggleUI(parent,default,callback)
@@ -767,9 +773,17 @@ local function createToggleUI(parent,default,callback)
 
 	local function updateVisual()
 
-		local goalSize=enabled and UDim2.new(1,-4.8,1,-4.8) or UDim2.fromOffset(0,0)
+		local goalSize=
+			enabled
+			and UDim2.new(1,-4.8,1,-4.8)
+			or UDim2.fromOffset(0,0)
 
-		tween(fill,{Size=goalSize},.18,Enum.EasingStyle.Quad)
+		tween(
+			fill,
+			{Size=goalSize},
+			.18,
+			Enum.EasingStyle.Quad
+		)
 
 	end
 
@@ -787,19 +801,30 @@ local function createToggleUI(parent,default,callback)
 
 	clickButton.MouseButton1Click:Connect(function()
 
-		setEnabled(not enabled,true)
+		setEnabled(
+			not enabled,
+			true
+		)
 
 	end)
 
 	clickButton.MouseEnter:Connect(function()
 
-		tween(stroke,{Thickness=3},.12)
+		tween(
+			stroke,
+			{Thickness=3},
+			.12
+		)
 
 	end)
 
 	clickButton.MouseLeave:Connect(function()
 
-		tween(stroke,{Thickness=2.5},.12)
+		tween(
+			stroke,
+			{Thickness=2.5},
+			.12
+		)
 
 	end)
 
@@ -818,6 +843,476 @@ end
 
 local createToggle=createUnifiedToggle
 local createCheckbox=createUnifiedToggle
+
+--========================================================
+-- SHOP PAGE
+--========================================================
+
+local shopTitle=createLabel(
+	shopPage,
+	"Misc Shop",
+	UDim2.new(1,-56,0,34),
+	UDim2.fromOffset(28,92),
+	Enum.Font.GothamBold,
+	26,
+	COLORS.Text,
+	Enum.TextXAlignment.Center
+)
+
+local shopSeparator=Instance.new("Frame")
+shopSeparator.Size=UDim2.new(1,-56,0,1)
+shopSeparator.Position=UDim2.fromOffset(28,130)
+shopSeparator.BackgroundColor3=COLORS.Border
+shopSeparator.BorderSizePixel=0
+shopSeparator.Parent=shopPage
+
+--========================================================
+-- MISC SHOP
+--========================================================
+
+local redeemCard=createCard(
+	shopPage,
+	"Redeem Code",
+	146,
+	58
+)
+
+local redeemButton=Instance.new("TextButton")
+redeemButton.Size=UDim2.fromScale(1,1)
+redeemButton.BackgroundTransparency=1
+redeemButton.BorderSizePixel=0
+redeemButton.Text=""
+redeemButton.AutoButtonColor=false
+redeemButton.Parent=redeemCard
+
+redeemButton.MouseButton1Click:Connect(function()
+
+	if ShopModule then
+		ShopModule:RedeemCode()
+	end
+
+end)
+
+local rerollCard=createCard(
+	shopPage,
+	"Reroll Race [2,500 Fragments]",
+	212,
+	58
+)
+
+local rerollButton=Instance.new("TextButton")
+rerollButton.Size=UDim2.fromScale(1,1)
+rerollButton.BackgroundTransparency=1
+rerollButton.BorderSizePixel=0
+rerollButton.Text=""
+rerollButton.AutoButtonColor=false
+rerollButton.Parent=rerollCard
+
+rerollButton.MouseButton1Click:Connect(function()
+
+	if ShopModule then
+		ShopModule:Buy("Reroll Race")
+	end
+
+end)
+
+local resetStatsCard=createCard(
+	shopPage,
+	"Reset Stats [3,000 Fragments]",
+	278,
+	58
+)
+
+local resetStatsButton=Instance.new("TextButton")
+resetStatsButton.Size=UDim2.fromScale(1,1)
+resetStatsButton.BackgroundTransparency=1
+resetStatsButton.BorderSizePixel=0
+resetStatsButton.Text=""
+resetStatsButton.AutoButtonColor=false
+resetStatsButton.Parent=resetStatsCard
+
+resetStatsButton.MouseButton1Click:Connect(function()
+
+	if ShopModule then
+		ShopModule:Buy("Reset Stats")
+	end
+
+end)
+
+local cyborgCard=createCard(
+	shopPage,
+	"Buy Race Cyborg [3,000 Fragments]",
+	344,
+	58
+)
+
+local cyborgButton=Instance.new("TextButton")
+cyborgButton.Size=UDim2.fromScale(1,1)
+cyborgButton.BackgroundTransparency=1
+cyborgButton.BorderSizePixel=0
+cyborgButton.Text=""
+cyborgButton.AutoButtonColor=false
+cyborgButton.Parent=cyborgCard
+
+cyborgButton.MouseButton1Click:Connect(function()
+
+	if ShopModule then
+		ShopModule:Buy("Buy Race Cyborg")
+	end
+
+end)
+
+local ghoulCard=createCard(
+	shopPage,
+	"Buy Race Ghoul [3,000 Fragments]",
+	410,
+	58
+)
+
+local ghoulButton=Instance.new("TextButton")
+ghoulButton.Size=UDim2.fromScale(1,1)
+ghoulButton.BackgroundTransparency=1
+ghoulButton.BorderSizePixel=0
+ghoulButton.Text=""
+ghoulButton.AutoButtonColor=false
+ghoulButton.Parent=ghoulCard
+
+ghoulButton.MouseButton1Click:Connect(function()
+
+	if ShopModule then
+		ShopModule:Buy("Buy Race Ghoul")
+	end
+
+end)
+
+--========================================================
+-- FIGHTING SHOP
+--========================================================
+
+local fightingTitle=createLabel(
+	shopPage,
+	"Fighting Shop",
+	UDim2.new(1,-56,0,34),
+	UDim2.fromOffset(28,486),
+	Enum.Font.GothamBold,
+	26,
+	COLORS.Text,
+	Enum.TextXAlignment.Center
+)
+
+local fightingSeparator=Instance.new("Frame")
+fightingSeparator.Size=UDim2.new(1,-56,0,1)
+fightingSeparator.Position=UDim2.fromOffset(28,524)
+fightingSeparator.BackgroundColor3=COLORS.Border
+fightingSeparator.BorderSizePixel=0
+fightingSeparator.Parent=shopPage
+
+createCheckbox(
+	shopPage,
+	"Dark Step",
+	540,
+	false,
+	function(enabled)
+
+		if ShopModule then
+			ShopModule:Set(
+				"Dark Step",
+				enabled
+			)
+		end
+
+	end
+)
+
+createCheckbox(
+	shopPage,
+	"Electric",
+	606,
+	false,
+	function(enabled)
+
+		if ShopModule then
+			ShopModule:Set(
+				"Electric",
+				enabled
+			)
+		end
+
+	end
+)
+
+createCheckbox(
+	shopPage,
+	"Water Kung Fu",
+	672,
+	false,
+	function(enabled)
+
+		if ShopModule then
+			ShopModule:Set(
+				"Water Kung Fu",
+				enabled
+			)
+		end
+
+	end
+)
+
+createCheckbox(
+	shopPage,
+	"Dragon Breath",
+	738,
+	false,
+	function(enabled)
+
+		if ShopModule then
+			ShopModule:Set(
+				"Dragon Breath",
+				enabled
+			)
+		end
+
+	end
+)
+
+createCheckbox(
+	shopPage,
+	"Superhuman",
+	804,
+	false,
+	function(enabled)
+
+		if ShopModule then
+			ShopModule:Set(
+				"Superhuman",
+				enabled
+			)
+		end
+
+	end
+)
+
+createCheckbox(
+	shopPage,
+	"Death Step",
+	870,
+	false,
+	function(enabled)
+
+		if ShopModule then
+			ShopModule:Set(
+				"Death Step",
+				enabled
+			)
+		end
+
+	end
+)
+
+createCheckbox(
+	shopPage,
+	"Sharkman Karate",
+	936,
+	false,
+	function(enabled)
+
+		if ShopModule then
+			ShopModule:Set(
+				"Sharkman Karate",
+				enabled
+			)
+		end
+
+	end
+)
+
+createCheckbox(
+	shopPage,
+	"Electric Claw",
+	1002,
+	false,
+	function(enabled)
+
+		if ShopModule then
+			ShopModule:Set(
+				"Electric Claw",
+				enabled
+			)
+		end
+
+	end
+)
+
+createCheckbox(
+	shopPage,
+	"Dragon Talon",
+	1068,
+	false,
+	function(enabled)
+
+		if ShopModule then
+			ShopModule:Set(
+				"Dragon Talon",
+				enabled
+			)
+		end
+
+	end
+)
+
+createCheckbox(
+	shopPage,
+	"God Human",
+	1134,
+	false,
+	function(enabled)
+
+		if ShopModule then
+			ShopModule:Set(
+				"God Human",
+				enabled
+			)
+		end
+
+	end
+)
+
+createCheckbox(
+	shopPage,
+	"Sanguine Art",
+	1200,
+	false,
+	function(enabled)
+
+		if ShopModule then
+			ShopModule:Set(
+				"Sanguine Art",
+				enabled
+			)
+		end
+
+	end
+)
+
+--========================================================
+-- ABILITIES SHOP
+--========================================================
+
+local abilitiesTitle=createLabel(
+	shopPage,
+	"Abilities Shop",
+	UDim2.new(1,-56,0,34),
+	UDim2.fromOffset(28,1270),
+	Enum.Font.GothamBold,
+	26,
+	COLORS.Text,
+	Enum.TextXAlignment.Center
+)
+
+local abilitiesSeparator=Instance.new("Frame")
+abilitiesSeparator.Size=UDim2.new(1,-56,0,1)
+abilitiesSeparator.Position=UDim2.fromOffset(28,1308)
+abilitiesSeparator.BackgroundColor3=COLORS.Border
+abilitiesSeparator.BorderSizePixel=0
+abilitiesSeparator.Parent=shopPage
+
+local skyJumpCard=createCard(
+	shopPage,
+	"Sky Jump [10,000 Beli]",
+	1324,
+	58
+)
+
+local skyJumpButton=Instance.new("TextButton")
+skyJumpButton.Size=UDim2.fromScale(1,1)
+skyJumpButton.BackgroundTransparency=1
+skyJumpButton.BorderSizePixel=0
+skyJumpButton.Text=""
+skyJumpButton.AutoButtonColor=false
+skyJumpButton.Parent=skyJumpCard
+
+skyJumpButton.MouseButton1Click:Connect(function()
+
+	if ShopModule then
+		ShopModule:Buy("Sky Jump")
+	end
+
+end)
+
+local busoCard=createCard(
+	shopPage,
+	"Buso Haki [25,000 Beli]",
+	1390,
+	58
+)
+
+local busoButton=Instance.new("TextButton")
+busoButton.Size=UDim2.fromScale(1,1)
+busoButton.BackgroundTransparency=1
+busoButton.BorderSizePixel=0
+busoButton.Text=""
+busoButton.AutoButtonColor=false
+busoButton.Parent=busoCard
+
+busoButton.MouseButton1Click:Connect(function()
+
+	if ShopModule then
+		ShopModule:Buy("Buso Haki")
+	end
+
+end)
+
+local flashStepCard=createCard(
+	shopPage,
+	"Flash Step [100,000 Beli]",
+	1456,
+	58
+)
+
+local flashStepButton=Instance.new("TextButton")
+flashStepButton.Size=UDim2.fromScale(1,1)
+flashStepButton.BackgroundTransparency=1
+flashStepButton.BorderSizePixel=0
+flashStepButton.Text=""
+flashStepButton.AutoButtonColor=false
+flashStepButton.Parent=flashStepCard
+
+flashStepButton.MouseButton1Click:Connect(function()
+
+	if ShopModule then
+		ShopModule:Buy("Flash Step")
+	end
+
+end)
+
+local observationCard=createCard(
+	shopPage,
+	"Observation Haki [750,000 Beli]",
+	1522,
+	58
+)
+
+local observationButton=Instance.new("TextButton")
+observationButton.Size=UDim2.fromScale(1,1)
+observationButton.BackgroundTransparency=1
+observationButton.BorderSizePixel=0
+observationButton.Text=""
+observationButton.AutoButtonColor=false
+observationButton.Parent=observationCard
+
+observationButton.MouseButton1Click:Connect(function()
+
+	if ShopModule then
+		ShopModule:Buy("Observation Haki")
+	end
+
+end)
+
+shopPage.CanvasSize=UDim2.fromOffset(0,1595)
+
+--========================================================
+-- ESP PAGE
+--========================================================
 
 createCheckbox(
 	espPage,
@@ -1553,6 +2048,7 @@ settingsPage.CanvasSize=UDim2.fromOffset(0,1146)
 --========================================================
 
 local menuItems={
+	{"Shop","Shop"},
 	{"ESP","ESP"},
 	{"PVP","PVP"},
 	{"Settings","Settings"}
@@ -1846,6 +2342,14 @@ close.MouseButton1Click:Connect(function()
 
 	saveConfig()
 
+	if ShopModule then
+		if ShopModule.Destroy then
+			ShopModule:Destroy()
+		end
+
+		ShopModule=nil
+	end
+
 	if ESPModule then
 		ESPModule:Destroy()
 		ESPModule=nil
@@ -1869,5 +2373,5 @@ close.MouseButton1Click:Connect(function()
 	end
 end)
 
-selectPage("ESP")
+selectPage("Shop")
 updateButtons()
