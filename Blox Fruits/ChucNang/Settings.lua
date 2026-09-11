@@ -357,7 +357,9 @@ function SettingsModule:SetupAutoLoad()
 	end
 
 	local code=[[
-		task.wait(2)
+		repeat
+			task.wait()
+		until game:IsLoaded() and game.Players.LocalPlayer
 
 		local success,err=pcall(function()
 			loadstring(game:HttpGet("]]..AUTO_LOAD_URL..[["))()
