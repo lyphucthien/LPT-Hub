@@ -2,14 +2,29 @@ local ShopModule={}
 
 local Players=game:GetService("Players")
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
-local TweenService=game:GetService("TweenService")
 
 local player=Players.LocalPlayer
 
-local RemotesFolder=ReplicatedStorage:WaitForChild("ShopRemotes")
+local BuyItemRemote=nil
+local RedeemCodeRemote=nil
 
-local BuyItemRemote=RemotesFolder:WaitForChild("BuyItem")
-local RedeemCodeRemote=RemotesFolder:WaitForChild("RedeemCode")
+local function refreshRemotes()
+
+	local RemotesFolder=ReplicatedStorage:FindFirstChild("ShopRemotes")
+
+	if not RemotesFolder then
+		BuyItemRemote=nil
+		RedeemCodeRemote=nil
+		return false
+	end
+
+	BuyItemRemote=RemotesFolder:FindFirstChild("BuyItem")
+	RedeemCodeRemote=RemotesFolder:FindFirstChild("RedeemCode")
+
+	return true
+end
+
+refreshRemotes()
 
 --========================================================
 -- CONFIG
@@ -176,19 +191,8 @@ local FightingStyleKeywords={
 	}
 }
 
---========================================================
--- STATE
---========================================================
-
-local State={
-	FightingStyleEnabled={}
-}
-
+local State={FightingStyleEnabled={}}
 local destroyed=false
-
---========================================================
--- CALLBACKS
---========================================================
 
 local Callbacks={
 	Success=nil,
@@ -209,15 +213,19 @@ local function notify(message)
 	message=tostring(message)
 
 	if type(Callbacks.Notification)=="function" then
+
 		pcall(
 			Callbacks.Notification,
 			message
 		)
+
 	else
+
 		print(
 			"[LPT Hub Shop]",
 			message
 		)
+
 	end
 end
 
@@ -259,28 +267,23 @@ local function normalizeName(name)
 
 end
 
-local function nameMatchesKeywords(name,keywords)
+local function getRemote(name)
 
-	local normalized=normalizeName(name)
-
-	for _,keyword in ipairs(keywords) do
-
-		local normalizedKeyword=
-			normalizeName(keyword)
-
-		if normalizedKeyword~=""
-			and string.find(
-				normalized,
-				normalizedKeyword,
-				1,
-				true
-			) then
-
-			return true
-		end
+	if destroyed then
+		return nil
 	end
 
-	return false
+	refreshRemotes()
+
+	if name=="BuyItem" then
+		return BuyItemRemote
+	end
+
+	if name=="RedeemCode" then
+		return RedeemCodeRemote
+	end
+
+	return nil
 end
 
 --========================================================
@@ -322,6 +325,7 @@ function ShopModule:FindFightingStyleNPC(styleName)
 		FightingStyleKeywords[styleName]
 
 	if not keywords then
+
 		notify(
 			"Không có dữ liệu quét NPC cho: "
 			..tostring(styleName)
@@ -336,8 +340,7 @@ function ShopModule:FindFightingStyleNPC(styleName)
 		return nil
 	end
 
-	local playerRoot=
-		character:FindFirstChild("HumanoidRootPart")
+	local playerRoot=character:FindFirstChild("HumanoidRootPart")
 
 	if not playerRoot then
 		return nil
@@ -356,55 +359,61 @@ function ShopModule:FindFightingStyleNPC(styleName)
 			if npcRoot then
 
 				local score=0
+
 				local normalized=
 					normalizeName(obj.Name)
 
-				-- Exact keyword matching
 				for _,keyword in ipairs(keywords) do
 
 					local normalizedKeyword=
 						normalizeName(keyword)
 
 					if normalized==normalizedKeyword then
+
 						score+=1000
+
 					elseif string.find(
 						normalized,
 						normalizedKeyword,
 						1,
 						true
 					) then
+
 						score+=500
+
 					end
 				end
 
-				-- Teacher-like name bonus
 				if string.find(
 					normalized,
 					"teacher",
 					1,
 					true
 				) then
+
 					score+=100
+
 				end
 
-				-- NPC bonus
 				if string.find(
 					normalized,
 					"npc",
 					1,
 					true
 				) then
+
 					score+=10
+
 				end
 
 				if score>0 then
 
 					local distance=
-						(playerRoot.Position
-						-npcRoot.Position).Magnitude
+						(
+							playerRoot.Position
+							-npcRoot.Position
+						).Magnitude
 
-					-- Ưu tiên score cao.
-					-- Nếu score bằng nhau thì ưu tiên gần hơn.
 					if score>bestScore
 						or (
 							score==bestScore
@@ -414,28 +423,11 @@ function ShopModule:FindFightingStyleNPC(styleName)
 						bestNPC=obj
 						bestScore=score
 						bestDistance=distance
+
 					end
 				end
 			end
 		end
-	end
-
-	if bestNPC then
-
-		notify(
-			"Đã tìm thấy NPC "
-			..bestNPC.Name
-			.." | Distance: "
-			..math.floor(bestDistance)
-		)
-
-	else
-
-		notify(
-			"Không tìm thấy NPC cho "
-			..tostring(styleName)
-		)
-
 	end
 
 	return bestNPC
@@ -489,29 +481,28 @@ function ShopModule:MoveToNPC(npc)
 		..npc.Name
 	)
 
-	--====================================================
-	-- ƯU TIÊN MOVETO
-	--====================================================
-
 	local finished=false
+	local moveConnection=nil
 
-	local moveConnection
+	moveConnection=
+		humanoid.MoveToFinished:Connect(
+			function()
 
-	moveConnection=humanoid.MoveToFinished:Connect(
-		function(success)
+				finished=true
 
-			finished=true
+				if moveConnection then
 
-			if moveConnection then
-				moveConnection:Disconnect()
-				moveConnection=nil
+					moveConnection:Disconnect()
+					moveConnection=nil
+
+				end
 			end
-
-		end
-	)
+		)
 
 	pcall(function()
+
 		humanoid:MoveTo(targetPosition)
+
 	end)
 
 	local startTime=os.clock()
@@ -523,7 +514,9 @@ function ShopModule:MoveToNPC(npc)
 		task.wait(.1)
 
 		local currentRoot=
-			character:FindFirstChild("HumanoidRootPart")
+			character:FindFirstChild(
+				"HumanoidRootPart"
+			)
 
 		if not currentRoot then
 			break
@@ -540,44 +533,25 @@ function ShopModule:MoveToNPC(npc)
 	end
 
 	if moveConnection then
+
 		moveConnection:Disconnect()
 		moveConnection=nil
-	end
 
-	--====================================================
-	-- FALLBACK: CFrame
-	--====================================================
+	end
 
 	local currentRoot=
-		character:FindFirstChild("HumanoidRootPart")
+		character:FindFirstChild(
+			"HumanoidRootPart"
+		)
 
-	if currentRoot then
-
-		local distance=
-			(currentRoot.Position
-			-targetPosition).Magnitude
-
-		if distance>8 then
-
-			pcall(function()
-
-				currentRoot.CFrame=
-					CFrame.new(targetPosition)
-					* CFrame.Angles(
-						0,
-						math.rad(
-							npcRoot.Orientation.Y
-						),
-						0
-					)
-
-			end)
-
-			task.wait(.25)
-		end
+	if not currentRoot then
+		return false
 	end
 
-	return true
+	return (
+		currentRoot.Position
+		-targetPosition
+	).Magnitude<=8
 end
 
 --========================================================
@@ -598,7 +572,9 @@ function ShopModule:InteractNPC(npc)
 	-- PROXIMITY PROMPT
 	--====================================================
 
-	for _,obj in ipairs(npc:GetDescendants()) do
+	for _,obj in ipairs(
+		npc:GetDescendants()
+	) do
 
 		if obj:IsA("ProximityPrompt") then
 
@@ -606,9 +582,7 @@ function ShopModule:InteractNPC(npc)
 
 			pcall(function()
 
-				if type(
-					fireproximityprompt
-				)=="function" then
+				if type(fireproximityprompt)=="function" then
 
 					fireproximityprompt(obj)
 					triggered=true
@@ -633,7 +607,9 @@ function ShopModule:InteractNPC(npc)
 	-- CLICK DETECTOR
 	--====================================================
 
-	for _,obj in ipairs(npc:GetDescendants()) do
+	for _,obj in ipairs(
+		npc:GetDescendants()
+	) do
 
 		if obj:IsA("ClickDetector") then
 
@@ -641,9 +617,7 @@ function ShopModule:InteractNPC(npc)
 
 			pcall(function()
 
-				if type(
-					fireclickdetector
-				)=="function" then
+				if type(fireclickdetector)=="function" then
 
 					fireclickdetector(obj)
 					clicked=true
@@ -665,7 +639,7 @@ function ShopModule:InteractNPC(npc)
 	end
 
 	notify(
-		"Không tìm thấy ProximityPrompt/ClickDetector tại "
+		"Không tìm thấy cách tương tác tại "
 		..npc.Name
 	)
 
@@ -712,16 +686,23 @@ function ShopModule:GetFightingStyle(styleName)
 	end
 
 	if not self:MoveToNPC(npc) then
+
 		notify(
 			"Không thể đến NPC "
 			..npc.Name
 		)
+
 		return false
 	end
 
 	task.wait(.25)
 
-	self:InteractNPC(npc)
+	local interacted=
+		self:InteractNPC(npc)
+
+	if not interacted then
+		return false
+	end
 
 	return true
 end
@@ -766,7 +747,6 @@ function ShopModule:Get(name)
 	end
 
 	local config=ShopConfig[name]
-
 	local result={}
 
 	for key,value in pairs(config) do
@@ -836,13 +816,34 @@ function ShopModule:Buy(name)
 		return false
 	end
 
-	local success,result=pcall(function()
+	local remote=getRemote("BuyItem")
 
-		return BuyItemRemote:InvokeServer(
-			name
+	if not remote then
+
+		notify(
+			"BuyItem remote chưa sẵn sàng"
 		)
 
-	end)
+		return false
+	end
+
+	if not remote:IsA("RemoteFunction") then
+
+		notify(
+			"BuyItem không phải RemoteFunction"
+		)
+
+		return false
+	end
+
+	local success,result=
+		pcall(function()
+
+			return remote:InvokeServer(
+				name
+			)
+
+		end)
 
 	if not success then
 
@@ -948,9 +949,10 @@ function ShopModule:Set(name,enabled)
 	-- FIND / GO / INTERACT
 	--====================================================
 
-	local success=self:GetFightingStyle(name)
+	local styleSuccess=
+		self:GetFightingStyle(name)
 
-	if not success then
+	if not styleSuccess then
 
 		State.FightingStyleEnabled[name]=false
 
@@ -970,15 +972,40 @@ function ShopModule:Set(name,enabled)
 	-- SERVER REQUEST
 	--====================================================
 
-	local remoteSuccess,result=pcall(function()
+	local remote=getRemote("BuyItem")
 
-		return BuyItemRemote:InvokeServer(
-			name,
-			"Toggle",
-			true
+	if not remote then
+
+		State.FightingStyleEnabled[name]=false
+
+		notify(
+			"BuyItem remote chưa sẵn sàng"
 		)
 
-	end)
+		return false
+	end
+
+	if not remote:IsA("RemoteFunction") then
+
+		State.FightingStyleEnabled[name]=false
+
+		notify(
+			"BuyItem không phải RemoteFunction"
+		)
+
+		return false
+	end
+
+	local remoteSuccess,result=
+		pcall(function()
+
+			return remote:InvokeServer(
+				name,
+				"Toggle",
+				true
+			)
+
+		end)
 
 	if not remoteSuccess then
 
@@ -1107,8 +1134,17 @@ function ShopModule:RedeemCode()
 		return false
 	end
 
-	local redeemed=0
-	local failed=0
+	local remote=getRemote("RedeemCode")
+
+	if not remote then
+		return false
+	end
+
+	if not remote:IsA("RemoteFunction") then
+		return false
+	end
+
+	local anySuccess=false
 
 	for _,code in ipairs(RedeemCodes) do
 
@@ -1116,25 +1152,24 @@ function ShopModule:RedeemCode()
 			break
 		end
 
-		local success,result=pcall(function()
+		local success,result=
+			pcall(function()
 
-			return RedeemCodeRemote:InvokeServer(
-				code
-			)
+				return remote:InvokeServer(
+					code
+				)
 
-		end)
+			end)
 
 		if success and result==true then
-			redeemed+=1
-		else
-			failed+=1
+			anySuccess=true
 		end
 
 		task.wait(.15)
 
 	end
 
-	return redeemed>0
+	return anySuccess
 end
 
 --========================================================
@@ -1169,6 +1204,9 @@ function ShopModule:Destroy()
 	end
 
 	destroyed=true
+
+	BuyItemRemote=nil
+	RedeemCodeRemote=nil
 
 	table.clear(
 		State.FightingStyleEnabled
