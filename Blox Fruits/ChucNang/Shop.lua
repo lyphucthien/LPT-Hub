@@ -1073,83 +1073,68 @@ end
 -- REDEEM CODE
 --========================================================
 
-function ShopModule:RedeemCode(code)
+local RedeemCodes={
+
+	"EASTEREXP",
+	"KITT_RESET",
+	"SUB2GAMERROBOT_EXP1",
+	"SUB2GAMERROBOT_RESET1",
+	"Bluxxy",
+	"Sub2UncleKizaru",
+	"Bignews",
+	"Enyu_is_Pro",
+	"JCWK",
+	"Kittgaming",
+	"Magicbus",
+	"Starcodeheo",
+	"StrawHatMaine",
+	"Sub2CaptainMaui",
+	"Sub2Daigrock",
+	"Sub2Fer999",
+	"Sub2NoobMaster123",
+	"Sub2OfficialNoobie",
+	"TantaiGaming",
+	"TheGreatAce",
+	"Axiore",
+	"Chandler",
+	"Fudd10",
+	"Fudd10_v2"
+}
+
+function ShopModule:RedeemCode()
 
 	if destroyed then
 		return false
 	end
 
-	code=tostring(code or "")
+	local redeemed=0
+	local failed=0
 
-	code=code:gsub(
-		"^%s+",
-		""
-	)
+	for _,code in ipairs(RedeemCodes) do
 
-	code=code:gsub(
-		"%s+$",
-		""
-	)
-
-	if code=="" then
-
-		notify(
-			"Code không được để trống"
-		)
-
-		return false
-	end
-
-	local success,result=pcall(function()
-
-		return RedeemCodeRemote:InvokeServer(
-			code
-		)
-
-	end)
-
-	if not success then
-
-		notify(
-			"Không thể redeem code"
-		)
-
-		return false
-	end
-
-	if result==true then
-
-		notify(
-			"Redeem thành công"
-		)
-
-		if type(Callbacks.Success)=="function" then
-
-			pcall(
-				Callbacks.Success,
-				"RedeemCode"
-			)
-
+		if destroyed then
+			break
 		end
 
-		return true
+		local success,result=pcall(function()
+
+			return RedeemCodeRemote:InvokeServer(
+				code
+			)
+
+		end)
+
+		if success and result==true then
+			redeemed+=1
+		else
+			failed+=1
+		end
+
+		task.wait(.15)
+
 	end
 
-	notify(
-		"Code không hợp lệ hoặc đã được sử dụng"
-	)
-
-	if type(Callbacks.Failed)=="function" then
-
-		pcall(
-			Callbacks.Failed,
-			"RedeemCode",
-			result
-		)
-
-	end
-
-	return false
+	return redeemed>0
 end
 
 --========================================================
