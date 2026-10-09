@@ -45,10 +45,6 @@ local State={
 	Submitting=false,
 }
 
---============================================================
--- COLORS
---============================================================
-
 local COLORS={
 	Background=Color3.fromRGB(8,18,32),
 	SurfaceLight=Color3.fromRGB(40,44,58),
@@ -151,10 +147,6 @@ local function saveKey(key)
 	end)
 end
 
---============================================================
--- SCREEN GUI
---============================================================
-
 local oldGui=playerGui:FindFirstChild("LPTKeyUI")
 
 if oldGui then
@@ -169,19 +161,9 @@ screenGui.IgnoreGuiInset=true
 screenGui.DisplayOrder=999999
 screenGui.Parent=playerGui
 
---============================================================
--- NOTIFICATIONS DISABLED
---============================================================
-
--- Giữ lại hàm để các đoạn code cũ không bị lỗi,
--- nhưng không tạo popup thông báo nữa.
 local function showNotification(titleText,messageText,notificationType)
     return
 end
-
---============================================================
--- KEY UI (MINIMAL BLACK / TWO-COLUMN LAYOUT)
---============================================================
 
 local keyFrame=Instance.new("Frame")
 keyFrame.Name="KeyUI"
@@ -451,7 +433,6 @@ local executorValue=makeLabel(rightPanel,"ExecutorValue","Detecting...",UDim2.fr
 executorValue.TextXAlignment=Enum.TextXAlignment.Right
 executorValue.TextTruncate=Enum.TextTruncate.AtEnd
 
--- Prefer the executor's own identification API, then inspect common environment markers.
 local function detectExecutorName()
 	local env=_G
 	if type(getgenv)=="function" then
@@ -629,11 +610,7 @@ for configKey,config in pairs(GAME_HO_TRO) do
 end
 State.GameSupported=initialGameConfig~=nil
 if initialGameConfig then
-	updateDetectedGame(
-		"Detecting game...",
-		"Supported game",
-		(type(initialGameConfig.UniverseId)=="table" and initialGameConfig.UniverseId[1]) or game.GameId or game.PlaceId
-	)
+	updateDetectedGame("Detecting game...","Supported game",(type(initialGameConfig.UniverseId)=="table" and initialGameConfig.UniverseId[1]) or game.GameId or game.PlaceId)
 else
 	updateDetectedGame("Detecting game...","Universal mode",game.GameId or game.PlaceId)
 end
@@ -730,17 +707,11 @@ local function copyButtonLink(button, link, titleText, subText)
 end
 
 discordButton.MouseButton1Click:Connect(function()
-    copyButtonLink(
-        discordButton,DISCORD_LINK,
-        "Discord","discord.gg/gyZ27Hw9qu"
-    )
+    copyButtonLink(discordButton,DISCORD_LINK,"Discord","discord.gg/gyZ27Hw9qu")
 end)
 
 websiteButton.MouseButton1Click:Connect(function()
-    copyButtonLink(
-        websiteButton,WEBSITE_LINK,
-        "Website","lyphucthien.vercel.app"
-    )
+    copyButtonLink(websiteButton,WEBSITE_LINK,"Website","lyphucthien.vercel.app")
 end)
 
 --============================================================
@@ -751,10 +722,7 @@ local function getUniverseId(placeId)
 	if not placeId then return nil end
 
 	local ok,result=pcall(function()
-		local url=
-			"https://apis.roblox.com/universes/v1/places/"
-			..tostring(placeId)
-			.."/universe"
+		local url="https://apis.roblox.com/universes/v1/places/"..tostring(placeId).."/universe"
 
 		local response=game:HttpGet(url)
 
@@ -817,31 +785,17 @@ local function resolveGame()
 		return false,"Không lấy được PlaceId."
 	end
 
-	setStatus(
-		"PlaceId: "..tostring(State.PlaceId).." • Đang nhận diện...",
-		COLORS.Info
-	)
-
-	showNotification(
-		"Detecting Game",
-		"Đang lấy PlaceId và UniverseId...",
-		"info"
-	)
+	setStatus("PlaceId: "..tostring(State.PlaceId).." • Đang nhận diện...",COLORS.Info)
+	showNotification("Detecting Game","Đang lấy PlaceId và UniverseId...","info")
 
 	task.wait(.25)
 
 	State.UniverseId=getUniverseId(State.PlaceId) or tonumber(game.GameId)
 
 	if State.UniverseId then
-		setStatus(
-			"UniverseId: "..tostring(State.UniverseId).." • Đang tìm game...",
-			COLORS.Info
-		)
+		setStatus("UniverseId: "..tostring(State.UniverseId).." • Đang tìm game...",COLORS.Info)
 	else
-		setStatus(
-			"Không lấy được UniverseId • Kiểm tra PlaceId...",
-			COLORS.Warning
-		)
+		setStatus("Không lấy được UniverseId • Kiểm tra PlaceId...",COLORS.Warning)
 	end
 
 	task.wait(.2)
@@ -887,16 +841,8 @@ local function resolveGame()
 	local iconId=(type(gameConfig.UniverseId)=="table" and gameConfig.UniverseId[1]) or game.GameId or State.PlaceId
 	updateDetectedGame(State.RobloxGameName or State.GameName,"Supported game",iconId)
 
-	setStatus(
-		"Đã nhận diện: "..State.GameName,
-		COLORS.Success
-	)
-
-	showNotification(
-		"Game Detected",
-		State.GameName.." • "..tostring(matchType),
-		"success"
-	)
+	setStatus("Đã nhận diện: "..State.GameName,COLORS.Success)
+	showNotification("Game Detected",State.GameName.." • "..tostring(matchType),"success")
 
 	return true
 end
@@ -911,10 +857,7 @@ local function waitForGameData(config)
 		return true
 	end
 
-	setStatus(
-		"Đang chờ dữ liệu game...",
-		COLORS.Info
-	)
+	setStatus("Đang chờ dữ liệu game...",COLORS.Info)
 
 	local dataLoaded=player:FindFirstChild("DataLoaded")
 
@@ -957,11 +900,7 @@ local function executeScript(url,scriptName)
 	end)
 
 	if not response then
-		error(
-			tostring(scriptName)
-			.." HttpGet lỗi: "
-			..tostring(requestError)
-		)
+		error(tostring(scriptName).." HttpGet lỗi: "..tostring(requestError))
 	end
 
 	if type(requestError)~="string" or requestError=="" then
@@ -973,30 +912,19 @@ local function executeScript(url,scriptName)
 	if code:match("^%s*<!DOCTYPE")
 		or code:match("^%s*<html")
 		or code:match("^%s*<HTML") then
-		error(
-			tostring(scriptName)
-			.." URL không trả về Luau. Có thể URL đang trả HTML."
-		)
+		error(tostring(scriptName).." URL không trả về Luau. Có thể URL đang trả HTML.")
 	end
 
 	local chunk,compileError=loadstring(code)
 
 	if type(chunk)~="function" then
-		error(
-			tostring(scriptName)
-			.." compile lỗi:\n"
-			..tostring(compileError)
-		)
+		error(tostring(scriptName).." compile lỗi:\n"..tostring(compileError))
 	end
 
 	local ok,runError=pcall(chunk)
 
 	if not ok then
-		error(
-			tostring(scriptName)
-			.." runtime lỗi:\n"
-			..tostring(runError)
-		)
+		error(tostring(scriptName).." runtime lỗi:\n"..tostring(runError))
 	end
 
 	return true
@@ -1012,31 +940,16 @@ local function loadMainUI()
 	State.Loading=true
 	keyFrame.Visible=true
 
-	setStatus(
-		"KEY hợp lệ • Đang nhận diện game...",
-		COLORS.Success
-	)
+	setStatus("KEY hợp lệ • Đang nhận diện game...",COLORS.Success)
 
 	task.wait(.25)
 
 	local resolved,resolveError=resolveGame()
 
-	--========================================================
-	-- GAME KHÔNG ĐƯỢC HỖ TRỢ → UNIVERSAL
-	--========================================================
-
 	if not resolved then
 		if resolveError=="Game không được hỗ trợ." then
-			setStatus(
-				"Universal Mode • Đang tải...",
-				COLORS.Warning
-			)
-
-			showNotification(
-				"Universal Mode",
-				"Game chưa có script riêng. Đang khởi chạy Universal...",
-				"warning"
-			)
+			setStatus("Universal Mode • Đang tải...",COLORS.Warning)
+			showNotification("Universal Mode","Game chưa có script riêng. Đang khởi chạy Universal...","warning")
 
 			task.wait(.5)
 
@@ -1050,31 +963,15 @@ local function loadMainUI()
 			if not ok then
 				keyFrame.Visible=true
 
-				setStatus(
-					"Không thể tải Universal.",
-					COLORS.Danger
-				)
-
-				showNotification(
-					"Universal Error",
-					tostring(result),
-					"error"
-				)
+				setStatus("Không thể tải Universal.",COLORS.Danger)
+				showNotification("Universal Error",tostring(result),"error")
 
 				State.Loading=false
 				return
 			end
 
-			setStatus(
-				"Universal đã được tải.",
-				COLORS.Success
-			)
-
-			showNotification(
-				"Universal Mode",
-				"Universal Script đã được tải thành công.",
-				"success"
-			)
+			setStatus("Universal đã được tải.",COLORS.Success)
+			showNotification("Universal Mode","Universal Script đã được tải thành công.","success")
 
 			task.wait(.25)
 
@@ -1085,55 +982,27 @@ local function loadMainUI()
 
 		keyFrame.Visible=true
 
-		setStatus(
-			tostring(resolveError),
-			COLORS.Danger
-		)
-
-		showNotification(
-			"Game Detection Error",
-			tostring(resolveError),
-			"error"
-		)
+		setStatus(tostring(resolveError),COLORS.Danger)
+		showNotification("Game Detection Error",tostring(resolveError),"error")
 
 		State.Loading=false
 		return
 	end
-
-	--========================================================
-	-- GAME ĐƯỢC HỖ TRỢ
-	--========================================================
 
 	task.wait(.4)
 
 	if not waitForGameData(State.GameConfig) then
 		keyFrame.Visible=true
 
-		setStatus(
-			"Game chưa sẵn sàng.",
-			COLORS.Danger
-		)
-
-		showNotification(
-			"Game Loading",
-			"DataLoaded chưa hoàn tất.",
-			"error"
-		)
+		setStatus("Game chưa sẵn sàng.",COLORS.Danger)
+		showNotification("Game Loading","DataLoaded chưa hoàn tất.","error")
 
 		State.Loading=false
 		return
 	end
 
-	setStatus(
-		"Đang tải MainUI...",
-		COLORS.Info
-	)
-
-	showNotification(
-		"Loading UI",
-		"Đang tải "..State.GameName.."...",
-		"info"
-	)
+	setStatus("Đang tải MainUI...",COLORS.Info)
+	showNotification("Loading UI","Đang tải "..State.GameName.."...","info")
 
 	task.wait(.25)
 
@@ -1147,31 +1016,15 @@ local function loadMainUI()
 	if not ok then
 		keyFrame.Visible=true
 
-		setStatus(
-			"Không thể tải MainUI.",
-			COLORS.Danger
-		)
-
-		showNotification(
-			"MainUI Error",
-			tostring(result),
-			"error"
-		)
+		setStatus("Không thể tải MainUI.",COLORS.Danger)
+		showNotification("MainUI Error",tostring(result),"error")
 
 		State.Loading=false
 		return
 	end
 
-	setStatus(
-		"Đã tải "..State.GameName,
-		COLORS.Success
-	)
-
-	showNotification(
-		"LPT HUB",
-		"Đã tải UI: "..State.GameName,
-		"success"
-	)
+	setStatus("Đã tải "..State.GameName,COLORS.Success)
+	showNotification("LPT HUB","Đã tải UI: "..State.GameName,"success")
 
 	task.wait(.25)
 
@@ -1225,53 +1078,25 @@ local function attemptSubmit()
 	key=key:gsub("^%s+",""):gsub("%s+$","")
 
 	if key=="" then
-		setStatus(
-			"Vui lòng nhập KEY.",
-			COLORS.Danger
-		)
+		setStatus("Vui lòng nhập KEY.",COLORS.Danger)
 
 		State.Submitting=false
 		return
 	end
 
-	setStatus(
-		"Đang xác thực KEY...",
-		COLORS.Info
-	)
+	setStatus("Đang xác thực KEY...",COLORS.Info)
 
 	task.wait(.2)
 
 	if not checkKey(key) then
-		setStatus(
-			"KEY không đúng, thử lại.",
-			COLORS.Danger
-		)
+		setStatus("KEY không đúng, thử lại.",COLORS.Danger)
+		showNotification("Invalid Key","KEY không hợp lệ.","error")
 
-		showNotification(
-			"Invalid Key",
-			"KEY không hợp lệ.",
-			"error"
-		)
-
-		tween(
-			inputStroke,
-			{
-				Color=COLORS.Danger,
-				Transparency=0
-			},
-			.1
-		)
+		tween(inputStroke,{Color=COLORS.Danger,Transparency=0},.1)
 
 		task.wait(.15)
 
-		tween(
-			inputStroke,
-			{
-				Color=COLORS.Border,
-				Transparency=.15
-			},
-			.2
-		)
+		tween(inputStroke,{Color=COLORS.Border,Transparency=.15},.2)
 
 		State.Submitting=false
 		return
@@ -1280,24 +1105,12 @@ local function attemptSubmit()
 	State.KeyValid=true
 	saveKey(key)
 
-	showNotification(
-		"Key Valid!",
-		"KEY hợp lệ. Đang nhận diện game...",
-		"success"
-	)
-
-	setStatus(
-		"KEY hợp lệ! Đang nhận diện game...",
-		COLORS.Success
-	)
+	showNotification("Key Valid!","KEY hợp lệ. Đang nhận diện game...","success")
+	setStatus("KEY hợp lệ! Đang nhận diện game...",COLORS.Success)
 
 	State.Submitting=false
 	loadMainUI()
 end
-
---============================================================
--- EVENTS
---============================================================
 
 submitButton.MouseButton1Click:Connect(attemptSubmit)
 
@@ -1306,10 +1119,6 @@ keyInput.FocusLost:Connect(function(enterPressed)
 		attemptSubmit()
 	end
 end)
-
---============================================================
--- LOAD SAVED KEY
---============================================================
 
 task.spawn(function()
 	local savedKey=getSavedKey()
@@ -1323,7 +1132,6 @@ task.spawn(function()
 	keyInput.Text=savedKey
 
 	setStatus("Đang xác thực KEY đã lưu...",COLORS.Info)
-
 	task.wait(.4)
 
 	attemptSubmit()
