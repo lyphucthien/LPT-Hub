@@ -1,6 +1,8 @@
 local Players=game:GetService("Players")
 local TweenService=game:GetService("TweenService")
 local HttpService=game:GetService("HttpService")
+local UserInputService=game:GetService("UserInputService")
+local MarketplaceService=game:GetService("MarketplaceService")
 
 local player=Players.LocalPlayer
 local playerGui=player:WaitForChild("PlayerGui")
@@ -35,6 +37,7 @@ local State={
 	PlaceId=nil,
 	UniverseId=nil,
 	GameName="Unknown Game",
+	RobloxGameName=nil,
 	GameSupported=false,
 	GameConfig=nil,
 	MainUI=nil,
@@ -93,6 +96,8 @@ end
 
 local LPT_HUB_FOLDER="LPT Hub"
 local KEY_FILE=LPT_HUB_FOLDER.."/LPT_Hub_Key.json"
+
+local KEY_DURATION=3*60*60
 
 local function ensureLPTFolder()
 	if type(isfolder)=="function" and type(makefolder)=="function" then
@@ -165,319 +170,186 @@ screenGui.DisplayOrder=999999
 screenGui.Parent=playerGui
 
 --============================================================
--- NOTIFICATION
+-- NOTIFICATIONS DISABLED
 --============================================================
 
-local notificationHolder=Instance.new("Frame")
-notificationHolder.Name="NotificationHolder"
-notificationHolder.Size=UDim2.fromScale(1,1)
-notificationHolder.BackgroundTransparency=1
-notificationHolder.BorderSizePixel=0
-notificationHolder.ZIndex=101
-notificationHolder.Parent=screenGui
-
-local activeNotifications={}
-
-local NOTIFICATION_WIDTH=340
-local NOTIFICATION_HEIGHT=82
-local NOTIFICATION_GAP=10
-local RIGHT_MARGIN=20
-local BOTTOM_MARGIN=20
-
-local function notificationPosition(index)
-	return UDim2.new(
-		1,
-		-RIGHT_MARGIN,
-		1,
-		-BOTTOM_MARGIN-((index-1)*(NOTIFICATION_HEIGHT+NOTIFICATION_GAP))
-	)
-end
-
-local function updateNotifications()
-	for i,notification in ipairs(activeNotifications) do
-		if notification and notification.Parent then
-			tween(
-				notification,
-				{Position=notificationPosition(i)},
-				.25,
-				Enum.EasingStyle.Quart
-			)
-		end
-	end
-end
-
+-- Giữ lại hàm để các đoạn code cũ không bị lỗi,
+-- nhưng không tạo popup thông báo nữa.
 local function showNotification(titleText,messageText,notificationType)
-	local accent=COLORS.Success
-	local iconText="✓"
-
-	if notificationType=="error" then
-		accent=COLORS.Danger
-		iconText="!"
-	elseif notificationType=="info" then
-		accent=COLORS.Info
-		iconText="i"
-	elseif notificationType=="warning" then
-		accent=COLORS.Warning
-		iconText="!"
-	end
-
-	local notification=Instance.new("Frame")
-	notification.Name="Notification"
-	notification.AnchorPoint=Vector2.new(1,1)
-	notification.Size=UDim2.fromOffset(
-		NOTIFICATION_WIDTH,
-		NOTIFICATION_HEIGHT
-	)
-
-	notification.Position=UDim2.new(
-		1,
-		NOTIFICATION_WIDTH+50,
-		1,
-		-BOTTOM_MARGIN
-	)
-
-	notification.BackgroundColor3=Color3.fromRGB(10,18,30)
-	notification.BackgroundTransparency=.04
-	notification.BorderSizePixel=0
-	notification.ZIndex=101
-	notification.Parent=notificationHolder
-
-	local corner=Instance.new("UICorner")
-	corner.CornerRadius=UDim.new(0,12)
-	corner.Parent=notification
-
-	local stroke=Instance.new("UIStroke")
-	stroke.Color=COLORS.Border
-	stroke.Thickness=1
-	stroke.Transparency=.15
-	stroke.Parent=notification
-
-	local bar=Instance.new("Frame")
-	bar.Size=UDim2.new(0,4,1,-18)
-	bar.Position=UDim2.new(0,0,.5,0)
-	bar.AnchorPoint=Vector2.new(0,.5)
-	bar.BackgroundColor3=accent
-	bar.BorderSizePixel=0
-	bar.ZIndex=102
-	bar.Parent=notification
-
-	local barCorner=Instance.new("UICorner")
-	barCorner.CornerRadius=UDim.new(1,0)
-	barCorner.Parent=bar
-
-	local icon=Instance.new("TextLabel")
-	icon.Size=UDim2.fromOffset(30,30)
-	icon.Position=UDim2.fromOffset(13,12)
-	icon.BackgroundColor3=accent
-	icon.BackgroundTransparency=.82
-	icon.BorderSizePixel=0
-	icon.Text=iconText
-	icon.TextColor3=accent
-	icon.TextSize=15
-	icon.Font=Enum.Font.GothamBold
-	icon.ZIndex=102
-	icon.Parent=notification
-
-	local iconCorner=Instance.new("UICorner")
-	iconCorner.CornerRadius=UDim.new(1,0)
-	iconCorner.Parent=icon
-
-	local title=Instance.new("TextLabel")
-	title.Size=UDim2.new(1,-62,0,21)
-	title.Position=UDim2.fromOffset(55,10)
-	title.BackgroundTransparency=1
-	title.Text=titleText
-	title.TextColor3=COLORS.Text
-	title.TextSize=15
-	title.Font=Enum.Font.GothamBold
-	title.TextXAlignment=Enum.TextXAlignment.Left
-	title.ZIndex=102
-	title.Parent=notification
-
-	local message=Instance.new("TextLabel")
-	message.Size=UDim2.new(1,-70,0,38)
-	message.Position=UDim2.fromOffset(55,34)
-	message.BackgroundTransparency=1
-	message.Text=messageText
-	message.TextColor3=COLORS.TextDim
-	message.TextSize=14
-	message.Font=Enum.Font.GothamMedium
-	message.TextWrapped=true
-	message.TextXAlignment=Enum.TextXAlignment.Left
-	message.TextYAlignment=Enum.TextYAlignment.Top
-	message.ZIndex=102
-	message.Parent=notification
-
-	local progress=Instance.new("Frame")
-	progress.Size=UDim2.new(1,0,0,2)
-	progress.Position=UDim2.new(0,0,1,-2)
-	progress.BackgroundColor3=accent
-	progress.BorderSizePixel=0
-	progress.ZIndex=103
-	progress.Parent=notification
-
-	table.insert(activeNotifications,1,notification)
-	updateNotifications()
-
-	tween(
-		notification,
-		{Position=notificationPosition(1)},
-		.3,
-		Enum.EasingStyle.Quart
-	)
-
-	tween(
-		progress,
-		{Size=UDim2.new(0,0,0,2)},
-		3,
-		Enum.EasingStyle.Linear
-	)
-
-	task.delay(3,function()
-		if not notification.Parent then return end
-
-		tween(
-			notification,
-			{
-				Position=UDim2.new(
-					1,
-					-RIGHT_MARGIN,
-					1,
-					NOTIFICATION_HEIGHT+30
-				)
-			},
-			.35,
-			Enum.EasingStyle.Quart
-		)
-
-		task.wait(.4)
-
-		if notification.Parent then
-			notification:Destroy()
-		end
-
-		for i,item in ipairs(activeNotifications) do
-			if item==notification then
-				table.remove(activeNotifications,i)
-				break
-			end
-		end
-
-		updateNotifications()
-	end)
+    return
 end
 
 --============================================================
--- KEY UI
+-- KEY UI (MINIMAL BLACK / TWO-COLUMN LAYOUT)
 --============================================================
 
 local keyFrame=Instance.new("Frame")
 keyFrame.Name="KeyUI"
-keyFrame.Size=UDim2.fromOffset(340,330)
-keyFrame.Position=UDim2.new(.5,-170,.5,-165)
-keyFrame.BackgroundColor3=COLORS.Background
-keyFrame.BackgroundTransparency=.15
+keyFrame.Size=UDim2.fromOffset(610,340)
+keyFrame.Position=UDim2.new(.5,-305,.5,-170)
+keyFrame.BackgroundColor3=Color3.fromRGB(5,5,5)
+keyFrame.BackgroundTransparency=.02
 keyFrame.BorderSizePixel=0
 keyFrame.ClipsDescendants=true
 keyFrame.ZIndex=10
 keyFrame.Parent=screenGui
 
 local frameCorner=Instance.new("UICorner")
-frameCorner.CornerRadius=UDim.new(0,18)
+frameCorner.CornerRadius=UDim.new(0,7)
 frameCorner.Parent=keyFrame
 
 local frameStroke=Instance.new("UIStroke")
-frameStroke.Color=COLORS.Border
-frameStroke.Thickness=1.5
-frameStroke.Transparency=.2
+frameStroke.Color=Color3.fromRGB(42,42,46)
+frameStroke.Thickness=1
+frameStroke.Transparency=.1
 frameStroke.Parent=keyFrame
 
-applyGradient(
-	frameStroke,
-	COLORS.Accent,
-	COLORS.AccentB,
-	45
-)
+local leftPanel=Instance.new("Frame")
+leftPanel.Name="LeftPanel"
+leftPanel.Size=UDim2.new(0,357,1,0)
+leftPanel.BackgroundTransparency=1
+leftPanel.BorderSizePixel=0
+leftPanel.ZIndex=10
+leftPanel.Parent=keyFrame
 
---============================================================
--- HEADER
---============================================================
+local rightPanel=Instance.new("Frame")
+rightPanel.Name="RightPanel"
+rightPanel.Position=UDim2.fromOffset(358,0)
+rightPanel.Size=UDim2.new(1,-358,1,0)
+rightPanel.BackgroundTransparency=1
+rightPanel.BorderSizePixel=0
+rightPanel.ZIndex=10
+rightPanel.Parent=keyFrame
+
+local divider=Instance.new("Frame")
+divider.Name="Divider"
+divider.Position=UDim2.fromOffset(357,29)
+divider.Size=UDim2.new(0,1,1,-58)
+divider.BackgroundColor3=Color3.fromRGB(43,43,43)
+divider.BorderSizePixel=0
+divider.ZIndex=11
+divider.Parent=keyFrame
+
+local function makeLabel(parent,name,text,size,pos,font,textSize,color)
+	local label=Instance.new("TextLabel")
+	label.Name=name
+	label.Size=size
+	label.Position=pos
+	label.BackgroundTransparency=1
+	label.BorderSizePixel=0
+	label.Text=text
+	label.TextColor3=color or Color3.fromRGB(240,240,240)
+	label.TextSize=textSize or 13
+	label.Font=font or Enum.Font.Gotham
+	label.TextXAlignment=Enum.TextXAlignment.Left
+	label.TextYAlignment=Enum.TextYAlignment.Center
+	label.ZIndex=12
+	label.Parent=parent
+	return label
+end
+
+local function makeCorner(object,radius)
+	local corner=Instance.new("UICorner")
+	corner.CornerRadius=UDim.new(0,radius or 6)
+	corner.Parent=object
+	return corner
+end
 
 local logo=Instance.new("ImageLabel")
 logo.Name="KeyLogo"
-logo.Size=UDim2.fromOffset(54,54)
-logo.Position=UDim2.fromOffset(24,24)
-logo.BackgroundColor3=Color3.fromRGB(8,8,10)
+logo.Size=UDim2.fromOffset(52,52)
+logo.Position=UDim2.fromOffset(32,16)
+logo.BackgroundTransparency=1
 logo.BorderSizePixel=0
 logo.Image="rbxassetid://86498268964550"
-logo.ScaleType=Enum.ScaleType.Crop
-logo.ZIndex=11
-logo.Parent=keyFrame
+logo.ScaleType=Enum.ScaleType.Fit
+logo.ZIndex=12
+logo.Parent=leftPanel
 
-local logoCorner=Instance.new("UICorner")
-logoCorner.CornerRadius=UDim.new(1,0)
-logoCorner.Parent=logo
+local title=makeLabel(leftPanel,"HeaderTitle","LPT Hub",UDim2.fromOffset(210,28),UDim2.fromOffset(108,23),Enum.Font.GothamBold,24,Color3.fromRGB(245,245,245))
+local subtitle=makeLabel(leftPanel,"HeaderSubtitle","Key system",UDim2.fromOffset(210,18),UDim2.fromOffset(109,49),Enum.Font.Gotham,12,Color3.fromRGB(105,105,105))
 
-local logoStroke=Instance.new("UIStroke")
-logoStroke.Color=COLORS.Border
-logoStroke.Thickness=1
-logoStroke.Transparency=.15
-logoStroke.Parent=logo
+local dragHandle=Instance.new("Frame")
+dragHandle.Name="DragHandle"
+dragHandle.Size=UDim2.fromOffset(357,86)
+dragHandle.Position=UDim2.fromOffset(0,0)
+dragHandle.BackgroundTransparency=1
+dragHandle.BorderSizePixel=0
+dragHandle.Active=true
+dragHandle.ZIndex=11
+dragHandle.Parent=keyFrame
 
-local title=Instance.new("TextLabel")
-title.Size=UDim2.fromOffset(250,28)
-title.Position=UDim2.fromOffset(92,20)
-title.BackgroundTransparency=1
-title.Text="LPT HUB KEY SYSTEM"
-title.TextColor3=COLORS.Text
-title.TextSize=22
-title.Font=Enum.Font.GothamBold
-title.TextXAlignment=Enum.TextXAlignment.Left
-title.ZIndex=11
-title.Parent=keyFrame
+local dragging=false
+local dragStart=nil
+local startPosition=nil
 
-local subtitle=Instance.new("TextLabel")
-subtitle.Size=UDim2.fromOffset(250,14)
-subtitle.Position=UDim2.fromOffset(92,47)
-subtitle.BackgroundTransparency=1
-subtitle.Text="THE AUTHENTICATE SYSTEM"
-subtitle.TextColor3=COLORS.TextDim
-subtitle.TextSize=11
-subtitle.Font=Enum.Font.Gotham
-subtitle.TextXAlignment=Enum.TextXAlignment.Left
-subtitle.ZIndex=11
-subtitle.Parent=keyFrame
+local function beginWindowDrag(input)
+	if input.UserInputType~=Enum.UserInputType.MouseButton1
+		and input.UserInputType~=Enum.UserInputType.Touch then
+		return
+	end
 
---============================================================
--- INPUT
---============================================================
+	dragging=true
+	dragStart=input.Position
+	startPosition=keyFrame.Position
+
+	local endedConnection
+	endedConnection=input.Changed:Connect(function()
+		if input.UserInputState==Enum.UserInputState.End then
+			dragging=false
+			if endedConnection then endedConnection:Disconnect() end
+		end
+	end)
+end
+
+for _,target in ipairs({dragHandle,logo,title,subtitle}) do
+	target.InputBegan:Connect(beginWindowDrag)
+end
+
+UserInputService.InputChanged:Connect(function(input)
+	if not dragging or not dragStart or not startPosition then return end
+	if input.UserInputType~=Enum.UserInputType.MouseMovement
+		and input.UserInputType~=Enum.UserInputType.Touch then
+		return
+	end
+
+	local delta=input.Position-dragStart
+	keyFrame.Position=UDim2.new(
+		startPosition.X.Scale,
+		startPosition.X.Offset+delta.X,
+		startPosition.Y.Scale,
+		startPosition.Y.Offset+delta.Y
+	)
+end)
+
+makeLabel(leftPanel,"LicenseLabel","License key",UDim2.fromOffset(300,18),UDim2.fromOffset(29,98),Enum.Font.Gotham,12,Color3.fromRGB(105,105,105))
 
 local inputBox=Instance.new("Frame")
-inputBox.Size=UDim2.new(1,-40,0,44)
-inputBox.Position=UDim2.fromOffset(20,100)
-inputBox.BackgroundColor3=COLORS.Card
+inputBox.Name="KeyInputBox"
+inputBox.Size=UDim2.fromOffset(300,40)
+inputBox.Position=UDim2.fromOffset(29,120)
+inputBox.BackgroundColor3=Color3.fromRGB(20,20,20)
 inputBox.BorderSizePixel=0
 inputBox.ZIndex=11
-inputBox.Parent=keyFrame
-
-local inputCorner=Instance.new("UICorner")
-inputCorner.CornerRadius=UDim.new(0,12)
-inputCorner.Parent=inputBox
+inputBox.Parent=leftPanel
+makeCorner(inputBox,6)
 
 local inputStroke=Instance.new("UIStroke")
-inputStroke.Color=COLORS.Border
+inputStroke.Color=Color3.fromRGB(45,45,45)
 inputStroke.Thickness=1
-inputStroke.Transparency=.15
+inputStroke.Transparency=.12
 inputStroke.Parent=inputBox
 
 local keyInput=Instance.new("TextBox")
-keyInput.Size=UDim2.new(1,-32,1,0)
-keyInput.Position=UDim2.fromOffset(16,0)
+keyInput.Name="LicenseInput"
+keyInput.Size=UDim2.new(1,-27,1,0)
+keyInput.Position=UDim2.fromOffset(13,0)
 keyInput.BackgroundTransparency=1
-keyInput.PlaceholderText="Enter Key..."
-keyInput.PlaceholderColor3=COLORS.TextDim
+keyInput.BorderSizePixel=0
+keyInput.PlaceholderText="Paste your key here"
+keyInput.PlaceholderColor3=Color3.fromRGB(94,94,94)
 keyInput.Text=""
-keyInput.TextColor3=COLORS.Text
+keyInput.TextColor3=Color3.fromRGB(245,245,245)
 keyInput.TextSize=14
 keyInput.Font=Enum.Font.Gotham
 keyInput.TextXAlignment=Enum.TextXAlignment.Left
@@ -485,185 +357,391 @@ keyInput.ClearTextOnFocus=false
 keyInput.ZIndex=12
 keyInput.Parent=inputBox
 
+local keyIcon=makeLabel(inputBox,"KeyIcon","⚿",UDim2.fromOffset(17,40),UDim2.fromOffset(8,0),Enum.Font.Gotham,17,Color3.fromRGB(95,95,95))
+keyIcon.TextXAlignment=Enum.TextXAlignment.Center
+keyInput.Position=UDim2.fromOffset(31,0)
+keyInput.Size=UDim2.new(1,-39,1,0)
+
 keyInput.Focused:Connect(function()
-	tween(
-		inputStroke,
-		{
-			Color=COLORS.Accent,
-			Transparency=0
-		}
-	)
+	tween(inputStroke,{Color=Color3.fromRGB(100,100,100),Transparency=0},.15)
 end)
-
 keyInput.FocusLost:Connect(function()
-	tween(
-		inputStroke,
-		{
-			Color=COLORS.Border,
-			Transparency=.15
-		}
-	)
+	tween(inputStroke,{Color=Color3.fromRGB(45,45,45),Transparency=.12},.15)
 end)
-
---============================================================
--- GET KEY
---============================================================
 
 local getKeyButton=Instance.new("TextButton")
-getKeyButton.Size=UDim2.new(1,-40,0,40)
-getKeyButton.Position=UDim2.fromOffset(20,154)
-getKeyButton.BackgroundColor3=COLORS.SurfaceLight
+getKeyButton.Name="GetKeyButton"
+getKeyButton.Size=UDim2.fromOffset(144,40)
+getKeyButton.Position=UDim2.fromOffset(29,177)
+getKeyButton.BackgroundColor3=Color3.fromRGB(22,22,22)
 getKeyButton.BorderSizePixel=0
-getKeyButton.Text="GET KEY"
-getKeyButton.TextColor3=COLORS.Text
+getKeyButton.Text="Get a key"
+getKeyButton.TextColor3=Color3.fromRGB(242,242,242)
 getKeyButton.TextSize=13
-getKeyButton.Font=Enum.Font.GothamBold
-getKeyButton.AutoButtonColor=false
+getKeyButton.Font=Enum.Font.GothamMedium
+getKeyButton.AutoButtonColor=true
 getKeyButton.ZIndex=11
-getKeyButton.Parent=keyFrame
-
-local getCorner=Instance.new("UICorner")
-getCorner.CornerRadius=UDim.new(0,12)
-getCorner.Parent=getKeyButton
-
+getKeyButton.Parent=leftPanel
+makeCorner(getKeyButton,6)
 local getStroke=Instance.new("UIStroke")
-getStroke.Color=COLORS.Border
+getStroke.Color=Color3.fromRGB(42,42,42)
 getStroke.Thickness=1
-getStroke.Transparency=.2
 getStroke.Parent=getKeyButton
 
-getKeyButton.MouseEnter:Connect(function()
-	tween(getKeyButton,{BackgroundColor3=COLORS.Card})
-end)
+local submitButton=Instance.new("TextButton")
+submitButton.Name="SubmitButton"
+submitButton.Size=UDim2.fromOffset(144,40)
+submitButton.Position=UDim2.fromOffset(185,177)
+submitButton.BackgroundColor3=Color3.fromRGB(245,245,245)
+submitButton.BorderSizePixel=0
+submitButton.Text="Submit"
+submitButton.TextColor3=Color3.fromRGB(15,15,15)
+submitButton.TextSize=13
+submitButton.Font=Enum.Font.GothamBold
+submitButton.AutoButtonColor=true
+submitButton.ZIndex=11
+submitButton.Parent=leftPanel
+makeCorner(submitButton,6)
 
-getKeyButton.MouseLeave:Connect(function()
-	tween(getKeyButton,{BackgroundColor3=COLORS.SurfaceLight})
-end)
+local keyStatus=makeLabel(leftPanel,"KeyStatus","",UDim2.fromOffset(300,30),UDim2.fromOffset(29,222),Enum.Font.Gotham,12,COLORS.Danger)
+keyStatus.TextWrapped=true
+keyStatus.TextYAlignment=Enum.TextYAlignment.Top
 
-getKeyButton.MouseButton1Click:Connect(function()
-	getKeyButton.Text="OPENING..."
+local getKeyHint=makeLabel(leftPanel,"GetKeyHint","Need a key? Click Get a key above.",UDim2.fromOffset(300,18),UDim2.fromOffset(29,265),Enum.Font.Gotham,11,Color3.fromRGB(100,170,255))
 
-	local opened=false
+local savedHint=makeLabel(leftPanel,"SavedHint","Your key is saved for next time",UDim2.fromOffset(300,18),UDim2.fromOffset(29,297),Enum.Font.Gotham,11,Color3.fromRGB(78,78,78))
 
-	if type(openurl)=="function" then
-		local ok=pcall(function()
-			openurl(GET_KEY_LINK)
-		end)
+makeLabel(rightPanel,"DetectedLabel","Detected game",UDim2.fromOffset(188,18),UDim2.fromOffset(28,28),Enum.Font.Gotham,11,Color3.fromRGB(100,100,100))
 
-		if ok then
-			opened=true
+local gameCard=Instance.new("Frame")
+gameCard.Name="DetectedGameCard"
+gameCard.Size=UDim2.fromOffset(188,60)
+gameCard.Position=UDim2.fromOffset(28,50)
+gameCard.BackgroundColor3=Color3.fromRGB(20,20,20)
+gameCard.BorderSizePixel=0
+gameCard.ZIndex=11
+gameCard.Parent=rightPanel
+makeCorner(gameCard,6)
+local gameCardStroke=Instance.new("UIStroke")
+gameCardStroke.Color=Color3.fromRGB(40,40,40)
+gameCardStroke.Thickness=1
+gameCardStroke.Parent=gameCard
+
+local gameIcon=Instance.new("ImageLabel")
+gameIcon.Name="GameIcon"
+gameIcon.Size=UDim2.fromOffset(39,39)
+gameIcon.Position=UDim2.fromOffset(10,10)
+gameIcon.BackgroundColor3=Color3.fromRGB(34,34,34)
+gameIcon.BorderSizePixel=0
+gameIcon.Image="rbxthumb://type=GameIcon&id="..tostring(game.GameId or game.PlaceId).."&w=150&h=150"
+gameIcon.ScaleType=Enum.ScaleType.Crop
+gameIcon.ZIndex=12
+gameIcon.Parent=gameCard
+makeCorner(gameIcon,5)
+
+local detectedGameName=makeLabel(gameCard,"GameName",tostring(game.Name or "Current game"),UDim2.new(1,-58,0,30),UDim2.fromOffset(57,7),Enum.Font.GothamMedium,12,Color3.fromRGB(238,238,238))
+detectedGameName.TextWrapped=true
+detectedGameName.TextTruncate=Enum.TextTruncate.AtEnd
+
+local detectedGameSub=makeLabel(gameCard,"GameSubtitle","Universal script",UDim2.new(1,-58,0,18),UDim2.fromOffset(57,35),Enum.Font.Gotham,10,Color3.fromRGB(90,90,90))
+detectedGameSub.TextTruncate=Enum.TextTruncate.AtEnd
+
+local executorLabel=makeLabel(rightPanel,"ExecutorLabel","Executor",UDim2.fromOffset(85,18),UDim2.fromOffset(28,120),Enum.Font.Gotham,11,Color3.fromRGB(95,95,95))
+local executorValue=makeLabel(rightPanel,"ExecutorValue","Detecting...",UDim2.fromOffset(100,18),UDim2.fromOffset(116,120),Enum.Font.Gotham,11,Color3.fromRGB(235,235,235))
+executorValue.TextXAlignment=Enum.TextXAlignment.Right
+executorValue.TextTruncate=Enum.TextTruncate.AtEnd
+
+-- Prefer the executor's own identification API, then inspect common environment markers.
+local function detectExecutorName()
+	local env=_G
+	if type(getgenv)=="function" then
+		local ok,result=pcall(getgenv)
+		if ok and type(result)=="table" then env=result end
+	end
+
+	local detectorNames={"identifyexecutor","getexecutorname","get_executor_name"}
+	for _,detectorName in ipairs(detectorNames) do
+		local detector=env[detectorName] or _G[detectorName]
+		if type(detector)=="function" then
+			local ok,name=pcall(detector)
+			if ok and type(name)=="string" and name~="" then
+				return name
+			end
 		end
 	end
 
-	if not opened and type(open_url)=="function" then
-		local ok=pcall(function()
-			open_url(GET_KEY_LINK)
-		end)
+	local markers={
+		{"KRNL_LOADED","KRNL"},
+		{"syn","Synapse X"},
+		{"fluxus","Fluxus"},
+		{"Fluxus","Fluxus"},
+		{"DELTA_LOADED","Delta"},
+		{"delta","Delta"},
+		{"Electron","Electron"},
+		{"electron","Electron"},
+		{"SIRHURT_LOADED","SirHurt"},
+	}
+	for _,marker in ipairs(markers) do
+		local value=env[marker[1]] or _G[marker[1]]
+		if value~=nil and value~=false then
+			return marker[2]
+		end
+	end
+	if type(env.is_sirhurt_closure)=="function" or type(_G.is_sirhurt_closure)=="function" then
+		return "SirHurt"
+	end
+	return "Unknown"
+end
 
-		if ok then
-			opened=true
+executorValue.Text=detectExecutorName()
+
+local statusTitle=makeLabel(rightPanel,"StatusTitle","Status",UDim2.fromOffset(85,18),UDim2.fromOffset(28,142),Enum.Font.Gotham,11,Color3.fromRGB(95,95,95))
+local statusValue=makeLabel(rightPanel,"StatusValue","Key required",UDim2.fromOffset(100,18),UDim2.fromOffset(116,142),Enum.Font.Gotham,11,Color3.fromRGB(255,200,65))
+statusValue.TextXAlignment=Enum.TextXAlignment.Right
+
+local statusDivider=Instance.new("Frame")
+statusDivider.Position=UDim2.fromOffset(28,171)
+statusDivider.Size=UDim2.fromOffset(188,1)
+statusDivider.BackgroundColor3=Color3.fromRGB(40,40,40)
+statusDivider.BorderSizePixel=0
+statusDivider.ZIndex=11
+statusDivider.Parent=rightPanel
+
+local discordButton=Instance.new("TextButton")
+discordButton.Name="DiscordCard"
+discordButton.Size=UDim2.fromOffset(188,48)
+discordButton.Position=UDim2.fromOffset(28,190)
+discordButton.BackgroundColor3=Color3.fromRGB(20,20,20)
+discordButton.BorderSizePixel=0
+discordButton.Text=""
+discordButton.AutoButtonColor=true
+discordButton.ZIndex=11
+discordButton.Parent=rightPanel
+makeCorner(discordButton,6)
+local discordStroke=Instance.new("UIStroke")
+discordStroke.Color=Color3.fromRGB(40,40,40)
+discordStroke.Thickness=1
+discordStroke.Parent=discordButton
+makeLabel(discordButton,"DiscordIcon","◉",UDim2.fromOffset(26,30),UDim2.fromOffset(10,8),Enum.Font.GothamBold,19,Color3.fromRGB(130,145,255))
+makeLabel(discordButton,"DiscordTitle","Discord",UDim2.fromOffset(130,16),UDim2.fromOffset(43,8),Enum.Font.GothamMedium,12,Color3.fromRGB(240,240,240))
+makeLabel(discordButton,"DiscordSub","discord.gg/gyZ27Hw9qu",UDim2.fromOffset(135,15),UDim2.fromOffset(43,24),Enum.Font.Gotham,11,Color3.fromRGB(100,170,255))
+
+local websiteButton=Instance.new("TextButton")
+websiteButton.Name="WebsiteCard"
+websiteButton.Size=UDim2.fromOffset(188,48)
+websiteButton.Position=UDim2.fromOffset(28,246)
+websiteButton.BackgroundColor3=Color3.fromRGB(20,20,20)
+websiteButton.BorderSizePixel=0
+websiteButton.Text=""
+websiteButton.AutoButtonColor=true
+websiteButton.ZIndex=11
+websiteButton.Parent=rightPanel
+makeCorner(websiteButton,6)
+local websiteStroke=Instance.new("UIStroke")
+websiteStroke.Color=Color3.fromRGB(40,40,40)
+websiteStroke.Thickness=1
+websiteStroke.Parent=websiteButton
+makeLabel(websiteButton,"WebsiteIcon","◎",UDim2.fromOffset(26,30),UDim2.fromOffset(10,8),Enum.Font.Gotham,19,Color3.fromRGB(115,145,255))
+makeLabel(websiteButton,"WebsiteTitle","Website",UDim2.fromOffset(130,16),UDim2.fromOffset(43,8),Enum.Font.GothamMedium,12,Color3.fromRGB(240,240,240))
+makeLabel(websiteButton,"WebsiteSub","lyphucthien.vercel.app",UDim2.fromOffset(135,15),UDim2.fromOffset(43,24),Enum.Font.Gotham,11,Color3.fromRGB(100,170,255))
+
+local function updateDetectedGame(name,subtitleText,iconId)
+	detectedGameName.Text=tostring(name or "Unknown game")
+	detectedGameSub.Text=tostring(subtitleText or "Universal script")
+	local id=tonumber(iconId) or tonumber(game.GameId) or tonumber(game.PlaceId)
+	if id then
+		gameIcon.Image="rbxthumb://type=GameIcon&id="..tostring(id).."&w=150&h=150"
+	end
+end
+
+local function fetchRobloxGameName()
+	local placeId = tonumber(game.PlaceId)
+	local universeId = tonumber(game.GameId)
+
+	local function validName(name)
+		return type(name) == "string"
+			and name ~= "" and not string.find(string.upper(name),"TITLE UNAVAILABLE",1,true)
+	end
+
+	for _, config in pairs(GAME_HO_TRO) do
+		for _, id in ipairs(config.PlaceId or {}) do
+			if tonumber(id) == placeId then
+				return config.Name
+			end
+		end
+
+		for _, id in ipairs(config.UniverseId or {}) do
+			if tonumber(id) == universeId then
+				return config.Name
+			end
 		end
 	end
 
-	if not opened then
-		if type(setclipboard)=="function" then
-			local copied=pcall(function()
-				setclipboard(GET_KEY_LINK)
+	if universeId and universeId > 0 then
+		local ok, response = pcall(function()
+			return game:HttpGet("https://games.roblox.com/v1/games?universeIds=".. universeId)
+		end)
+
+		if ok and type(response) == "string" then
+			local decoded, data = pcall(function()
+				return HttpService:JSONDecode(response)
 			end)
 
-			if copied then
-				showNotification(
-					"Link Copied",
-					"Không thể mở Web tự động. Link đã được copy.",
-					"warning"
-				)
-			else
-				showNotification(
-					"Copy Failed",
-					"Không thể mở Web hoặc copy link.",
-					"error"
-				)
+			if decoded and type(data.data) == "table" then
+				local info = data.data[1]
+
+				if info and validName(info.name) then
+					return info.name
+				end
 			end
-		else
-			showNotification(
-				"Open Failed",
-				"Executor không hỗ trợ mở Web hoặc copy link.",
-				"error"
-			)
 		end
 	end
 
-	task.delay(.8,function()
-		if getKeyButton.Parent then
-			getKeyButton.Text="GET KEY"
-		end
+	local ok, info = pcall(function()
+		return MarketplaceService:GetProductInfoAsync(
+			placeId,
+			Enum.InfoType.Asset
+		)
 	end)
-end)
 
---============================================================
--- SUBMIT
---============================================================
+	if ok and type(info) == "table" and validName(info.Name) then
+		return info.Name
+	end
 
-local submitButton=Instance.new("TextButton")
-submitButton.Size=UDim2.new(1,-40,0,44)
-submitButton.Position=UDim2.fromOffset(20,208)
-submitButton.BackgroundColor3=COLORS.Accent
-submitButton.BorderSizePixel=0
-submitButton.Text="Submit Key"
-submitButton.TextColor3=Color3.fromRGB(255,255,255)
-submitButton.TextSize=14
-submitButton.Font=Enum.Font.GothamBold
-submitButton.AutoButtonColor=false
-submitButton.ZIndex=11
-submitButton.Parent=keyFrame
+	return "Place ID " .. tostring(placeId or "Unknown")
+end
 
-local submitCorner=Instance.new("UICorner")
-submitCorner.CornerRadius=UDim.new(0,12)
-submitCorner.Parent=submitButton
-
-applyGradient(
-	submitButton,
-	COLORS.Accent,
-	COLORS.AccentB,
-	0
-)
-
-submitButton.MouseEnter:Connect(function()
-	tween(
-		submitButton,
-		{Size=UDim2.new(1,-36,0,44)},
-		.12
+local initialGameConfig=nil
+for configKey,config in pairs(GAME_HO_TRO) do
+	local matched=false
+	for _,id in ipairs(config.PlaceId or {}) do
+		if tonumber(id)==tonumber(game.PlaceId) then matched=true break end
+	end
+	if not matched then
+		for _,id in ipairs(config.UniverseId or {}) do
+			if tonumber(id)==tonumber(game.GameId) then matched=true break end
+		end
+	end
+	if matched then
+		initialGameConfig=config
+		break
+	end
+end
+State.GameSupported=initialGameConfig~=nil
+if initialGameConfig then
+	updateDetectedGame(
+		"Detecting game...",
+		"Supported game",
+		(type(initialGameConfig.UniverseId)=="table" and initialGameConfig.UniverseId[1]) or game.GameId or game.PlaceId
 	)
+else
+	updateDetectedGame("Detecting game...","Universal mode",game.GameId or game.PlaceId)
+end
+
+task.spawn(function()
+	local actualName=fetchRobloxGameName()
+	State.RobloxGameName=actualName
+	if detectedGameName and detectedGameName.Parent then
+		detectedGameName.Text=actualName
+	end
 end)
 
-submitButton.MouseLeave:Connect(function()
-	tween(
-		submitButton,
-		{Size=UDim2.new(1,-40,0,44)},
-		.12
-	)
-end)
-
---============================================================
--- STATUS
---============================================================
-
-local keyStatus=Instance.new("TextLabel")
-keyStatus.Size=UDim2.new(1,-40,0,18)
-keyStatus.Position=UDim2.fromOffset(20,260)
-keyStatus.BackgroundTransparency=1
-keyStatus.Text=""
-keyStatus.TextColor3=COLORS.Danger
-keyStatus.TextSize=12
-keyStatus.Font=Enum.Font.Gotham
-keyStatus.TextXAlignment=Enum.TextXAlignment.Left
-keyStatus.ZIndex=11
-keyStatus.Parent=keyFrame
+local function updateKeyStatus(text,color)
+	local value=tostring(text or "")
+	local lower=string.lower(value)
+	if string.find(lower,"xác thực") or string.find(lower,"nhận diện") or string.find(lower,"đang tải") or string.find(lower,"loading") then
+		statusValue.Text="Checking..."
+		statusValue.TextColor3=Color3.fromRGB(130,180,255)
+	elseif string.find(lower,"hợp lệ") or string.find(lower,"đã tải") or string.find(lower,"valid") then
+		statusValue.Text="Key valid"
+		statusValue.TextColor3=Color3.fromRGB(90,220,145)
+	elseif string.find(lower,"không đúng") or string.find(lower,"không thể") or string.find(lower,"lỗi") or string.find(lower,"error") then
+		statusValue.Text="Invalid / error"
+		statusValue.TextColor3=Color3.fromRGB(255,100,100)
+	elseif string.find(lower,"vui lòng") or string.find(lower,"chưa có key") or string.find(lower,"required") then
+		statusValue.Text="Key required"
+		statusValue.TextColor3=Color3.fromRGB(255,200,65)
+	end
+end
 
 local function setStatus(text,color)
 	keyStatus.Text=tostring(text or "")
-	keyStatus.TextColor3=color or COLORS.Text
+	keyStatus.TextColor3=color or Color3.fromRGB(230,230,230)
+	updateKeyStatus(text,color)
 end
+
+getKeyButton.MouseButton1Click:Connect(function()
+    if type(setclipboard) ~= "function" then
+        getKeyButton.Text = "Copy Failed"
+        task.delay(1.2, function()
+            if getKeyButton.Parent then
+                getKeyButton.Text = "Get a key"
+            end
+        end)
+        return
+    end
+
+    local ok = pcall(function()
+        setclipboard(GET_KEY_LINK)
+    end)
+
+    getKeyButton.Text = ok and "Link Copied..." or "Copy Failed"
+
+    task.delay(1.2, function()
+        if getKeyButton.Parent then
+            getKeyButton.Text = "Get a key"
+        end
+    end)
+end)
+
+local DISCORD_LINK = "https://discord.gg/gyZ27Hw9qu"
+local WEBSITE_LINK = "https://lyphucthien.vercel.app"
+
+local function copyButtonLink(button, link, titleText, subText)
+    local titleLabel = button:FindFirstChild(
+        button == discordButton and "DiscordTitle" or "WebsiteTitle"
+    )
+    local subLabel = button:FindFirstChild(
+        button == discordButton and "DiscordSub" or "WebsiteSub"
+    )
+
+    local ok = false
+
+    if type(setclipboard) == "function" then
+        ok = pcall(function()
+            setclipboard(link)
+        end)
+    end
+
+    if titleLabel then
+        titleLabel.Text = ok and "Link Copied..." or "Copy Failed"
+    end
+
+    if subLabel then
+        subLabel.Text = ok and "Copied to clipboard" or "Clipboard unavailable"
+    end
+
+    task.delay(1.2, function()
+        if button.Parent then
+            if titleLabel then titleLabel.Text = titleText end
+            if subLabel then subLabel.Text = subText end
+        end
+    end)
+end
+
+discordButton.MouseButton1Click:Connect(function()
+    copyButtonLink(
+        discordButton,DISCORD_LINK,
+        "Discord","discord.gg/gyZ27Hw9qu"
+    )
+end)
+
+websiteButton.MouseButton1Click:Connect(function()
+    copyButtonLink(
+        websiteButton,WEBSITE_LINK,
+        "Website","lyphucthien.vercel.app"
+    )
+end)
 
 --============================================================
 -- GAME DETECTION
@@ -752,7 +830,7 @@ local function resolveGame()
 
 	task.wait(.25)
 
-	State.UniverseId=getUniverseId(State.PlaceId)
+	State.UniverseId=getUniverseId(State.PlaceId) or tonumber(game.GameId)
 
 	if State.UniverseId then
 		setStatus(
@@ -778,6 +856,7 @@ local function resolveGame()
 		State.GameSupported=false
 		State.GameConfig=nil
 		State.MainUI=nil
+		updateDetectedGame(State.RobloxGameName or ("Place ID "..tostring(game.PlaceId)),"Universal mode",game.GameId or game.PlaceId)
 		return false,"Game không được hỗ trợ."
 	end
 
@@ -805,6 +884,8 @@ local function resolveGame()
 	State.GameConfig=gameConfig
 	State.MainUI=mainUI
 	State.GameSupported=true
+	local iconId=(type(gameConfig.UniverseId)=="table" and gameConfig.UniverseId[1]) or game.GameId or State.PlaceId
+	updateDetectedGame(State.RobloxGameName or State.GameName,"Supported game",iconId)
 
 	setStatus(
 		"Đã nhận diện: "..State.GameName,
@@ -1241,10 +1322,7 @@ task.spawn(function()
 
 	keyInput.Text=savedKey
 
-	setStatus(
-		"Đang xác thực KEY đã lưu...",
-		COLORS.Info
-	)
+	setStatus("Đang xác thực KEY đã lưu...",COLORS.Info)
 
 	task.wait(.4)
 
