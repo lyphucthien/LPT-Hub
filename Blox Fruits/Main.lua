@@ -249,8 +249,6 @@ end
 
 loadConfig()
 
-SettingsModule:Set("AutoLoadScript",Config.AutoLoadScript)
-
 local oldGui=playerGui:FindFirstChild("LPTHub")
 if oldGui then oldGui:Destroy() end
 
@@ -2268,13 +2266,23 @@ refreshSidebar=function()
 
 	for _,data in pairs(sidebarButtons) do
 
-		if data.button and data.button.Parent then
-			data.button:Destroy()
-		end
+		if data.button
+			and data.button.Parent then
 
+			data.button:Destroy()
+
+		end
 	end
 
 	table.clear(sidebarButtons)
+
+	if indicator and indicator.Parent then
+
+		indicator:Destroy()
+
+	end
+
+	indicator=nil
 
 	local order=0
 
@@ -2283,50 +2291,48 @@ refreshSidebar=function()
 		local pageName=item[1]
 		local title=item[2]
 
-		if moduleAvailable(pageName) then
+		if ModuleLoaded[pageName] then
 
 			order+=1
 
-			createSidebarButton(
-				title,
-				order,
-				pageName
-			)
+			createSidebarButton(title,order,pageName)
 
 		end
-
 	end
 
-	if oldCurrent
-		and ModuleLoaded[oldCurrent]
-	then
+	local targetPage=nil
 
-		currentPage=nil
-		selectPage(oldCurrent)
+	if oldCurrent
+		and ModuleLoaded[oldCurrent] then
+
+		targetPage=oldCurrent
 
 	else
-
-		local firstPage=nil
 
 		for _,item in ipairs(menuItems) do
 
 			if ModuleLoaded[item[1]] then
-				firstPage=item[1]
+
+				targetPage=item[1]
 				break
+
 			end
+		end
+	end
 
+	if targetPage then
+
+		currentPage=nil
+		selectPage(targetPage)
+
+	else
+
+		for _,page in pairs(pages) do
+			page.Visible=false
 		end
 
-		if firstPage then
+		currentPage=nil
 
-			currentPage=nil
-			selectPage(firstPage)
-
-		else
-
-			currentPage=nil
-
-		end
 	end
 end
 
