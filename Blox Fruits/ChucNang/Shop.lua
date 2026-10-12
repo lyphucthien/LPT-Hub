@@ -30,29 +30,35 @@ refreshRemotes()
 -- CONFIG
 --========================================================
 
+local LIGHT_BLUE = Color3.fromRGB(135, 206, 250)
+
 local ShopConfig = {
     ["Reroll Race"] = {
         Type = "Button",
         Cost = 2500,
-        Currency = "Fragments"
+        Currency = "Fragments",
+    	Color = LIGHT_BLUE
     },
 
     ["Reset Stats"] = {
         Type = "Button",
         Cost = 3000,
-        Currency = "Fragments"
+        Currency = "Fragments",
+    	Color = LIGHT_BLUE
     },
 
     ["Buy Race Cyborg"] = {
         Type = "Button",
         Cost = 3000,
-        Currency = "Fragments"
+        Currency = "Fragments",
+    	Color = LIGHT_BLUE
     },
 
     ["Buy Race Ghoul"] = {
         Type = "Button",
         Cost = 3000,
-        Currency = "Fragments"
+        Currency = "Fragments",
+    	Color = LIGHT_BLUE
     },
 
     ["Dark Step"] = {Type = "Toggle"},
@@ -70,25 +76,29 @@ local ShopConfig = {
     ["Sky Jump"] = {
         Type = "Button",
         Cost = 10000,
-        Currency = "Beli"
+        Currency = "Beli",
+    	Color = LIGHT_BLUE
     },
 
     ["Buso Haki"] = {
         Type = "Button",
         Cost = 25000,
-        Currency = "Beli"
+        Currency = "Beli",
+    	Color = LIGHT_BLUE
     },
 
     ["Flash Step"] = {
         Type = "Button",
         Cost = 100000,
-        Currency = "Beli"
+        Currency = "Beli",
+    	Color = LIGHT_BLUE
     },
 
     ["Observation Haki"] = {
         Type = "Button",
         Cost = 750000,
-        Currency = "Beli"
+        Currency = "Beli",
+    	Color = LIGHT_BLUE
     }
 }
 
