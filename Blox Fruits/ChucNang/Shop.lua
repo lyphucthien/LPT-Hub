@@ -97,64 +97,17 @@ local ShopConfig = {
 --========================================================
 
 local FightingStyleKeywords = {
-    ["Dark Step"] = {
-        "dark step",
-        "darkstep",
-        "dark step teacher"
-    },
-
-    ["Electric"] = {
-        "electric",
-        "mad scientist"
-    },
-
-    ["Water Kung Fu"] = {
-        "water kung fu",
-        "water kung fu teacher",
-        "water fighter"
-    },
-
-    ["Dragon Breath"] = {
-        "dragon breath",
-        "sabi"
-    },
-
-    ["Superhuman"] = {
-        "superhuman",
-        "martial arts master"
-    },
-
-    ["Death Step"] = {
-        "death step",
-        "phoeyu",
-        "reformed"
-    },
-
-    ["Sharkman Karate"] = {
-        "sharkman karate",
-        "sharkman",
-        "daigrock"
-    },
-
-    ["Electric Claw"] = {
-        "electric claw",
-        "previous hero"
-    },
-
-    ["Dragon Talon"] = {
-        "dragon talon",
-        "uzoth"
-    },
-
-    ["God Human"] = {
-        "god human",
-        "ancient monk"
-    },
-
-    ["Sanguine Art"] = {
-        "sanguine art",
-        "shafi"
-    }
+    ["Dark Step"] = {"dark step teacher"},
+    ["Electric"] = {"mad scientist"},
+    ["Water Kung Fu"] = {"water kung fu teacher"},
+    ["Dragon Breath"] = {"sabi"},
+    ["Superhuman"] = {"martial arts master"},
+    ["Death Step"] = {"phoeyu", "reformed"},
+    ["Sharkman Karate"] = {"sharkman teacher", "daigrock"},
+    ["Electric Claw"] = {"previous hero"},
+    ["Dragon Talon"] = {"uzoth"},
+    ["God Human"] = {"ancient monk"},
+    ["Sanguine Art"] = {"shafi"}
 }
 
 local State = {
@@ -520,12 +473,10 @@ function ShopModule:GetFightingStyle(styleName)
 
     local npc = self:FindFightingStyleNPC(styleName)
 
-    -- Không tìm thấy NPC: dừng ngay
     if not npc then
         return nil
     end
 
-    -- Bay đến NPC, không đi bộ
     if not self:FlyToNPC(npc) then
         notify("Không thể bay tới NPC " .. npc.Name)
         return false
@@ -533,7 +484,6 @@ function ShopModule:GetFightingStyle(styleName)
 
     task.wait(0.25)
 
-    -- Tương tác sau khi bay tới
     if not self:InteractNPC(npc) then
         return false
     end
