@@ -12,17 +12,11 @@ end
 
 local playerGui = player:WaitForChild("PlayerGui")
 
---============================================================
--- CONFIG
---============================================================
-
-local RAW = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/"
-local GET_KEY_LINK = "https://link4sub.com/owycAYxKdu"
+local GET_KEY_LINK = "https://work.ink/34tV/LPT-Hub-Script-Key-Mission"
 local DISCORD_LINK = "https://discord.gg/gyZ27Hw9qu"
 local WEBSITE_LINK = "https://youtube.com/@lyphucthien1803"
 local KEY_API_URL = "https://lyphucthien.vercel.app/api/get-key"
-
-local UNIVERSAL_SCRIPT = RAW .. "Script%20Cho%20Game%20Ko%20H%E1%BB%97%20Tr%E1%BB%A3/Script.lua"
+local SCRIPT_API_URL = "https://lyphucthien.vercel.app/api/get-script"
 
 local GAME_HO_TRO = {
     ["+1 Speed Keyboard Escape"] = {
@@ -30,15 +24,24 @@ local GAME_HO_TRO = {
         PlaceId = {95082159892680},
         UniverseId = {9584852943},
         WaitForDataLoaded = false,
-        MainUI = RAW .. "%2B1%20Speed%20Keyboard%20Escape/MainUI.lua",
+        MainUI = "server",
     },
     ["Blox Fruits"] = {
         Name = "Blox Fruits",
         PlaceId = {85211729168715},
         UniverseId = {994732206},
         WaitForDataLoaded = false,
-        MainUI = RAW .. "Blox%20Fruits/Main.lua",
+        MainUI = "server",
     },
+}
+
+local SERVER_ERRORS = {
+    ["invalid key"] = "KEY không hợp lệ.",
+    ["key expired"] = "KEY đã hết hạn. Hãy lấy key mới.",
+    ["key bound to another device"] = "KEY đã gắn với thiết bị khác.",
+    ["bad request"] = "Yêu cầu gửi lên server không hợp lệ.",
+    ["upstream error"] = "Server không lấy được script từ kho. Hãy báo admin.",
+    ["server error"] = "Lỗi máy chủ. Hãy thử lại sau.",
 }
 
 local LPT_HUB_FOLDER = "LPT Hub"
@@ -64,6 +67,10 @@ local ICON_URLS = {
 }
 
 local State = {
+    Key = nil,
+    GameKey = nil,
+    ExpiresAt = nil,
+    Watching = false,
     KeyValid = false,
     PlaceId = nil,
     UniverseId = nil,
@@ -179,6 +186,26 @@ local function copyToClipboard(text)
     return ok
 end
 
+local function httpGet(url, retries)
+    local lastErr
+    for i = 1, (retries or 3) do
+        local ok, res = pcall(game.HttpGet, game, url)
+        if ok and type(res) == "string" and res ~= "" then
+            return res
+        end
+        lastErr = res
+        task.wait(0.5 * i)
+    end
+    return nil, tostring(lastErr)
+end
+
+local function getHWID()
+    local ok, id = pcall(function()
+        return game:GetService("RbxAnalyticsService"):GetClientId()
+    end)
+    return ok and id or "unknown"
+end
+
 --============================================================
 -- KEY FILE
 --============================================================
@@ -265,65 +292,57 @@ screenGui.IgnoreGuiInset = true
 screenGui.DisplayOrder = 999999
 screenGui.Parent = playerGui
 
-local function showNotification(titleText, messageText, notificationType)
-    if not screenGui or not screenGui.Parent then
+local function showNotification() end
+local expiredShown = false
+
+local function showExpiredOverlay()
+    if expiredShown or not screenGui or not screenGui.Parent then
         return
     end
+    expiredShown = true
 
-    local tint = COLORS.Info
-    if notificationType == "success" then
-        tint = COLORS.Success
-    elseif notificationType == "error" then
-        tint = COLORS.Danger
-    elseif notificationType == "warning" then
-        tint = COLORS.Warning
-    end
+    local canClose = false
 
-    local toast = Instance.new("Frame")
-    toast.Name = "LPTToast"
-    toast.Size = UDim2.fromOffset(300, 68)
-    toast.Position = UDim2.new(1, -316, 0, 18)
-    toast.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-    toast.BorderSizePixel = 0
-    toast.ZIndex = 50
-    toast.Parent = screenGui
-    makeCorner(toast, 7)
+    local overlay = Instance.new("TextButton")
+    overlay.Name = "ExpiredOverlay"
+    overlay.Size = UDim2.fromScale(1, 1)
+    overlay.Position = UDim2.fromScale(0, 0)
+    overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    overlay.BackgroundTransparency = 1
+    overlay.BorderSizePixel = 0
+    overlay.Text = ""
+    overlay.AutoButtonColor = false
+    overlay.Active = true
+    overlay.ZIndex = 100
+    overlay.Parent = screenGui
+    tween(overlay, {BackgroundTransparency = 0.45}, 0.25)
 
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = tint
-    stroke.Thickness = 1
-    stroke.Transparency = 0.15
-    stroke.Parent = toast
+    local title = makeLabel(overlay, "Title", "Key Đã Hết Hạn", UDim2.fromOffset(600, 50), UDim2.new(0.5, -300, 0.5, -40), Enum.Font.GothamBold, 36, COLORS.Danger)
+    title.TextXAlignment = Enum.TextXAlignment.Center
+    title.ZIndex = 101
 
-    local accent = Instance.new("Frame")
-    accent.Size = UDim2.new(0, 3, 1, -16)
-    accent.Position = UDim2.fromOffset(8, 8)
-    accent.BackgroundColor3 = tint
-    accent.BorderSizePixel = 0
-    accent.ZIndex = 51
-    accent.Parent = toast
-    makeCorner(accent, 2)
+    local countdown = makeLabel(overlay, "Countdown", "5s", UDim2.fromOffset(600, 30), UDim2.new(0.5, -300, 0.5, 20), Enum.Font.GothamMedium, 22, COLORS.Text)
+    countdown.TextXAlignment = Enum.TextXAlignment.Center
+    countdown.ZIndex = 101
 
-    local title = makeLabel(toast, "Title", tostring(titleText or "LPT Hub"), UDim2.new(1, -30, 0, 22), UDim2.fromOffset(20, 8), Enum.Font.GothamBold, 13, COLORS.Text)
-    title.ZIndex = 52
+    overlay.Activated:Connect(function()
+        if canClose and overlay.Parent then
+            overlay:Destroy()
+        end
+    end)
 
-    local message = makeLabel(toast, "Message", tostring(messageText or ""), UDim2.new(1, -30, 0, 30), UDim2.fromOffset(20, 30), Enum.Font.Gotham, 11, COLORS.TextDim)
-    message.TextWrapped = true
-    message.TextYAlignment = Enum.TextYAlignment.Top
-    message.ZIndex = 52
-
-    toast.BackgroundTransparency = 1
-    toast.Position = UDim2.new(1, 10, 0, 18)
-    tween(toast, {BackgroundTransparency = 0, Position = UDim2.new(1, -316, 0, 18)}, 0.2)
-
-    task.delay(3, function()
-        if toast and toast.Parent then
-            tween(toast, {BackgroundTransparency = 1, Position = UDim2.new(1, 10, 0, 18)}, 0.2)
-            task.delay(0.25, function()
-                if toast and toast.Parent then
-                    toast:Destroy()
-                end
-            end)
+    task.spawn(function()
+        for i = 5, 1, -1 do
+            if not overlay.Parent then
+                return
+            end
+            countdown.Text = tostring(i) .. "s"
+            task.wait(1)
+        end
+        if overlay.Parent then
+            canClose = true
+            countdown.Text = "Nhấn để đóng"
+            countdown.TextColor3 = COLORS.TextDim
         end
     end)
 end
@@ -510,10 +529,10 @@ getKeyButton.Position = UDim2.fromOffset(29, 166)
 getKeyButton.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
 getKeyButton.BorderSizePixel = 0
 getKeyButton.Text = "Get a key"
-getKeyButton.TextColor3 = COLORS.Text
+getKeyButton.TextColor3 = Color3.fromRGB(150, 150, 155)
 getKeyButton.TextSize = 13
 getKeyButton.Font = Enum.Font.GothamMedium
-getKeyButton.AutoButtonColor = true
+getKeyButton.AutoButtonColor = false
 getKeyButton.ZIndex = 11
 getKeyButton.Parent = leftPanel
 makeCorner(getKeyButton, 6)
@@ -526,13 +545,13 @@ local submitButton = Instance.new("TextButton")
 submitButton.Name = "SubmitButton"
 submitButton.Size = UDim2.fromOffset(144, 40)
 submitButton.Position = UDim2.fromOffset(185, 166)
-submitButton.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
+submitButton.BackgroundColor3 = Color3.fromRGB(155, 210, 255)
+submitButton.TextColor3 = Color3.fromRGB(10, 30, 50)
 submitButton.BorderSizePixel = 0
 submitButton.Text = "Submit"
-submitButton.TextColor3 = Color3.fromRGB(15, 15, 15)
 submitButton.TextSize = 13
 submitButton.Font = Enum.Font.GothamBold
-submitButton.AutoButtonColor = true
+submitButton.AutoButtonColor = false
 submitButton.ZIndex = 11
 submitButton.Parent = leftPanel
 makeCorner(submitButton, 6)
@@ -581,42 +600,59 @@ executorValue.TextXAlignment = Enum.TextXAlignment.Right
 executorValue.TextTruncate = Enum.TextTruncate.AtEnd
 
 local function detectExecutorName()
-    local env = _G
+    local envs = {_G}
     if type(getgenv) == "function" then
         local ok, result = pcall(getgenv)
         if ok and type(result) == "table" then
-            env = result
+            table.insert(envs, 1, result)
         end
     end
 
-    for _, detectorName in ipairs({"identifyexecutor", "getexecutorname", "get_executor_name"}) do
-        local detector = env[detectorName] or _G[detectorName]
-        if type(detector) == "function" then
-            local ok, name = pcall(detector)
-            if ok and type(name) == "string" and name ~= "" then
-                return name
+    for _, env in ipairs(envs) do
+        for _, detectorName in ipairs({"identifyexecutor", "getexecutorname", "get_executor_name", "whatexecutor"}) do
+            local detector = env[detectorName]
+            if type(detector) == "function" then
+                local ok, name = pcall(detector)
+                if ok and type(name) == "string" and name ~= "" then
+                    return name
+                end
             end
         end
     end
 
-    local markers = {
-        {"KRNL_LOADED", "KRNL"}, {"syn", "Synapse X"},
-        {"fluxus", "Fluxus"}, {"Fluxus", "Fluxus"},
-        {"DELTA_LOADED", "Delta"}, {"delta", "Delta"},
-        {"Electron", "Electron"}, {"electron", "Electron"},
-        {"SIRHURT_LOADED", "SirHurt"},
+    local known = {
+        {"madium", "Madium"}, {"krnl", "KRNL"}, {"synapse", "Synapse X"},
+        {"syn", "Synapse X"}, {"fluxus", "Fluxus"}, {"delta", "Delta"},
+        {"electron", "Electron"}, {"sirhurt", "SirHurt"}, {"scriptware", "Script-Ware"},
+        {"wave", "Wave"}, {"solara", "Solara"}, {"xeno", "Xeno"},
+        {"codex", "Codex"}, {"arceus", "Arceus X"}, {"hydrogen", "Hydrogen"},
+        {"macsploit", "MacSploit"}, {"swift", "Swift"}, {"volcano", "Volcano"},
+        {"velocity", "Velocity"}, {"seliware", "Seliware"}, {"awp", "AWP"},
+        {"cryptic", "Cryptic"}, {"valex", "Valex"}, {"evon", "Evon"},
+        {"trigon", "Trigon"}, {"nihon", "Nihon"}, {"oxygen", "Oxygen U"},
+        {"comet", "Comet"}, {"vegax", "Vega X"}, {"jjsploit", "JJSploit"},
     }
 
-    for _, marker in ipairs(markers) do
-        local value = env[marker[1]] or _G[marker[1]]
-        if value ~= nil and value ~= false then
-            return marker[2]
+    for _, env in ipairs(envs) do
+        local found = nil
+        pcall(function()
+            for key, value in pairs(env) do
+                if not found and type(key) == "string" and value ~= nil and value ~= false then
+                    local lowerKey = string.lower(key)
+                    for _, item in ipairs(known) do
+                        if lowerKey == item[1]
+                            or lowerKey == item[1] .. "_loaded"
+                            or lowerKey == item[1] .. "loaded" then
+                            found = item[2]
+                            break
+                        end
+                    end
+                end
+            end
+        end)
+        if found then
+            return found
         end
-    end
-
-    if type(env.is_sirhurt_closure) == "function"
-        or type(_G.is_sirhurt_closure) == "function" then
-        return "SirHurt"
     end
 
     return "Unknown"
@@ -644,7 +680,7 @@ local function makeIconButton(name, posX, labelText, fallbackText, fallbackColor
     button.BackgroundColor3 = COLORS.Surface
     button.BorderSizePixel = 0
     button.Text = ""
-    button.AutoButtonColor = true
+    button.AutoButtonColor = false
     button.ZIndex = 11
     button.Parent = rightPanel
     makeCorner(button, 6)
@@ -691,8 +727,67 @@ local function makeIconButton(name, posX, labelText, fallbackText, fallbackColor
     return button, stroke, image, fallback
 end
 
+local function addHoverGlow(button, stroke, glowColor, hoverBg)
+    local hovering = false
+
+    local baseBackground = button.BackgroundColor3
+    local baseStrokeColor = stroke.Color
+    local baseThickness = stroke.Thickness
+    local baseTransparency = stroke.Transparency
+    hoverBg = hoverBg or Color3.fromRGB(34, 34, 42)
+
+    local function showGlow()
+        tween(button, {BackgroundColor3 = hoverBg}, 0.15)
+        tween(stroke, {Color = glowColor, Thickness = 2, Transparency = 0}, 0.15)
+    end
+
+    local function hideGlow()
+        tween(button, {BackgroundColor3 = baseBackground}, 0.15)
+        tween(stroke, {Color = baseStrokeColor, Thickness = baseThickness, Transparency = baseTransparency}, 0.15)
+    end
+
+    button.MouseEnter:Connect(function()
+        hovering = true
+        showGlow()
+    end)
+
+    button.MouseLeave:Connect(function()
+        hovering = false
+        hideGlow()
+    end)
+
+    return function()
+        if hovering then
+            showGlow()
+        else
+            hideGlow()
+        end
+    end
+end
+
 local discordButton, discordStroke, discordImg, discordFallback = makeIconButton("DiscordCard", 28, "Discord", "◉", Color3.fromRGB(130, 145, 255), 18)
 local websiteButton, websiteStroke, youtubeImg, youtubeFallback = makeIconButton("WebsiteCard", 130, "YouTube", "▶", Color3.fromRGB(255, 60, 60), 16)
+
+local restoreDiscordHover = addHoverGlow(discordButton, discordStroke, Color3.fromRGB(130, 145, 255))
+local restoreYoutubeHover = addHoverGlow(websiteButton, websiteStroke, Color3.fromRGB(255, 60, 60))
+
+-- Get a key
+addHoverGlow(getKeyButton, getStroke, Color3.fromRGB(70, 70, 70), Color3.fromRGB(28, 28, 28))
+
+getKeyButton.MouseEnter:Connect(function()
+    tween(getKeyButton, {TextColor3 = Color3.fromRGB(255, 255, 255)}, 0.15)
+end)
+getKeyButton.MouseLeave:Connect(function()
+    tween(getKeyButton, {TextColor3 = Color3.fromRGB(150, 150, 155)}, 0.15)
+end)
+
+-- Submit
+local submitStroke = Instance.new("UIStroke")
+submitStroke.Color = Color3.fromRGB(155, 210, 255)
+submitStroke.Thickness = 1
+submitStroke.Transparency = 1
+submitStroke.Parent = submitButton
+addHoverGlow(submitButton, submitStroke, Color3.fromRGB(200, 235, 255), Color3.fromRGB(190, 230, 255))
 
 task.spawn(function()
     local image = getWebImage(ICON_URLS.Discord, "icon_discord.png")
@@ -858,6 +953,7 @@ local function resolveGame()
         State.GameSupported = false
         State.GameConfig = nil
         State.MainUI = nil
+        State.GameKey = nil
         updateDetectedGame(State.RobloxGameName or ("Place ID " .. tostring(State.PlaceId)), "Universal mode", game.GameId or State.PlaceId)
         return false, "Game không được hỗ trợ."
     end
@@ -870,6 +966,7 @@ local function resolveGame()
     State.GameName = tostring(config.Name or config.name or configKey or "Unknown Game")
     State.GameConfig = config
     State.MainUI = mainUI
+    State.GameKey = configKey
     State.GameSupported = true
 
     local iconId = (type(config.UniverseId) == "table" and config.UniverseId[1]) or game.GameId or State.PlaceId
@@ -909,43 +1006,75 @@ local function waitForGameData(config)
     return true
 end
 
-local function executeScript(url, scriptName)
+local function executeScript(scriptId, scriptName)
     scriptName = tostring(scriptName or "Script")
-    if type(url) ~= "string" or url == "" or not url:match("^https://") then
-        error(scriptName .. ": URL không hợp lệ.")
+    if not State.Key then
+        error(scriptName .. ": Chưa có KEY.", 0)
+    end
+    if type(scriptId) ~= "string" or scriptId == "" then
+        error(scriptName .. ": Thiếu ID script.", 0)
     end
 
-    local requestOK, code = pcall(function()
-        return game:HttpGet(url)
-    end)
-    if not requestOK then
-        error(scriptName .. ": Lỗi tải dữ liệu: " .. tostring(code))
+    local url = SCRIPT_API_URL
+        .. "?key=" .. HttpService:UrlEncode(State.Key)
+        .. "&hwid=" .. HttpService:UrlEncode(getHWID())
+        .. "&script=" .. HttpService:UrlEncode(scriptId)
+
+    local code, err = httpGet(url)
+    if not code then
+        error(scriptName .. ": Lỗi tải dữ liệu: " .. tostring(err), 0)
     end
-    if type(code) ~= "string" or code:match("^%s*$") then
-        error(scriptName .. ": Nội dung tải về rỗng.")
+    if code:match("^%s*$") then
+        error(scriptName .. ": Nội dung tải về rỗng.", 0)
+    end
+
+    local trimmed = code:gsub("^%s+", ""):gsub("%s+$", "")
+    local serverMessage = SERVER_ERRORS[string.lower(trimmed)]
+    if serverMessage then
+        error(scriptName .. ": " .. serverMessage, 0)
     end
 
     local prefix = string.lower(code:sub(1, 512))
     if prefix:match("^%s*<!doctype") or prefix:match("^%s*<html") then
-        error(scriptName .. ": Máy chủ trả về HTML thay vì mã Luau.")
+        error(scriptName .. ": Máy chủ trả về HTML thay vì mã Luau.", 0)
     end
     if type(loadstring) ~= "function" then
-        error(scriptName .. ": Môi trường hiện tại không hỗ trợ loadstring.")
+        error(scriptName .. ": Môi trường hiện tại không hỗ trợ loadstring.", 0)
     end
 
     local compileCallOK, chunk, compileError = pcall(loadstring, code)
     if not compileCallOK then
-        error(scriptName .. ": Lỗi biên dịch: " .. tostring(chunk))
+        error(scriptName .. ": Lỗi biên dịch: " .. tostring(chunk), 0)
     end
     if type(chunk) ~= "function" then
-        error(scriptName .. ": Mã Luau không hợp lệ: " .. tostring(compileError))
+        if #trimmed < 80 and not trimmed:find("\n", 1, true) then
+            error(scriptName .. ": Server trả về: " .. trimmed, 0)
+        end
+        error(scriptName .. ": Mã Luau không hợp lệ: " .. tostring(compileError), 0)
     end
 
     local runOK, runError = pcall(chunk)
     if not runOK then
-        error(scriptName .. ": Lỗi khi chạy: " .. tostring(runError))
+        error(scriptName .. ": Lỗi khi chạy: " .. tostring(runError), 0)
     end
     return true
+end
+
+local function startExpiryWatcher()
+    if State.Watching then
+        return
+    end
+    State.Watching = true
+
+    task.spawn(function()
+        while screenGui and screenGui.Parent do
+            task.wait(1)
+            if State.ExpiresAt and State.ExpiresAt / 1000 - os.time() <= 0 then
+                showExpiredOverlay()
+                break
+            end
+        end
+    end)
 end
 
 local function loadMainUI()
@@ -963,39 +1092,36 @@ local function loadMainUI()
 
         if not resolved then
             if resolveError ~= "Game không được hỗ trợ." then
-                error(resolveError or "Không nhận diện được game.")
+                error(resolveError or "Không nhận diện được game.", 0)
             end
 
             setStatus("Universal Mode • Đang tải...", COLORS.Warning)
-            showNotification("Universal Mode", "Game chưa có script riêng. Đang khởi chạy Universal...", "warning")
             task.wait(0.25)
-            executeScript(UNIVERSAL_SCRIPT, "Universal Script")
+            executeScript("universal", "Universal Script")
             setStatus("Universal đã được tải.", COLORS.Success)
-            showNotification("Universal Mode", "Universal Script đã được tải thành công.", "success")
             task.wait(0.2)
             keyFrame.Visible = false
+            startExpiryWatcher()
             return
         end
 
         task.wait(0.25)
         if not waitForGameData(State.GameConfig) then
-            error("Game chưa sẵn sàng: DataLoaded chưa hoàn tất.")
+            error("Game chưa sẵn sàng: DataLoaded chưa hoàn tất.", 0)
         end
 
         setStatus("Đang tải MainUI...", COLORS.Info)
-        showNotification("Loading UI", "Đang tải " .. State.GameName .. "...", "info")
         task.wait(0.15)
-        executeScript(State.MainUI, "MainUI")
+        executeScript(State.GameKey, "MainUI")
         setStatus("Đã tải " .. State.GameName, COLORS.Success)
-        showNotification("LPT Hub", "Đã tải UI: " .. State.GameName, "success")
         task.wait(0.2)
         keyFrame.Visible = false
+        startExpiryWatcher()
     end)
 
     if not success then
         keyFrame.Visible = true
         setStatus("Không thể tải script: " .. tostring(fatalError), COLORS.Danger)
-        showNotification("Load Error", tostring(fatalError), "error")
     end
 
     State.Loading = false
@@ -1010,12 +1136,8 @@ local function checkKey(key)
         return false, "Vui lòng nhập KEY."
     end
 
-    local requestOK, response = pcall(function()
-        return game:HttpGet(
-            KEY_API_URL .. "?type=lpthub&key=" .. HttpService:UrlEncode(key)
-        )
-    end)
-    if not requestOK or type(response) ~= "string" then
+    local response = httpGet(KEY_API_URL .. "?type=lpthub&key=" .. HttpService:UrlEncode(key))
+    if not response then
         return false, "Không kết nối được máy chủ xác thực."
     end
 
@@ -1026,8 +1148,13 @@ local function checkKey(key)
         return false, "Phản hồi xác thực không hợp lệ."
     end
     if data.valid ~= true then
+        if data.expired == true then
+            return false, "KEY đã hết hạn. Hãy lấy key mới."
+        end
         return false, "KEY không đúng hoặc không còn hợp lệ."
     end
+
+    State.ExpiresAt = tonumber(data.expiresAt)
     return true
 end
 
@@ -1038,9 +1165,6 @@ end
 getKeyButton.MouseButton1Click:Connect(function()
     local ok = copyToClipboard(GET_KEY_LINK)
     getKeyButton.Text = ok and "Link Copied!" or "Copy Failed"
-    if not ok then
-        showNotification("Clipboard Error", "Executor không hỗ trợ sao chép clipboard.", "error")
-    end
     task.delay(1.2, function()
         if getKeyButton and getKeyButton.Parent then
             getKeyButton.Text = "Get a key"
@@ -1048,27 +1172,45 @@ getKeyButton.MouseButton1Click:Connect(function()
     end)
 end)
 
-local function copyButtonLink(button, link, stroke)
+local function copyButtonLink(button, link, stroke, restoreHover)
+    local row = button:FindFirstChild("Row")
+    local nameLabel = row and row:FindFirstChild("Name")
+
+    if nameLabel and not button:GetAttribute("OrigText") then
+        button:SetAttribute("OrigText", nameLabel.Text)
+    end
+    local origText = button:GetAttribute("OrigText")
+
     local ok = copyToClipboard(link)
     stroke.Color = ok and COLORS.Success or COLORS.Danger
     stroke.Thickness = 2
-    if not ok then
-        showNotification("Clipboard Error", "Không thể sao chép link trong môi trường hiện tại.", "error")
+
+    if nameLabel then
+        nameLabel.Text = ok and "Copied!" or "Failed"
     end
 
     task.delay(1.2, function()
         if button and button.Parent and stroke and stroke.Parent then
-            stroke.Color = Color3.fromRGB(40, 40, 40)
-            stroke.Thickness = 1
+            if nameLabel and origText then
+                nameLabel.Text = origText
+            end
+
+            if restoreHover then
+                restoreHover()
+            else
+                stroke.Color = Color3.fromRGB(40, 40, 40)
+                stroke.Thickness = 1
+            end
         end
     end)
 end
 
 discordButton.MouseButton1Click:Connect(function()
-    copyButtonLink(discordButton, DISCORD_LINK, discordStroke)
+    copyButtonLink(discordButton, DISCORD_LINK, discordStroke, restoreDiscordHover)
 end)
+
 websiteButton.MouseButton1Click:Connect(function()
-    copyButtonLink(websiteButton, WEBSITE_LINK, websiteStroke)
+    copyButtonLink(websiteButton, WEBSITE_LINK, websiteStroke, restoreYoutubeHover)
 end)
 
 local function attemptSubmit()
@@ -1091,7 +1233,6 @@ local function attemptSubmit()
     local keyIsValid, verifyError = checkKey(key)
     if not keyIsValid then
         setStatus(verifyError or "Xác thực KEY thất bại.", COLORS.Danger)
-        showNotification("Key Verification Failed", verifyError or "Xác thực KEY thất bại.", "error")
         tween(inputStroke, {Color = COLORS.Danger, Transparency = 0}, 0.1)
         task.wait(0.15)
         tween(inputStroke, {Color = COLORS.Border, Transparency = 0.15}, 0.2)
@@ -1100,12 +1241,8 @@ local function attemptSubmit()
     end
 
     State.KeyValid = true
-    local saved = saveKey(key)
-    if not saved then
-        showNotification("Key Valid", "KEY hợp lệ nhưng không thể lưu vào file trên môi trường này.", "warning")
-    else
-        showNotification("Key Valid", "KEY hợp lệ. Đang nhận diện game...", "success")
-    end
+    State.Key = key
+    saveKey(key)
     setStatus("KEY hợp lệ! Đang nhận diện game...", COLORS.Success)
     State.Submitting = false
     loadMainUI()
