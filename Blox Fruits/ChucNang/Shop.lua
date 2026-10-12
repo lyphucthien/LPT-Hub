@@ -1,27 +1,27 @@
-local ShopModule={}
+local ShopModule = {}
 
-local Players=game:GetService("Players")
-local ReplicatedStorage=game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
-local player=Players.LocalPlayer
+local player = Players.LocalPlayer
 
-local BuyItemRemote=nil
-local RedeemCodeRemote=nil
+local BuyItemRemote = nil
+local RedeemCodeRemote = nil
 
 local function refreshRemotes()
+    local RemotesFolder = ReplicatedStorage:FindFirstChild("ShopRemotes")
 
-	local RemotesFolder=ReplicatedStorage:FindFirstChild("ShopRemotes")
+    if not RemotesFolder then
+        BuyItemRemote = nil
+        RedeemCodeRemote = nil
+        return false
+    end
 
-	if not RemotesFolder then
-		BuyItemRemote=nil
-		RedeemCodeRemote=nil
-		return false
-	end
+    BuyItemRemote = RemotesFolder:FindFirstChild("BuyItem")
+    RedeemCodeRemote = RemotesFolder:FindFirstChild("RedeemCode")
 
-	BuyItemRemote=RemotesFolder:FindFirstChild("BuyItem")
-	RedeemCodeRemote=RemotesFolder:FindFirstChild("RedeemCode")
-
-	return true
+    return true
 end
 
 refreshRemotes()
@@ -30,174 +30,143 @@ refreshRemotes()
 -- CONFIG
 --========================================================
 
-local ShopConfig={
+local ShopConfig = {
+    ["Reroll Race"] = {
+        Type = "Button",
+        Cost = 2500,
+        Currency = "Fragments"
+    },
 
-	["Reroll Race"]={
-		Type="Button",
-		Cost=2500,
-		Currency="Fragments"
-	},
+    ["Reset Stats"] = {
+        Type = "Button",
+        Cost = 3000,
+        Currency = "Fragments"
+    },
 
-	["Reset Stats"]={
-		Type="Button",
-		Cost=3000,
-		Currency="Fragments"
-	},
+    ["Buy Race Cyborg"] = {
+        Type = "Button",
+        Cost = 3000,
+        Currency = "Fragments"
+    },
 
-	["Buy Race Cyborg"]={
-		Type="Button",
-		Cost=3000,
-		Currency="Fragments"
-	},
+    ["Buy Race Ghoul"] = {
+        Type = "Button",
+        Cost = 3000,
+        Currency = "Fragments"
+    },
 
-	["Buy Race Ghoul"]={
-		Type="Button",
-		Cost=3000,
-		Currency="Fragments"
-	},
+    ["Dark Step"] = {Type = "Toggle"},
+    ["Electric"] = {Type = "Toggle"},
+    ["Water Kung Fu"] = {Type = "Toggle"},
+    ["Dragon Breath"] = {Type = "Toggle"},
+    ["Superhuman"] = {Type = "Toggle"},
+    ["Death Step"] = {Type = "Toggle"},
+    ["Sharkman Karate"] = {Type = "Toggle"},
+    ["Electric Claw"] = {Type = "Toggle"},
+    ["Dragon Talon"] = {Type = "Toggle"},
+    ["God Human"] = {Type = "Toggle"},
+    ["Sanguine Art"] = {Type = "Toggle"},
 
-	["Dark Step"]={
-		Type="Toggle"
-	},
+    ["Sky Jump"] = {
+        Type = "Button",
+        Cost = 10000,
+        Currency = "Beli"
+    },
 
-	["Electric"]={
-		Type="Toggle"
-	},
+    ["Buso Haki"] = {
+        Type = "Button",
+        Cost = 25000,
+        Currency = "Beli"
+    },
 
-	["Water Kung Fu"]={
-		Type="Toggle"
-	},
+    ["Flash Step"] = {
+        Type = "Button",
+        Cost = 100000,
+        Currency = "Beli"
+    },
 
-	["Dragon Breath"]={
-		Type="Toggle"
-	},
-
-	["Superhuman"]={
-		Type="Toggle"
-	},
-
-	["Death Step"]={
-		Type="Toggle"
-	},
-
-	["Sharkman Karate"]={
-		Type="Toggle"
-	},
-
-	["Electric Claw"]={
-		Type="Toggle"
-	},
-
-	["Dragon Talon"]={
-		Type="Toggle"
-	},
-
-	["God Human"]={
-		Type="Toggle"
-	},
-
-	["Sanguine Art"]={
-		Type="Toggle"
-	},
-
-	["Sky Jump"]={
-		Type="Button",
-		Cost=10000,
-		Currency="Beli"
-	},
-
-	["Buso Haki"]={
-		Type="Button",
-		Cost=25000,
-		Currency="Beli"
-	},
-
-	["Flash Step"]={
-		Type="Button",
-		Cost=100000,
-		Currency="Beli"
-	},
-
-	["Observation Haki"]={
-		Type="Button",
-		Cost=750000,
-		Currency="Beli"
-	}
+    ["Observation Haki"] = {
+        Type = "Button",
+        Cost = 750000,
+        Currency = "Beli"
+    }
 }
 
 --========================================================
 -- FIGHTING STYLE SCAN CONFIG
 --========================================================
 
-local FightingStyleKeywords={
+local FightingStyleKeywords = {
+    ["Dark Step"] = {
+        "dark step",
+        "darkstep",
+        "dark step teacher"
+    },
 
-	["Dark Step"]={
-		"dark step",
-		"darkstep",
-		"dark step teacher"
-	},
+    ["Electric"] = {
+        "electric",
+        "mad scientist"
+    },
 
-	["Electric"]={
-		"electric",
-		"mad scientist"
-	},
+    ["Water Kung Fu"] = {
+        "water kung fu",
+        "water kung fu teacher",
+        "water fighter"
+    },
 
-	["Water Kung Fu"]={
-		"water kung fu",
-		"water kung fu teacher",
-		"water fighter"
-	},
+    ["Dragon Breath"] = {
+        "dragon breath",
+        "sabi"
+    },
 
-	["Dragon Breath"]={
-		"dragon breath",
-		"sabi"
-	},
+    ["Superhuman"] = {
+        "superhuman",
+        "martial arts master"
+    },
 
-	["Superhuman"]={
-		"superhuman",
-		"martial arts master"
-	},
+    ["Death Step"] = {
+        "death step",
+        "phoeyu",
+        "reformed"
+    },
 
-	["Death Step"]={
-		"death step",
-		"phoeyu",
-		"reformed"
-	},
+    ["Sharkman Karate"] = {
+        "sharkman karate",
+        "sharkman",
+        "daigrock"
+    },
 
-	["Sharkman Karate"]={
-		"sharkman karate",
-		"sharkman",
-		"daigrock"
-	},
+    ["Electric Claw"] = {
+        "electric claw",
+        "previous hero"
+    },
 
-	["Electric Claw"]={
-		"electric claw",
-		"previous hero"
-	},
+    ["Dragon Talon"] = {
+        "dragon talon",
+        "uzoth"
+    },
 
-	["Dragon Talon"]={
-		"dragon talon",
-		"uzoth"
-	},
+    ["God Human"] = {
+        "god human",
+        "ancient monk"
+    },
 
-	["God Human"]={
-		"god human",
-		"ancient monk"
-	},
-
-	["Sanguine Art"]={
-		"sanguine art",
-		"shafi"
-	}
+    ["Sanguine Art"] = {
+        "sanguine art",
+        "shafi"
+    }
 }
 
-local State={FightingStyleEnabled={}}
-local destroyed=false
+local State = {
+    FightingStyleEnabled = {}
+}
 
-local Callbacks={
-	Success=nil,
-	Failed=nil,
-	Notification=nil
+local destroyed = false
+
+local Callbacks = {
+    Success = nil,
+    Failed = nil,
+    Notification = nil
 }
 
 --========================================================
@@ -205,85 +174,66 @@ local Callbacks={
 --========================================================
 
 local function notify(message)
+    if destroyed then
+        return
+    end
 
-	if destroyed then
-		return
-	end
+    message = tostring(message)
 
-	message=tostring(message)
-
-	if type(Callbacks.Notification)=="function" then
-
-		pcall(
-			Callbacks.Notification,
-			message
-		)
-
-	else
-
-		print(
-			"[LPT Hub Shop]",
-			message
-		)
-
-	end
+    if type(Callbacks.Notification) == "function" then
+        pcall(Callbacks.Notification, message)
+    else
+        print("[LPT Hub Shop]", message)
+    end
 end
 
 local function validItem(name)
-
-	return type(name)=="string"
-		and ShopConfig[name]~=nil
-
+    return type(name) == "string"
+        and ShopConfig[name] ~= nil
 end
 
 local function getCharacter()
+    if destroyed then
+        return nil
+    end
 
-	if destroyed then
-		return nil
-	end
-
-	return player.Character
+    return player.Character
 end
 
 local function getRoot(model)
+    if not model then
+        return nil
+    end
 
-	if not model then
-		return nil
-	end
-
-	return model:FindFirstChild("HumanoidRootPart")
-		or model.PrimaryPart
-
+    return model:FindFirstChild("HumanoidRootPart")
+        or model.PrimaryPart
 end
 
 local function normalizeName(name)
-
-	return tostring(name or "")
-		:lower()
-		:gsub("[%p_]+"," ")
-		:gsub("%s+"," ")
-		:match("^%s*(.-)%s*$")
-		or ""
-
+    return tostring(name or "")
+        :lower()
+        :gsub("[%p_]+", " ")
+        :gsub("%s+", " ")
+        :match("^%s*(.-)%s*$")
+        or ""
 end
 
 local function getRemote(name)
+    if destroyed then
+        return nil
+    end
 
-	if destroyed then
-		return nil
-	end
+    refreshRemotes()
 
-	refreshRemotes()
+    if name == "BuyItem" then
+        return BuyItemRemote
+    end
 
-	if name=="BuyItem" then
-		return BuyItemRemote
-	end
+    if name == "RedeemCode" then
+        return RedeemCodeRemote
+    end
 
-	if name=="RedeemCode" then
-		return RedeemCodeRemote
-	end
-
-	return nil
+    return nil
 end
 
 --========================================================
@@ -291,24 +241,20 @@ end
 --========================================================
 
 local function isNPCModel(obj)
+    if not obj:IsA("Model") then
+        return false
+    end
 
-	if not obj:IsA("Model") then
-		return false
-	end
+    local humanoid = obj:FindFirstChildOfClass("Humanoid")
 
-	if not obj:FindFirstChildOfClass("Humanoid") then
-		return false
-	end
+    if not humanoid or humanoid.Health <= 0 then
+        return false
+    end
 
-	local root=
-		obj:FindFirstChild("HumanoidRootPart")
-		or obj.PrimaryPart
+    local root = obj:FindFirstChild("HumanoidRootPart")
+        or obj.PrimaryPart
 
-	if not root then
-		return false
-	end
-
-	return true
+    return root ~= nil
 end
 
 --========================================================
@@ -316,242 +262,190 @@ end
 --========================================================
 
 function ShopModule:FindFightingStyleNPC(styleName)
+    if destroyed then
+        return nil
+    end
 
-	if destroyed then
-		return nil
-	end
+    local keywords = FightingStyleKeywords[styleName]
 
-	local keywords=
-		FightingStyleKeywords[styleName]
+    if not keywords then
+        notify("Không có dữ liệu quét NPC cho: " .. tostring(styleName))
+        return nil
+    end
 
-	if not keywords then
+    local character = getCharacter()
 
-		notify(
-			"Không có dữ liệu quét NPC cho: "
-			..tostring(styleName)
-		)
+    if not character then
+        return nil
+    end
 
-		return nil
-	end
+    local playerRoot = character:FindFirstChild("HumanoidRootPart")
 
-	local character=getCharacter()
+    if not playerRoot then
+        return nil
+    end
 
-	if not character then
-		return nil
-	end
+    local bestNPC = nil
+    local bestScore = -math.huge
+    local bestDistance = math.huge
 
-	local playerRoot=character:FindFirstChild("HumanoidRootPart")
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if isNPCModel(obj) then
+            local npcRoot = getRoot(obj)
 
-	if not playerRoot then
-		return nil
-	end
+            if npcRoot then
+                local score = 0
+                local normalized = normalizeName(obj.Name)
 
-	local bestNPC=nil
-	local bestScore=-math.huge
-	local bestDistance=math.huge
+                for _, keyword in ipairs(keywords) do
+                    local normalizedKeyword = normalizeName(keyword)
 
-	for _,obj in ipairs(workspace:GetDescendants()) do
+                    if normalized == normalizedKeyword then
+                        score += 1000
+                    elseif string.find(
+                        normalized,
+                        normalizedKeyword,
+                        1,
+                        true
+                    ) then
+                        score += 500
+                    end
+                end
 
-		if isNPCModel(obj) then
+                if string.find(normalized, "teacher", 1, true) then
+                    score += 100
+                end
 
-			local npcRoot=getRoot(obj)
+                if string.find(normalized, "npc", 1, true) then
+                    score += 10
+                end
 
-			if npcRoot then
+                if score > 0 then
+                    local distance =
+                        (playerRoot.Position - npcRoot.Position).Magnitude
 
-				local score=0
+                    if score > bestScore
+                        or (
+                            score == bestScore
+                            and distance < bestDistance
+                        ) then
 
-				local normalized=
-					normalizeName(obj.Name)
+                        bestNPC = obj
+                        bestScore = score
+                        bestDistance = distance
+                    end
+                end
+            end
+        end
+    end
 
-				for _,keyword in ipairs(keywords) do
-
-					local normalizedKeyword=
-						normalizeName(keyword)
-
-					if normalized==normalizedKeyword then
-
-						score+=1000
-
-					elseif string.find(
-						normalized,
-						normalizedKeyword,
-						1,
-						true
-					) then
-
-						score+=500
-
-					end
-				end
-
-				if string.find(
-					normalized,
-					"teacher",
-					1,
-					true
-				) then
-
-					score+=100
-
-				end
-
-				if string.find(
-					normalized,
-					"npc",
-					1,
-					true
-				) then
-
-					score+=10
-
-				end
-
-				if score>0 then
-
-					local distance=
-						(
-							playerRoot.Position
-							-npcRoot.Position
-						).Magnitude
-
-					if score>bestScore
-						or (
-							score==bestScore
-							and distance<bestDistance
-						) then
-
-						bestNPC=obj
-						bestScore=score
-						bestDistance=distance
-
-					end
-				end
-			end
-		end
-	end
-
-	return bestNPC
+    return bestNPC
 end
 
 --========================================================
--- MOVE TO NPC
+-- FLY TO NPC
 --========================================================
 
-function ShopModule:MoveToNPC(npc)
+local FLY_SPEED = 250
 
-	if destroyed then
-		return false
-	end
+function ShopModule:FlyToNPC(npc)
+    if destroyed or not npc or not npc.Parent then
+        return false
+    end
 
-	if not npc then
-		return false
-	end
+    local character = getCharacter()
 
-	local character=getCharacter()
+    if not character then
+        return false
+    end
 
-	if not character then
-		return false
-	end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local root = character:FindFirstChild("HumanoidRootPart")
+    local npcRoot = getRoot(npc)
 
-	local humanoid=
-		character:FindFirstChildOfClass("Humanoid")
+    if not humanoid
+        or humanoid.Health <= 0
+        or not root
+        or not npcRoot then
 
-	local root=
-		character:FindFirstChild("HumanoidRootPart")
+        return false
+    end
 
-	local npcRoot=getRoot(npc)
+    -- Vị trí dừng phía trước NPC
+    local targetPosition =
+        npcRoot.Position
+        - npcRoot.CFrame.LookVector * 4
+        + Vector3.new(0, 2, 0)
 
-	if not humanoid
-		or not root
-		or not npcRoot then
+    local distance = (root.Position - targetPosition).Magnitude
 
-		return false
-	end
+    if distance <= 5 then
+        return true
+    end
 
-	local targetPosition=
-		npcRoot.Position
-		-(
-			npcRoot.CFrame.LookVector*3
-		)
+    local duration = math.max(distance / FLY_SPEED, 0.15)
 
-	targetPosition+=Vector3.new(0,1.5,0)
+    local targetCFrame = CFrame.lookAt(
+        targetPosition,
+        npcRoot.Position
+    )
 
-	notify(
-		"Đang di chuyển tới "
-		..npc.Name
-	)
+    notify("Đang bay tới " .. npc.Name)
 
-	local finished=false
-	local moveConnection=nil
+    local tween = TweenService:Create(
+        root,
+        TweenInfo.new(
+            duration,
+            Enum.EasingStyle.Linear
+        ),
+        {
+            CFrame = targetCFrame
+        }
+    )
 
-	moveConnection=
-		humanoid.MoveToFinished:Connect(
-			function()
+    local finished = false
+    local reached = false
 
-				finished=true
+    local connection = tween.Completed:Connect(function(playbackState)
+        finished = true
+        reached = playbackState == Enum.PlaybackState.Completed
+    end)
 
-				if moveConnection then
+    tween:Play()
 
-					moveConnection:Disconnect()
-					moveConnection=nil
+    local deadline = os.clock() + duration + 2
 
-				end
-			end
-		)
+    while not finished
+        and not destroyed
+        and os.clock() < deadline do
 
-	pcall(function()
+        if player.Character ~= character
+            or not root.Parent
+            or not npc.Parent
+            or humanoid.Health <= 0 then
 
-		humanoid:MoveTo(targetPosition)
+            tween:Cancel()
+            break
+        end
 
-	end)
+        task.wait(0.05)
+    end
 
-	local startTime=os.clock()
+    if not finished then
+        tween:Cancel()
+    end
 
-	while not finished
-		and not destroyed
-		and os.clock()-startTime<8 do
+    connection:Disconnect()
 
-		task.wait(.1)
+    if destroyed
+        or player.Character ~= character
+        or not root.Parent then
 
-		local currentRoot=
-			character:FindFirstChild(
-				"HumanoidRootPart"
-			)
+        return false
+    end
 
-		if not currentRoot then
-			break
-		end
-
-		if (
-			currentRoot.Position
-			-targetPosition
-		).Magnitude<=5 then
-
-			finished=true
-			break
-		end
-	end
-
-	if moveConnection then
-
-		moveConnection:Disconnect()
-		moveConnection=nil
-
-	end
-
-	local currentRoot=
-		character:FindFirstChild(
-			"HumanoidRootPart"
-		)
-
-	if not currentRoot then
-		return false
-	end
-
-	return (
-		currentRoot.Position
-		-targetPosition
-	).Magnitude<=8
+    return reached
+        and (root.Position - targetPosition).Magnitude <= 10
 end
 
 --========================================================
@@ -559,91 +453,50 @@ end
 --========================================================
 
 function ShopModule:InteractNPC(npc)
+    if destroyed or not npc or not npc.Parent then
+        return false
+    end
 
-	if destroyed then
-		return false
-	end
+    -- Proximity Prompt
+    for _, obj in ipairs(npc:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            local triggered = false
 
-	if not npc then
-		return false
-	end
+            pcall(function()
+                if type(fireproximityprompt) == "function" then
+                    fireproximityprompt(obj)
+                    triggered = true
+                end
+            end)
 
-	--====================================================
-	-- PROXIMITY PROMPT
-	--====================================================
+            if triggered then
+                notify("Đã tương tác với " .. npc.Name)
+                return true
+            end
+        end
+    end
 
-	for _,obj in ipairs(
-		npc:GetDescendants()
-	) do
+    -- Click Detector
+    for _, obj in ipairs(npc:GetDescendants()) do
+        if obj:IsA("ClickDetector") then
+            local clicked = false
 
-		if obj:IsA("ProximityPrompt") then
+            pcall(function()
+                if type(fireclickdetector) == "function" then
+                    fireclickdetector(obj)
+                    clicked = true
+                end
+            end)
 
-			local triggered=false
+            if clicked then
+                notify("Đã click " .. npc.Name)
+                return true
+            end
+        end
+    end
 
-			pcall(function()
-
-				if type(fireproximityprompt)=="function" then
-
-					fireproximityprompt(obj)
-					triggered=true
-
-				end
-
-			end)
-
-			if triggered then
-
-				notify(
-					"Đã tương tác với "
-					..npc.Name
-				)
-
-				return true
-			end
-		end
-	end
-
-	--====================================================
-	-- CLICK DETECTOR
-	--====================================================
-
-	for _,obj in ipairs(
-		npc:GetDescendants()
-	) do
-
-		if obj:IsA("ClickDetector") then
-
-			local clicked=false
-
-			pcall(function()
-
-				if type(fireclickdetector)=="function" then
-
-					fireclickdetector(obj)
-					clicked=true
-
-				end
-
-			end)
-
-			if clicked then
-
-				notify(
-					"Đã click "
-					..npc.Name
-				)
-
-				return true
-			end
-		end
-	end
-
-	notify(
-		"Không tìm thấy cách tương tác tại "
-		..npc.Name
-	)
-
-	return false
+    notify("Không tìm thấy cách tương tác tại " .. npc.Name)
+    return false
 end
 
 --========================================================
@@ -651,85 +504,63 @@ end
 --========================================================
 
 function ShopModule:GetFightingStyle(styleName)
+    if destroyed then
+        return false
+    end
 
-	if destroyed then
-		return false
-	end
+    if not validItem(styleName) then
+        notify("Unknown Fighting Style: " .. tostring(styleName))
+        return false
+    end
 
-	if not validItem(styleName) then
+    if ShopConfig[styleName].Type ~= "Toggle" then
+        notify("Không phải Fighting Style: " .. styleName)
+        return false
+    end
 
-		notify(
-			"Unknown Fighting Style: "
-			..tostring(styleName)
-		)
+    local npc = self:FindFightingStyleNPC(styleName)
 
-		return false
-	end
+    -- Không tìm thấy NPC: dừng ngay
+    if not npc then
+        return nil
+    end
 
-	if ShopConfig[styleName].Type~="Toggle" then
+    -- Bay đến NPC, không đi bộ
+    if not self:FlyToNPC(npc) then
+        notify("Không thể bay tới NPC " .. npc.Name)
+        return false
+    end
 
-		notify(
-			"Không phải Fighting Style: "
-			..styleName
-		)
+    task.wait(0.25)
 
-		return false
-	end
+    -- Tương tác sau khi bay tới
+    if not self:InteractNPC(npc) then
+        return false
+    end
 
-	local npc=
-		self:FindFightingStyleNPC(
-			styleName
-		)
-
-	if not npc then
-		return false
-	end
-
-	if not self:MoveToNPC(npc) then
-
-		notify(
-			"Không thể đến NPC "
-			..npc.Name
-		)
-
-		return false
-	end
-
-	task.wait(.25)
-
-	local interacted=
-		self:InteractNPC(npc)
-
-	if not interacted then
-		return false
-	end
-
-	return true
+    return true
 end
 
 --========================================================
 -- CALLBACK
 --========================================================
 
-function ShopModule:SetCallback(name,callback)
+function ShopModule:SetCallback(name, callback)
+    if destroyed then
+        return false
+    end
 
-	if destroyed then
-		return false
-	end
+    if Callbacks[name] == nil then
+        return false
+    end
 
-	if Callbacks[name]==nil then
-		return false
-	end
+    if callback ~= nil and type(callback) ~= "function" then
+        return false
+    end
 
-	if callback~=nil
-		and type(callback)~="function" then
+    Callbacks[name] = callback
 
-		return false
-	end
-
-	Callbacks[name]=callback
-
-	return true
+    return true
 end
 
 --========================================================
@@ -737,30 +568,23 @@ end
 --========================================================
 
 function ShopModule:Get(name)
+    if destroyed or not validItem(name) then
+        return nil
+    end
 
-	if destroyed then
-		return nil
-	end
+    local config = ShopConfig[name]
+    local result = {}
 
-	if not validItem(name) then
-		return nil
-	end
+    for key, value in pairs(config) do
+        result[key] = value
+    end
 
-	local config=ShopConfig[name]
-	local result={}
+    if config.Type == "Toggle" then
+        result.Enabled =
+            State.FightingStyleEnabled[name] == true
+    end
 
-	for key,value in pairs(config) do
-		result[key]=value
-	end
-
-	if config.Type=="Toggle" then
-
-		result.Enabled=
-			State.FightingStyleEnabled[name]==true
-
-	end
-
-	return result
+    return result
 end
 
 --========================================================
@@ -768,20 +592,15 @@ end
 --========================================================
 
 function ShopModule:GetState(name)
+    if destroyed or not validItem(name) then
+        return nil
+    end
 
-	if destroyed then
-		return nil
-	end
+    if ShopConfig[name].Type ~= "Toggle" then
+        return nil
+    end
 
-	if not validItem(name) then
-		return nil
-	end
-
-	if ShopConfig[name].Type~="Toggle" then
-		return nil
-	end
-
-	return State.FightingStyleEnabled[name]==true
+    return State.FightingStyleEnabled[name] == true
 end
 
 --========================================================
@@ -789,284 +608,169 @@ end
 --========================================================
 
 function ShopModule:Buy(name)
+    if destroyed then
+        return false
+    end
 
-	if destroyed then
-		return false
-	end
+    if not validItem(name) then
+        notify("Unknown item: " .. tostring(name))
+        return false
+    end
 
-	if not validItem(name) then
+    local config = ShopConfig[name]
 
-		notify(
-			"Unknown item: "
-			..tostring(name)
-		)
+    if config.Type ~= "Button" then
+        notify("Item này không phải Button: " .. name)
+        return false
+    end
 
-		return false
-	end
+    local remote = getRemote("BuyItem")
 
-	local config=ShopConfig[name]
+    if not remote then
+        notify("BuyItem remote chưa sẵn sàng")
+        return false
+    end
 
-	if config.Type~="Button" then
+    if not remote:IsA("RemoteFunction") then
+        notify("BuyItem không phải RemoteFunction")
+        return false
+    end
 
-		notify(
-			"Item này không phải Button: "
-			..name
-		)
+    local success, result = pcall(function()
+        return remote:InvokeServer(name)
+    end)
 
-		return false
-	end
+    if not success then
+        notify("Không thể gửi yêu cầu mua: " .. name)
 
-	local remote=getRemote("BuyItem")
+        if type(Callbacks.Failed) == "function" then
+            pcall(Callbacks.Failed, name)
+        end
 
-	if not remote then
+        return false
+    end
 
-		notify(
-			"BuyItem remote chưa sẵn sàng"
-		)
+    if result == true then
+        notify("Mua thành công: " .. name)
 
-		return false
-	end
+        if type(Callbacks.Success) == "function" then
+            pcall(Callbacks.Success, name)
+        end
 
-	if not remote:IsA("RemoteFunction") then
+        return true
+    end
 
-		notify(
-			"BuyItem không phải RemoteFunction"
-		)
+    notify("Mua thất bại: " .. name)
 
-		return false
-	end
+    if type(Callbacks.Failed) == "function" then
+        pcall(Callbacks.Failed, name, result)
+    end
 
-	local success,result=
-		pcall(function()
-
-			return remote:InvokeServer(
-				name
-			)
-
-		end)
-
-	if not success then
-
-		notify(
-			"Không thể gửi yêu cầu mua: "
-			..name
-		)
-
-		if type(Callbacks.Failed)=="function" then
-
-			pcall(
-				Callbacks.Failed,
-				name
-			)
-
-		end
-
-		return false
-	end
-
-	if result==true then
-
-		notify(
-			"Mua thành công: "
-			..name
-		)
-
-		if type(Callbacks.Success)=="function" then
-
-			pcall(
-				Callbacks.Success,
-				name
-			)
-
-		end
-
-		return true
-	end
-
-	notify(
-		"Mua thất bại: "
-		..name
-	)
-
-	if type(Callbacks.Failed)=="function" then
-
-		pcall(
-			Callbacks.Failed,
-			name,
-			result
-		)
-
-	end
-
-	return false
+    return false
 end
 
 --========================================================
 -- SET FIGHTING STYLE
 --========================================================
 
-function ShopModule:Set(name,enabled)
+function ShopModule:Set(name, enabled)
+    if destroyed then
+        return false
+    end
 
-	if destroyed then
-		return false
-	end
+    if not validItem(name) then
+        return false
+    end
 
-	if not validItem(name) then
-		return false
-	end
+    if ShopConfig[name].Type ~= "Toggle" then
+        return false
+    end
 
-	if ShopConfig[name].Type~="Toggle" then
-		return false
-	end
+    enabled = enabled == true
 
-	enabled=enabled==true
+    -- Tắt Fighting Style
+    if not enabled then
+        State.FightingStyleEnabled[name] = false
 
-	--====================================================
-	-- DISABLE
-	--====================================================
+        notify("Đã tắt: " .. name)
 
-	if not enabled then
+        return true
+    end
 
-		State.FightingStyleEnabled[name]=false
+    -- Đã bật
+    if State.FightingStyleEnabled[name] == true then
+        return true
+    end
 
-		notify(
-			"Đã tắt: "
-			..name
-		)
+    -- Quét NPC và bay tới
+    local styleSuccess = self:GetFightingStyle(name)
 
-		return true
-	end
+    -- Không có NPC: không làm gì thêm
+    if styleSuccess == nil then
+        State.FightingStyleEnabled[name] = false
+        return false
+    end
 
-	--====================================================
-	-- ALREADY ENABLED
-	--====================================================
+    if not styleSuccess then
+        State.FightingStyleEnabled[name] = false
 
-	if State.FightingStyleEnabled[name]==true then
-		return true
-	end
+        if type(Callbacks.Failed) == "function" then
+            pcall(Callbacks.Failed, name)
+        end
 
-	--====================================================
-	-- FIND / GO / INTERACT
-	--====================================================
+        return false
+    end
 
-	local styleSuccess=
-		self:GetFightingStyle(name)
+    -- Gửi yêu cầu tới server sau khi tìm thấy và tương tác NPC
+    local remote = getRemote("BuyItem")
 
-	if not styleSuccess then
+    if not remote then
+        State.FightingStyleEnabled[name] = false
+        notify("BuyItem remote chưa sẵn sàng")
+        return false
+    end
 
-		State.FightingStyleEnabled[name]=false
+    if not remote:IsA("RemoteFunction") then
+        State.FightingStyleEnabled[name] = false
+        notify("BuyItem không phải RemoteFunction")
+        return false
+    end
 
-		if type(Callbacks.Failed)=="function" then
+    local remoteSuccess, result = pcall(function()
+        return remote:InvokeServer(name, "Toggle", true)
+    end)
 
-			pcall(
-				Callbacks.Failed,
-				name
-			)
+    if not remoteSuccess then
+        State.FightingStyleEnabled[name] = false
+        notify("Không thể gửi yêu cầu: " .. name)
 
-		end
+        if type(Callbacks.Failed) == "function" then
+            pcall(Callbacks.Failed, name)
+        end
 
-		return false
-	end
+        return false
+    end
 
-	--====================================================
-	-- SERVER REQUEST
-	--====================================================
+    if result ~= true then
+        State.FightingStyleEnabled[name] = false
+        notify("Server từ chối: " .. name)
 
-	local remote=getRemote("BuyItem")
+        if type(Callbacks.Failed) == "function" then
+            pcall(Callbacks.Failed, name, result)
+        end
 
-	if not remote then
+        return false
+    end
 
-		State.FightingStyleEnabled[name]=false
+    State.FightingStyleEnabled[name] = true
 
-		notify(
-			"BuyItem remote chưa sẵn sàng"
-		)
+    notify("Đã bật: " .. name)
 
-		return false
-	end
+    if type(Callbacks.Success) == "function" then
+        pcall(Callbacks.Success, name)
+    end
 
-	if not remote:IsA("RemoteFunction") then
-
-		State.FightingStyleEnabled[name]=false
-
-		notify(
-			"BuyItem không phải RemoteFunction"
-		)
-
-		return false
-	end
-
-	local remoteSuccess,result=
-		pcall(function()
-
-			return remote:InvokeServer(
-				name,
-				"Toggle",
-				true
-			)
-
-		end)
-
-	if not remoteSuccess then
-
-		State.FightingStyleEnabled[name]=false
-
-		notify(
-			"Không thể gửi yêu cầu: "
-			..name
-		)
-
-		if type(Callbacks.Failed)=="function" then
-
-			pcall(
-				Callbacks.Failed,
-				name
-			)
-
-		end
-
-		return false
-	end
-
-	if result~=true then
-
-		State.FightingStyleEnabled[name]=false
-
-		notify(
-			"Server từ chối: "
-			..name
-		)
-
-		if type(Callbacks.Failed)=="function" then
-
-			pcall(
-				Callbacks.Failed,
-				name,
-				result
-			)
-
-		end
-
-		return false
-	end
-
-	State.FightingStyleEnabled[name]=true
-
-	notify(
-		"Đã bật: "
-		..name
-	)
-
-	if type(Callbacks.Success)=="function" then
-
-		pcall(
-			Callbacks.Success,
-			name
-		)
-
-	end
-
-	return true
+    return true
 end
 
 --========================================================
@@ -1074,102 +778,85 @@ end
 --========================================================
 
 function ShopModule:Toggle(name)
+    if destroyed then
+        return false
+    end
 
-	if destroyed then
-		return false
-	end
+    if not validItem(name) then
+        return false
+    end
 
-	if not validItem(name) then
-		return false
-	end
+    if ShopConfig[name].Type ~= "Toggle" then
+        return false
+    end
 
-	if ShopConfig[name].Type~="Toggle" then
-		return false
-	end
+    local current =
+        State.FightingStyleEnabled[name] == true
 
-	local current=
-		State.FightingStyleEnabled[name]==true
-
-	return self:Set(
-		name,
-		not current
-	)
+    return self:Set(name, not current)
 end
 
 --========================================================
 -- REDEEM CODE
 --========================================================
 
-local RedeemCodes={
-
-	"EASTEREXP",
-	"KITT_RESET",
-	"SUB2GAMERROBOT_EXP1",
-	"SUB2GAMERROBOT_RESET1",
-	"Bluxxy",
-	"Sub2UncleKizaru",
-	"Bignews",
-	"Enyu_is_Pro",
-	"JCWK",
-	"Kittgaming",
-	"Magicbus",
-	"Starcodeheo",
-	"StrawHatMaine",
-	"Sub2CaptainMaui",
-	"Sub2Daigrock",
-	"Sub2Fer999",
-	"Sub2NoobMaster123",
-	"Sub2OfficialNoobie",
-	"TantaiGaming",
-	"TheGreatAce",
-	"Axiore",
-	"Chandler",
-	"Fudd10",
-	"Fudd10_v2"
+local RedeemCodes = {
+    "EASTEREXP",
+    "KITT_RESET",
+    "SUB2GAMERROBOT_EXP1",
+    "SUB2GAMERROBOT_RESET1",
+    "Bluxxy",
+    "Sub2UncleKizaru",
+    "Bignews",
+    "Enyu_is_Pro",
+    "JCWK",
+    "Kittgaming",
+    "Magicbus",
+    "Starcodeheo",
+    "StrawHatMaine",
+    "Sub2CaptainMaui",
+    "Sub2Daigrock",
+    "Sub2Fer999",
+    "Sub2NoobMaster123",
+    "Sub2OfficialNoobie",
+    "TantaiGaming",
+    "TheGreatAce",
+    "Axiore",
+    "Chandler",
+    "Fudd10",
+    "Fudd10_v2"
 }
 
 function ShopModule:RedeemCode()
+    if destroyed then
+        return false
+    end
 
-	if destroyed then
-		return false
-	end
+    local remote = getRemote("RedeemCode")
 
-	local remote=getRemote("RedeemCode")
+    if not remote or not remote:IsA("RemoteFunction") then
+        return false
+    end
 
-	if not remote then
-		return false
-	end
+    local anySuccess = false
 
-	if not remote:IsA("RemoteFunction") then
-		return false
-	end
+    for _, code in ipairs(RedeemCodes) do
+        if destroyed then
+            break
+        end
 
-	local anySuccess=false
+        local success, result = pcall(function()
+            return remote:InvokeServer(code)
+        end)
 
-	for _,code in ipairs(RedeemCodes) do
+        if success and result == true then
+            anySuccess = true
+        end
 
-		if destroyed then
-			break
-		end
+        task.wait(0.15)
+    end
 
-		local success,result=
-			pcall(function()
-
-				return remote:InvokeServer(
-					code
-				)
-
-			end)
-
-		if success and result==true then
-			anySuccess=true
-		end
-
-		task.wait(.15)
-
-	end
-
-	return anySuccess
+    return anySuccess
 end
 
 --========================================================
@@ -1177,45 +864,34 @@ end
 --========================================================
 
 function ShopModule:GetAll()
+    if destroyed then
+        return {}
+    end
 
-	if destroyed then
-		return {}
-	end
+    local result = {}
 
-	local result={}
+    for name in pairs(ShopConfig) do
+        result[name] = self:Get(name)
+    end
 
-	for name in pairs(ShopConfig) do
-
-		result[name]=self:Get(name)
-
-	end
-
-	return result
+    return result
 end
 
---========================================================
--- DESTROY
---========================================================
-
 function ShopModule:Destroy()
+    if destroyed then
+        return
+    end
 
-	if destroyed then
-		return
-	end
+    destroyed = true
 
-	destroyed=true
+    BuyItemRemote = nil
+    RedeemCodeRemote = nil
 
-	BuyItemRemote=nil
-	RedeemCodeRemote=nil
+    table.clear(State.FightingStyleEnabled)
 
-	table.clear(
-		State.FightingStyleEnabled
-	)
-
-	for key in pairs(Callbacks) do
-		Callbacks[key]=nil
-	end
-
+    for key in pairs(Callbacks) do
+        Callbacks[key] = nil
+    end
 end
 
 return ShopModule
