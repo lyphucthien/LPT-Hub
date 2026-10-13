@@ -2,7 +2,6 @@ local Players=game:GetService("Players")
 local UserInputService=game:GetService("UserInputService")
 local RunService=game:GetService("RunService")
 local TweenService=game:GetService("TweenService")
-local MarketplaceService=game:GetService("MarketplaceService")
 local HttpService=game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
 
@@ -744,7 +743,6 @@ local function createPage(name)
 	return page
 end
 
-local informationPage=createPage("Information")
 local mainPage=createPage("Main")
 local aimPage=createPage("Aim")
 local settingsPage=createPage("Settings")
@@ -779,7 +777,6 @@ local function createPageTitle(parent,text,description)
 	end
 end
 
-createPageTitle(informationPage,"Thông Tin","Thông tin Owner, Tên Game, Chức năng và trạng thái.")
 createPageTitle(mainPage,"Main")
 createPageTitle(settingsPage,"Settings")
 createPageTitle(aimPage,"Aim","Các thiết lập hỗ trợ ngắm.")
@@ -1106,129 +1103,6 @@ local function createSlider(parent,text,y,defaultValue,minValue,maxValue,callbac
 	setValue(defaultValue,false)
 	return setValue
 end
-
---========================================================
--- INFORMATION
---========================================================
-
-local informationContainer=Instance.new("Frame")
-informationContainer.Size=UDim2.new(1,-56,0,430)
-informationContainer.Position=UDim2.new(0,28,0,95)
-informationContainer.BackgroundTransparency=1
-informationContainer.Parent=informationPage
-
-local informationCard=Instance.new("Frame")
-informationCard.Size=UDim2.new(1,0,0,350)
-informationCard.BackgroundColor3=Color3.fromRGB(26,25,31)
-informationCard.BorderSizePixel=0
-informationCard.Parent=informationContainer
-
-local informationCorner=Instance.new("UICorner")
-informationCorner.CornerRadius=UDim.new(0,20)
-informationCorner.Parent=informationCard
-
-local informationStroke=Instance.new("UIStroke")
-informationStroke.Color=Color3.fromRGB(255,255,255)
-informationStroke.Transparency=.9
-informationStroke.Thickness=1
-informationStroke.Parent=informationCard
-
-local ownerText=Instance.new("TextLabel")
-ownerText.Size=UDim2.new(0,100,0,20)
-ownerText.Position=UDim2.new(0,15,0,15)
-ownerText.BackgroundTransparency=1
-ownerText.Text="OWNER"
-ownerText.Font=Enum.Font.GothamBold
-ownerText.TextSize=25
-ownerText.TextColor3=Color3.fromRGB(200,200,200)
-ownerText.TextXAlignment=Enum.TextXAlignment.Left
-ownerText.Parent=informationCard
-
-local informationList=Instance.new("Frame")
-informationList.Size=UDim2.new(1,-48,1,-75)
-informationList.Position=UDim2.new(0,24,0,60)
-informationList.BackgroundTransparency=1
-informationList.Parent=informationCard
-
-local informationLayout=Instance.new("UIListLayout")
-informationLayout.FillDirection=Enum.FillDirection.Vertical
-informationLayout.Padding=UDim.new(0,16)
-informationLayout.SortOrder=Enum.SortOrder.LayoutOrder
-informationLayout.Parent=informationList
-
-local function createInformationRow(order,labelText,valueText,valueColor)
-	local row=Instance.new("Frame")
-	row.Size=UDim2.new(1,0,0,44)
-	row.BackgroundTransparency=1
-	row.LayoutOrder=order
-	row.Parent=informationList
-
-	local label=Instance.new("TextLabel")
-	label.Size=UDim2.new(1,0,0,16)
-	label.BackgroundTransparency=1
-	label.Text=labelText
-	label.Font=Enum.Font.Gotham
-	label.TextSize=13
-	label.TextColor3=Color3.fromRGB(150,148,155)
-	label.TextXAlignment=Enum.TextXAlignment.Left
-	label.Parent=row
-
-	local value=Instance.new("TextLabel")
-	value.Size=UDim2.new(1,0,0,22)
-	value.Position=UDim2.new(0,0,0,20)
-	value.BackgroundTransparency=1
-	value.Text=valueText
-	value.Font=Enum.Font.GothamMedium
-	value.TextSize=17
-	value.TextColor3=valueColor or Color3.fromRGB(240,240,240)
-	value.TextXAlignment=Enum.TextXAlignment.Left
-	value.Parent=row
-end
-
-createInformationRow(1,"Họ và Tên","Lý Phúc Thiện")
-createInformationRow(2,"Ngày sinh","18/3")
-createInformationRow(3,"Tuổi","15")
-createInformationRow(4,"Trạng Thái","Online",Color3.fromRGB(80,220,120))
-
-local gameCard=Instance.new("Frame")
-gameCard.Size=UDim2.new(1,0,0,60)
-gameCard.Position=UDim2.new(0,0,0,370)
-gameCard.BackgroundColor3=Color3.fromRGB(30,28,35)
-gameCard.BorderSizePixel=0
-gameCard.Parent=informationContainer
-
-local gameCorner=Instance.new("UICorner")
-gameCorner.CornerRadius=UDim.new(0,20)
-gameCorner.Parent=gameCard
-
-local gameRow=Instance.new("TextLabel")
-gameRow.Size=UDim2.new(1,-48,1,0)
-gameRow.Position=UDim2.new(0,24,0,0)
-gameRow.BackgroundTransparency=1
-gameRow.Font=Enum.Font.GothamMedium
-gameRow.TextSize=18
-gameRow.TextXAlignment=Enum.TextXAlignment.Left
-gameRow.TextYAlignment=Enum.TextYAlignment.Center
-gameRow.TextColor3=Color3.fromRGB(240,240,240)
-gameRow.RichText=true
-gameRow.Parent=gameCard
-
-local gameName="Unknown Game"
-
-local gameInfoOK,gameInfo=pcall(function()
-	return MarketplaceService:GetProductInfo(game.PlaceId)
-end)
-
-if gameInfoOK and type(gameInfo)=="table" and gameInfo.Name then
-	gameName=tostring(gameInfo.Name)
-end
-
-gameRow.Text=string.format(
-	'<font color="rgb(160,158,165)">Tên Game: </font><font color="rgb(240,240,240)">%s</font>',
-	gameName
-)
-
-informationPage.CanvasSize=UDim2.new(0,0,0,540)
 
 --========================================================
 -- MAIN PAGE
@@ -1894,10 +1768,6 @@ ESPConnections.Validation = task.spawn(function()
         end
     end)
 
---========================================================
--- ENABLE / DISABLE
---========================================================
-
 local function setESPEnabled(enabled)
     ESPState.Enabled = enabled == true
 
@@ -2075,7 +1945,6 @@ fixLag.MouseButton1Click:Connect(function()
 					object.CastShadow=false
 				end)
 
-				-- giảm physics không cần thiết
 				if object:IsA("MeshPart") then
 					pcall(function()
 						object.RenderFidelity=Enum.RenderFidelity.Performance
@@ -2363,12 +2232,11 @@ local function createSidebarButton(text,order,pageName)
 	end)
 end
 
-createSidebarButton("Information",1,"Information")
-createSidebarButton("Main",2,"Main")
-createSidebarButton("Aim",3,"Aim")
-createSidebarButton("Settings",4,"Settings")
+createSidebarButton("Main",1,"Main")
+createSidebarButton("Aim",2,"Aim")
+createSidebarButton("Settings",3,"Settings")
 
-selectPage("Information")
+selectPage("Main")
 
 --========================================================
 -- RESTORE SAVED STATE
