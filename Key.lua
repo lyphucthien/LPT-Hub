@@ -13,7 +13,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 local GET_KEY_LINK = "https://work.ink/34tV/lpt-hub-script-key-mission"
 local DISCORD_LINK = "https://discord.gg/gyZ27Hw9qu"
-local WEBSITE_LINK = "https://youtube.com/@lyphucthien1803"
+local YOUTUBE_LINK = "https://youtube.com/@lyphucthien1803"
 local KEY_API_URL = "https://lyphucthien.vercel.app/api/get-key"
 local SCRIPT_API_URL = "https://lyphucthien.vercel.app/api/get-script"
 
@@ -931,13 +931,13 @@ local DISCORD_W, DISCORD_H = 29, 22
 local YOUTUBE_W, YOUTUBE_H = 33, 22
 
 local discordButton, discordStroke, discordHolder = makeIconButton("DiscordCard", 29, "Discord", DISCORD_W, DISCORD_H)
-local websiteButton, websiteStroke, youtubeHolder = makeIconButton("WebsiteCard", 185, "YouTube", YOUTUBE_W, YOUTUBE_H)
+local youtubeButton, youtubeStroke, youtubeHolder = makeIconButton("YoutubeCard", 185, "YouTube", YOUTUBE_W, YOUTUBE_H)
 
 applyIcon(discordHolder, DISCORD_W * 2, DISCORD_H * 2, buildDiscordFrames, renderDiscordPixels)
 applyIcon(youtubeHolder, YOUTUBE_W * 2, YOUTUBE_H * 2, buildYouTubeFrames, renderYouTubePixels)
 
 local restoreDiscordHover = addHoverGlow(discordButton, discordStroke, Color3.fromRGB(130, 145, 255))
-local restoreYoutubeHover = addHoverGlow(websiteButton, websiteStroke, Color3.fromRGB(255, 60, 60))
+local restoreYoutubeHover = addHoverGlow(youtubeButton, youtubeStroke, Color3.fromRGB(255, 60, 60))
 
 addHoverGlow(getKeyButton, getStroke, Color3.fromRGB(70, 70, 70), Color3.fromRGB(28, 28, 28))
 
@@ -1290,7 +1290,7 @@ end)
 websiteButton.MouseButton1Click:Connect(function()
     copyButtonLink(websiteButton, WEBSITE_LINK, websiteStroke, restoreYoutubeHover)
 end)
-
+    
 local function attemptSubmit()
     if State.Submitting or State.Loading then
         return
