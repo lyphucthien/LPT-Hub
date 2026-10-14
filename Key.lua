@@ -926,8 +926,9 @@ local function addHoverGlow(button, stroke, glowColor, hoverBg)
         end
     end
 end
-local DISCORD_W, DISCORD_H = 30, 23
-local YOUTUBE_W, YOUTUBE_H = 34, 24
+
+local DISCORD_W, DISCORD_H = 29, 22
+local YOUTUBE_W, YOUTUBE_H = 33, 22
 
 local discordButton, discordStroke, discordHolder = makeIconButton("DiscordCard", 29, "Discord", DISCORD_W, DISCORD_H)
 local websiteButton, websiteStroke, youtubeHolder = makeIconButton("WebsiteCard", 185, "YouTube", YOUTUBE_W, YOUTUBE_H)
