@@ -788,7 +788,7 @@ keyInput.PlaceholderColor3 = Color3.fromRGB(94, 94, 94)
 keyInput.Text = ""
 keyInput.TextColor3 = Color3.fromRGB(245, 245, 245)
 keyInput.TextSize = 14
-keyInput.Font = Enum.Font.Gotham
+keyInput.Font = Enum.Font.GothamMedium
 keyInput.TextXAlignment = Enum.TextXAlignment.Left
 keyInput.ClearTextOnFocus = false
 keyInput.ClipsDescendants = true
@@ -1287,8 +1287,8 @@ discordButton.MouseButton1Click:Connect(function()
     copyButtonLink(discordButton, DISCORD_LINK, discordStroke, restoreDiscordHover)
 end)
 
-websiteButton.MouseButton1Click:Connect(function()
-    copyButtonLink(websiteButton, WEBSITE_LINK, websiteStroke, restoreYoutubeHover)
+youtubeButton.MouseButton1Click:Connect(function()
+    copyButtonLink(youtubeButton, YOUTUBE_LINK, youtubeStroke, restoreYoutubeHover)
 end)
     
 local function attemptSubmit()
