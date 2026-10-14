@@ -2,7 +2,6 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 local UserInputService = game:GetService("UserInputService")
-local MarketplaceService = game:GetService("MarketplaceService")
 
 local player = Players.LocalPlayer
 if not player then
@@ -12,7 +11,7 @@ end
 
 local playerGui = player:WaitForChild("PlayerGui")
 
-local GET_KEY_LINK = "https://work.ink/34tV/LPT-Hub-Script-Key-Mission"
+local GET_KEY_LINK = "https://work.ink/34tV/lpt-hub-script-key-mission"
 local DISCORD_LINK = "https://discord.gg/gyZ27Hw9qu"
 local WEBSITE_LINK = "https://youtube.com/@lyphucthien1803"
 local KEY_API_URL = "https://lyphucthien.vercel.app/api/get-key"
@@ -47,6 +46,7 @@ local SERVER_ERRORS = {
 local LPT_HUB_FOLDER = "LPT Hub"
 local KEY_FILE = LPT_HUB_FOLDER .. "/LPT_Hub_Key.json"
 local KEY_DURATION = 3 * 60 * 60
+local USE_EDITABLE_IMAGE = true
 
 local COLORS = {
     Background = Color3.fromRGB(5, 5, 5),
@@ -58,12 +58,6 @@ local COLORS = {
     Success = Color3.fromRGB(74, 222, 128),
     Info = Color3.fromRGB(96, 165, 250),
     Warning = Color3.fromRGB(250, 204, 21),
-}
-
-local ICON_URLS = {
-    Key = "https://img.icons8.com/ios-filled/50/969696/key.png",
-    Discord = "https://img.icons8.com/color/96/discord-new-logo.png",
-    YouTube = "https://img.icons8.com/color/96/youtube-play.png",
 }
 
 local State = {
@@ -86,13 +80,6 @@ local State = {
 --============================================================
 -- HELPERS
 --============================================================
-
-local function safeCall(callback, ...)
-    local args = table.pack(...)
-    return pcall(function()
-        return callback(table.unpack(args, 1, args.n))
-    end)
-end
 
 local function tween(object, properties, duration, style)
     if not object or not object.Parent then
@@ -137,6 +124,47 @@ local function makeLabel(parent, name, text, size, position, font, textSize, col
     return label
 end
 
+local function makeShape(parent, size, position, color, radius, zIndex)
+    local frame = Instance.new("Frame")
+    frame.Size = size
+    frame.Position = position or UDim2.fromOffset(0, 0)
+    frame.BackgroundColor3 = color
+    frame.BorderSizePixel = 0
+    frame.ZIndex = zIndex or 13
+    frame.Parent = parent
+    if radius then
+        makeCorner(frame, radius)
+    end
+    return frame
+end
+
+local function buildKeyIcon(parent, color)
+    local holder = Instance.new("Frame")
+    holder.Name = "KeyGlyph"
+    holder.Size = UDim2.fromOffset(18, 18)
+    holder.AnchorPoint = Vector2.new(0.5, 0.5)
+    holder.Position = UDim2.fromScale(0.5, 0.5)
+    holder.BackgroundTransparency = 1
+    holder.Rotation = -45
+    holder.ZIndex = 13
+    holder.Parent = parent
+
+    local ring = makeShape(holder, UDim2.fromOffset(6, 6), UDim2.fromOffset(2, 6), color, 99)
+    ring.BackgroundTransparency = 1
+    local ringStroke = Instance.new("UIStroke")
+    ringStroke.Color = color
+    ringStroke.Thickness = 2
+    ringStroke.Parent = ring
+
+    makeShape(holder, UDim2.fromOffset(8, 2), UDim2.fromOffset(10, 8), color, 1)
+    makeShape(holder, UDim2.fromOffset(2, 3), UDim2.fromOffset(13, 10), color, 1)
+    makeShape(holder, UDim2.fromOffset(2, 3), UDim2.fromOffset(16, 10), color, 1)
+end
+
+--============================================================
+-- FILE / CLIPBOARD / HTTP
+--============================================================
+
 local function ensureLPTFolder()
     if type(isfolder) ~= "function" or type(makefolder) ~= "function" then
         return
@@ -146,36 +174,6 @@ local function ensureLPTFolder()
     if ok and not exists then
         pcall(makefolder, LPT_HUB_FOLDER)
     end
-end
-
-local function getWebImage(url, fileName)
-    local getAsset = getcustomasset or getsynasset
-    if type(writefile) ~= "function" or type(getAsset) ~= "function" then
-        return nil
-    end
-
-    ensureLPTFolder()
-    local path = LPT_HUB_FOLDER .. "/" .. fileName
-
-    local ok, asset = pcall(function()
-        local needsDownload = true
-        if type(isfile) == "function" then
-            local checkOK, exists = pcall(isfile, path)
-            needsDownload = not (checkOK and exists)
-        end
-
-        if needsDownload then
-            local response = game:HttpGet(url)
-            if type(response) ~= "string" or response == "" then
-                error("Empty image response")
-            end
-            writefile(path, response)
-        end
-
-        return getAsset(path)
-    end)
-
-    return ok and asset or nil
 end
 
 local function copyToClipboard(text)
@@ -205,6 +203,313 @@ local function getHWID()
     end)
     return ok and id or "unknown"
 end
+
+local DISCORD_RGB = {88 / 255, 101 / 255, 242 / 255}
+
+local function bezier(p, steps, out)
+    for i = 1, steps do
+        local t = i / steps
+        local u = 1 - t
+        local x, y
+        if #p == 3 then
+            x = u * u * p[1][1] + 2 * u * t * p[2][1] + t * t * p[3][1]
+            y = u * u * p[1][2] + 2 * u * t * p[2][2] + t * t * p[3][2]
+        else
+            x = u ^ 3 * p[1][1] + 3 * u * u * t * p[2][1] + 3 * u * t * t * p[3][1] + t ^ 3 * p[4][1]
+            y = u ^ 3 * p[1][2] + 3 * u * u * t * p[2][2] + 3 * u * t * t * p[3][2] + t ^ 3 * p[4][2]
+        end
+        out[#out + 1] = {x, y}
+    end
+end
+
+local DISCORD_POLY = {{433, 328}}
+do
+    local right = {{560, 303}, {661, 334}}
+    bezier({{661, 334}, {712, 410}, {742, 500}, {733, 613}}, 20, right)
+    bezier({{733, 613}, {685, 652}, {609, 677}}, 8, right)
+    right[#right + 1] = {583, 634}
+    right[#right + 1] = {623, 614}
+    right[#right + 1] = {615, 606}
+
+    bezier({{433, 328}, {490, 322}, {546, 328}}, 12, DISCORD_POLY)
+    for _, p in ipairs(right) do
+        DISCORD_POLY[#DISCORD_POLY + 1] = p
+    end
+    bezier({{615, 606}, {490, 662}, {365, 606}}, 20, DISCORD_POLY)
+    for i = #right - 1, 1, -1 do
+        DISCORD_POLY[#DISCORD_POLY + 1] = {980 - right[i][1], right[i][2]}
+    end
+    for _, p in ipairs(DISCORD_POLY) do
+        p[1] = (p[1] - 245) / 490
+        p[2] = (p[2] - 303) / 374
+    end
+end
+
+local DISCORD_EYES = {{0.3327, 0.5481, 0.0898, 0.1337},{0.6653, 0.5481, 0.0898, 0.1337},}
+
+local function discordIntervals(y)
+    local xs = {}
+    local n = #DISCORD_POLY
+    for i = 1, n do
+        local a = DISCORD_POLY[i]
+        local b = DISCORD_POLY[i % n + 1]
+        if (a[2] <= y) ~= (b[2] <= y) then
+            xs[#xs + 1] = a[1] + (y - a[2]) / (b[2] - a[2]) * (b[1] - a[1])
+        end
+    end
+    table.sort(xs)
+
+    local intervals = {}
+    for i = 1, #xs - 1, 2 do
+        intervals[#intervals + 1] = {xs[i], xs[i + 1]}
+    end
+
+    for _, eye in ipairs(DISCORD_EYES) do
+        local cx, cy, rx, ry = eye[1], eye[2], eye[3], eye[4]
+        local d = 1 - ((y - cy) / ry) ^ 2
+        if d > 0 then
+            local half = rx * math.sqrt(d)
+            local out = {}
+            for _, seg in ipairs(intervals) do
+                local a, b = seg[1], seg[2]
+                if b <= cx - half or a >= cx + half then
+                    out[#out + 1] = seg
+                else
+                    if a < cx - half then
+                        out[#out + 1] = {a, cx - half}
+                    end
+                    if b > cx + half then
+                        out[#out + 1] = {cx + half, b}
+                    end
+                end
+            end
+            intervals = out
+        end
+    end
+    return intervals
+end
+
+local function renderDiscordPixels(w, h)
+    local SUB = 4
+    local px = table.create(w * h * 4, 0)
+    local cov = table.create(w, 0)
+
+    for row = 0, h - 1 do
+        for x = 1, w do
+            cov[x] = 0
+        end
+        for s = 0, SUB - 1 do
+            local y = (row + (s + 0.5) / SUB) / h
+            for _, seg in ipairs(discordIntervals(y)) do
+                local a, b = seg[1] * w, seg[2] * w
+                local x1 = math.max(1, math.floor(a) + 1)
+                local x2 = math.min(w, math.ceil(b))
+                for x = x1, x2 do
+                    local overlap = math.min(b, x) - math.max(a, x - 1)
+                    if overlap > 0 then
+                        cov[x] = cov[x] + overlap
+                    end
+                end
+            end
+        end
+        for x = 1, w do
+            local i = (row * w + (x - 1)) * 4
+            px[i + 1] = DISCORD_RGB[1]
+            px[i + 2] = DISCORD_RGB[2]
+            px[i + 3] = DISCORD_RGB[3]
+            px[i + 4] = math.clamp(cov[x] / SUB, 0, 1)
+        end
+    end
+    return px
+end
+
+local YT_TRI = {{0.409, 0.278}, {0.409, 0.722}, {0.683, 0.5}}
+local YT_RADIUS = 0.29
+
+local function pointInTriangle(px, py, a, b, c)
+    local function sign(p1x, p1y, p2x, p2y, p3x, p3y)
+        return (p1x - p3x) * (p2y - p3y) - (p2x - p3x) * (p1y - p3y)
+    end
+    local d1 = sign(px, py, a[1], a[2], b[1], b[2])
+    local d2 = sign(px, py, b[1], b[2], c[1], c[2])
+    local d3 = sign(px, py, c[1], c[2], a[1], a[2])
+    local hasNeg = d1 < 0 or d2 < 0 or d3 < 0
+    local hasPos = d1 > 0 or d2 > 0 or d3 > 0
+    return not (hasNeg and hasPos)
+end
+
+local function renderYouTubePixels(w, h)
+    local SUB = 4
+    local r = h * YT_RADIUS
+    local tri = {}
+    for i, p in ipairs(YT_TRI) do
+        tri[i] = {p[1] * w, p[2] * h}
+    end
+
+    local px = table.create(w * h * 4, 0)
+    for row = 0, h - 1 do
+        for col = 0, w - 1 do
+            local rectCount, triCount = 0, 0
+            for sy = 0, SUB - 1 do
+                for sx = 0, SUB - 1 do
+                    local x = col + (sx + 0.5) / SUB
+                    local y = row + (sy + 0.5) / SUB
+                    local dx = math.max(math.abs(x - w / 2) - (w / 2 - r), 0)
+                    local dy = math.max(math.abs(y - h / 2) - (h / 2 - r), 0)
+                    if dx * dx + dy * dy <= r * r then
+                        rectCount = rectCount + 1
+                        if pointInTriangle(x, y, tri[1], tri[2], tri[3]) then
+                            triCount = triCount + 1
+                        end
+                    end
+                end
+            end
+            local i = (row * w + col) * 4
+            local t = rectCount > 0 and triCount / rectCount or 0
+            px[i + 1] = 1
+            px[i + 2] = t
+            px[i + 3] = t
+            px[i + 4] = rectCount / (SUB * SUB)
+        end
+    end
+    return px
+end
+
+--============================================================
+-- ICON BUILDERS
+--============================================================
+
+local DISCORD_BLUE = Color3.fromRGB(88, 101, 242)
+
+local function buildDiscordFrames(holder)
+    local rows = 28
+    for r = 0, rows - 1 do
+        local y = (r + 0.5) / rows
+        for _, seg in ipairs(discordIntervals(y)) do
+            local f = Instance.new("Frame")
+            f.BackgroundColor3 = DISCORD_BLUE
+            f.BorderSizePixel = 0
+            f.Position = UDim2.fromScale(seg[1], r / rows)
+            f.Size = UDim2.fromScale(seg[2] - seg[1], 1 / rows + 0.003)
+            f.ZIndex = 13
+            f.Parent = holder
+        end
+    end
+end
+
+local function buildYouTubeFrames(holder)
+    local body = Instance.new("Frame")
+    body.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    body.BorderSizePixel = 0
+    body.Size = UDim2.fromScale(1, 1)
+    body.ZIndex = 13
+    body.Parent = holder
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(YT_RADIUS, 0)
+    corner.Parent = body
+
+    local left, right = YT_TRI[1][1], YT_TRI[3][1]
+    local top, bottom = YT_TRI[1][2], YT_TRI[2][2]
+    local columns = 14
+    local step = (right - left) / columns
+    for i = 0, columns - 1 do
+        local h = (bottom - top) * (1 - (i + 0.5) / columns)
+        local strip = Instance.new("Frame")
+        strip.BackgroundColor3 = Color3.new(1, 1, 1)
+        strip.BorderSizePixel = 0
+        strip.Position = UDim2.fromScale(left + i * step, 0.5 - h / 2)
+        strip.Size = UDim2.fromScale(step + 0.004, h)
+        strip.ZIndex = 14
+        strip.Parent = holder
+    end
+end
+
+local function makeEditableImage(w, h, pixels)
+    local img
+    local ok = pcall(function()
+        img = game:GetService("AssetService"):CreateEditableImage({Size = Vector2.new(w, h)})
+    end)
+    if not ok or not img then
+        ok = pcall(function()
+            img = Instance.new("EditableImage")
+            img.Size = Vector2.new(w, h)
+        end)
+        if not ok or not img then
+            return nil
+        end
+    end
+
+    local wrote = pcall(function()
+        img:WritePixels(Vector2.new(0, 0), Vector2.new(w, h), pixels)
+    end)
+    if not wrote then
+        wrote = pcall(function()
+            local buf = buffer.create(w * h * 4)
+            for i = 1, #pixels do
+                buffer.writeu8(buf, i - 1, math.floor(pixels[i] * 255 + 0.5))
+            end
+            img:WritePixelsBuffer(Vector2.new(0, 0), Vector2.new(w, h), buf)
+        end)
+    end
+    if not wrote then
+        pcall(function() img:Destroy() end)
+        return nil
+    end
+    return img
+end
+
+local function applyEditableImage(label, img)
+    local ok = pcall(function()
+        label.ImageContent = Content.fromObject(img)
+    end)
+    if not ok then
+        ok = pcall(function()
+            img.Parent = label
+        end)
+    end
+    return ok
+end
+
+local function applyIcon(holder, texW, texH, buildFrames, renderPixels)
+    buildFrames(holder)
+    if not USE_EDITABLE_IMAGE then
+        return
+    end
+
+    task.spawn(function()
+        local okPixels, pixels = pcall(renderPixels, texW, texH)
+        if not okPixels or type(pixels) ~= "table" then
+            return
+        end
+        local img = makeEditableImage(texW, texH, pixels)
+        if not img or not holder.Parent then
+            return
+        end
+
+        local label = Instance.new("ImageLabel")
+        label.Name = "SmoothIcon"
+        label.Size = UDim2.fromScale(1, 1)
+        label.BackgroundTransparency = 1
+        label.BorderSizePixel = 0
+        label.ScaleType = Enum.ScaleType.Stretch
+        label.ZIndex = 13
+        label.Visible = false
+        label.Parent = holder
+
+        if applyEditableImage(label, img) then
+            for _, child in ipairs(holder:GetChildren()) do
+                if child ~= label then
+                    child:Destroy()
+                end
+            end
+            label.Visible = true
+        else
+            label:Destroy()
+            pcall(function() img:Destroy() end)
+        end
+    end)
+end
+
 
 --============================================================
 -- KEY FILE
@@ -292,7 +597,6 @@ screenGui.IgnoreGuiInset = true
 screenGui.DisplayOrder = 999999
 screenGui.Parent = playerGui
 
-local function showNotification() end
 local expiredShown = false
 
 local function showExpiredOverlay()
@@ -349,8 +653,8 @@ end
 
 local keyFrame = Instance.new("Frame")
 keyFrame.Name = "KeyUI"
-keyFrame.Size = UDim2.fromOffset(610, 270)
-keyFrame.Position = UDim2.new(0.5, -305, 0.5, -135)
+keyFrame.Size = UDim2.fromOffset(357, 310)
+keyFrame.Position = UDim2.new(0.5, -178, 0.5, -155)
 keyFrame.BackgroundColor3 = COLORS.Background
 keyFrame.BackgroundTransparency = 0.02
 keyFrame.BorderSizePixel = 0
@@ -372,24 +676,6 @@ leftPanel.BackgroundTransparency = 1
 leftPanel.BorderSizePixel = 0
 leftPanel.ZIndex = 10
 leftPanel.Parent = keyFrame
-
-local rightPanel = Instance.new("Frame")
-rightPanel.Name = "RightPanel"
-rightPanel.Position = UDim2.fromOffset(358, 0)
-rightPanel.Size = UDim2.new(1, -358, 1, 0)
-rightPanel.BackgroundTransparency = 1
-rightPanel.BorderSizePixel = 0
-rightPanel.ZIndex = 10
-rightPanel.Parent = keyFrame
-
-local divider = Instance.new("Frame")
-divider.Name = "Divider"
-divider.Position = UDim2.fromOffset(357, 29)
-divider.Size = UDim2.new(0, 1, 1, -58)
-divider.BackgroundColor3 = Color3.fromRGB(43, 43, 43)
-divider.BorderSizePixel = 0
-divider.ZIndex = 11
-divider.Parent = keyFrame
 
 local logo = Instance.new("ImageLabel")
 logo.Name = "KeyLogo"
@@ -482,25 +768,19 @@ inputStroke.Thickness = 1
 inputStroke.Transparency = 0.12
 inputStroke.Parent = inputBox
 
-local keyIcon = Instance.new("ImageLabel")
+local keyIcon = Instance.new("Frame")
 keyIcon.Name = "KeyIcon"
-keyIcon.Size = UDim2.fromOffset(16, 16)
-keyIcon.Position = UDim2.new(0, 9, 0.5, -8)
+keyIcon.Size = UDim2.fromOffset(18, 18)
+keyIcon.Position = UDim2.new(0, 8, 0.5, -9)
 keyIcon.BackgroundTransparency = 1
-keyIcon.ScaleType = Enum.ScaleType.Fit
 keyIcon.ZIndex = 12
 keyIcon.Parent = inputBox
 
-task.spawn(function()
-    local image = getWebImage(ICON_URLS.Key, "icon_key.png")
-    if image and keyIcon.Parent then
-        keyIcon.Image = image
-    end
-end)
+buildKeyIcon(keyIcon, Color3.fromRGB(245, 190, 60))
 
 local keyInput = Instance.new("TextBox")
 keyInput.Name = "LicenseInput"
-keyInput.Size = UDim2.new(1, -39, 1, 0)
+keyInput.Size = UDim2.new(1, -44, 1, 0)
 keyInput.Position = UDim2.fromOffset(31, 0)
 keyInput.BackgroundTransparency = 1
 keyInput.BorderSizePixel = 0
@@ -512,6 +792,7 @@ keyInput.TextSize = 14
 keyInput.Font = Enum.Font.Gotham
 keyInput.TextXAlignment = Enum.TextXAlignment.Left
 keyInput.ClearTextOnFocus = false
+keyInput.ClipsDescendants = true
 keyInput.ZIndex = 12
 keyInput.Parent = inputBox
 
@@ -522,10 +803,14 @@ keyInput.FocusLost:Connect(function()
     tween(inputStroke, {Color = COLORS.Border, Transparency = 0.12}, 0.15)
 end)
 
+local keyStatus = makeLabel(leftPanel, "KeyStatus", "", UDim2.fromOffset(300, 28), UDim2.fromOffset(29, 155), Enum.Font.GothamMedium, 12, COLORS.Danger)
+keyStatus.TextWrapped = true
+keyStatus.TextYAlignment = Enum.TextYAlignment.Top
+
 local getKeyButton = Instance.new("TextButton")
 getKeyButton.Name = "GetKeyButton"
 getKeyButton.Size = UDim2.fromOffset(144, 40)
-getKeyButton.Position = UDim2.fromOffset(29, 166)
+getKeyButton.Position = UDim2.fromOffset(29, 188)
 getKeyButton.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
 getKeyButton.BorderSizePixel = 0
 getKeyButton.Text = "Get a key"
@@ -544,7 +829,7 @@ getStroke.Parent = getKeyButton
 local submitButton = Instance.new("TextButton")
 submitButton.Name = "SubmitButton"
 submitButton.Size = UDim2.fromOffset(144, 40)
-submitButton.Position = UDim2.fromOffset(185, 166)
+submitButton.Position = UDim2.fromOffset(185, 188)
 submitButton.BackgroundColor3 = Color3.fromRGB(155, 210, 255)
 submitButton.TextColor3 = Color3.fromRGB(10, 30, 50)
 submitButton.BorderSizePixel = 0
@@ -556,133 +841,17 @@ submitButton.ZIndex = 11
 submitButton.Parent = leftPanel
 makeCorner(submitButton, 6)
 
-local keyStatus = makeLabel(leftPanel, "KeyStatus", "", UDim2.fromOffset(300, 30), UDim2.fromOffset(29, 216), Enum.Font.Gotham, 12, COLORS.Danger)
-keyStatus.TextWrapped = true
-keyStatus.TextYAlignment = Enum.TextYAlignment.Top
-
-makeLabel(rightPanel, "DetectedLabel", "Detected game", UDim2.fromOffset(196, 20), UDim2.fromOffset(28, 20), Enum.Font.GothamMedium, 13, Color3.fromRGB(165, 165, 170))
-
-local gameCard = Instance.new("Frame")
-gameCard.Name = "DetectedGameCard"
-gameCard.Size = UDim2.fromOffset(196, 60)
-gameCard.Position = UDim2.fromOffset(28, 44)
-gameCard.BackgroundColor3 = COLORS.Surface
-gameCard.BorderSizePixel = 0
-gameCard.ZIndex = 11
-gameCard.Parent = rightPanel
-makeCorner(gameCard, 6)
-local gameCardStroke = Instance.new("UIStroke")
-gameCardStroke.Color = Color3.fromRGB(40, 40, 40)
-gameCardStroke.Thickness = 1
-gameCardStroke.Parent = gameCard
-
-local gameIcon = Instance.new("ImageLabel")
-gameIcon.Name = "GameIcon"
-gameIcon.Size = UDim2.fromOffset(39, 39)
-gameIcon.Position = UDim2.fromOffset(10, 10)
-gameIcon.BackgroundColor3 = Color3.fromRGB(34, 34, 34)
-gameIcon.BorderSizePixel = 0
-gameIcon.Image = "rbxthumb://type=GameIcon&id=" .. tostring(game.GameId or game.PlaceId) .. "&w=150&h=150"
-gameIcon.ScaleType = Enum.ScaleType.Crop
-gameIcon.ZIndex = 12
-gameIcon.Parent = gameCard
-makeCorner(gameIcon, 5)
-
-local detectedGameName = makeLabel(gameCard, "GameName", tostring(game.Name or "Current game"), UDim2.new(1, -58, 0, 30), UDim2.fromOffset(57, 7), Enum.Font.GothamMedium, 12, Color3.fromRGB(238, 238, 238))
-detectedGameName.TextWrapped = true
-detectedGameName.TextTruncate = Enum.TextTruncate.AtEnd
-local detectedGameSub = makeLabel(gameCard, "GameSubtitle", "Universal script", UDim2.new(1, -58, 0, 18), UDim2.fromOffset(57, 35), Enum.Font.Gotham, 10, Color3.fromRGB(110, 110, 110))
-detectedGameSub.TextTruncate = Enum.TextTruncate.AtEnd
-
-makeLabel(rightPanel, "ExecutorLabel", "Executor", UDim2.fromOffset(85, 18), UDim2.fromOffset(28, 114), Enum.Font.GothamMedium, 13, Color3.fromRGB(165, 165, 170))
-local executorValue = makeLabel(rightPanel, "ExecutorValue", "Detecting...", UDim2.fromOffset(108, 18), UDim2.fromOffset(116, 114), Enum.Font.GothamMedium, 13, Color3.fromRGB(210, 210, 215))
-executorValue.TextXAlignment = Enum.TextXAlignment.Right
-executorValue.TextTruncate = Enum.TextTruncate.AtEnd
-
-local function detectExecutorName()
-    local envs = {_G}
-    if type(getgenv) == "function" then
-        local ok, result = pcall(getgenv)
-        if ok and type(result) == "table" then
-            table.insert(envs, 1, result)
-        end
-    end
-
-    for _, env in ipairs(envs) do
-        for _, detectorName in ipairs({"identifyexecutor", "getexecutorname", "get_executor_name", "whatexecutor"}) do
-            local detector = env[detectorName]
-            if type(detector) == "function" then
-                local ok, name = pcall(detector)
-                if ok and type(name) == "string" and name ~= "" then
-                    return name
-                end
-            end
-        end
-    end
-
-    local known = {
-        {"madium", "Madium"}, {"krnl", "KRNL"}, {"synapse", "Synapse X"},
-        {"syn", "Synapse X"}, {"fluxus", "Fluxus"}, {"delta", "Delta"},
-        {"electron", "Electron"}, {"sirhurt", "SirHurt"}, {"scriptware", "Script-Ware"},
-        {"wave", "Wave"}, {"solara", "Solara"}, {"xeno", "Xeno"},
-        {"codex", "Codex"}, {"arceus", "Arceus X"}, {"hydrogen", "Hydrogen"},
-        {"macsploit", "MacSploit"}, {"swift", "Swift"}, {"volcano", "Volcano"},
-        {"velocity", "Velocity"}, {"seliware", "Seliware"}, {"awp", "AWP"},
-        {"cryptic", "Cryptic"}, {"valex", "Valex"}, {"evon", "Evon"},
-        {"trigon", "Trigon"}, {"nihon", "Nihon"}, {"oxygen", "Oxygen U"},
-        {"comet", "Comet"}, {"vegax", "Vega X"}, {"jjsploit", "JJSploit"},
-    }
-
-    for _, env in ipairs(envs) do
-        local found = nil
-        pcall(function()
-            for key, value in pairs(env) do
-                if not found and type(key) == "string" and value ~= nil and value ~= false then
-                    local lowerKey = string.lower(key)
-                    for _, item in ipairs(known) do
-                        if lowerKey == item[1]
-                            or lowerKey == item[1] .. "_loaded"
-                            or lowerKey == item[1] .. "loaded" then
-                            found = item[2]
-                            break
-                        end
-                    end
-                end
-            end
-        end)
-        if found then
-            return found
-        end
-    end
-
-    return "Unknown"
-end
-
-executorValue.Text = detectExecutorName()
-
-makeLabel(rightPanel, "StatusTitle", "Status", UDim2.fromOffset(85, 18), UDim2.fromOffset(28, 136), Enum.Font.GothamMedium, 13, Color3.fromRGB(165, 165, 170))
-local statusValue = makeLabel(rightPanel, "StatusValue", "Key required", UDim2.fromOffset(108, 18), UDim2.fromOffset(116, 136), Enum.Font.GothamMedium, 13, Color3.fromRGB(210, 210, 215))
-statusValue.TextXAlignment = Enum.TextXAlignment.Right
-
-local statusDivider = Instance.new("Frame")
-statusDivider.Position = UDim2.fromOffset(28, 164)
-statusDivider.Size = UDim2.fromOffset(196, 1)
-statusDivider.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-statusDivider.BorderSizePixel = 0
-statusDivider.ZIndex = 11
-statusDivider.Parent = rightPanel
-
-local function makeIconButton(name, posX, labelText, fallbackText, fallbackColor, fallbackSize)
+local function makeIconButton(name, posX, labelText, iconW, iconH)
     local button = Instance.new("TextButton")
     button.Name = name
-    button.Size = UDim2.fromOffset(94, 40)
-    button.Position = UDim2.fromOffset(posX, 176)
+    button.Size = UDim2.fromOffset(144, 40)
+    button.Position = UDim2.fromOffset(posX, 238)
     button.BackgroundColor3 = COLORS.Surface
     button.BorderSizePixel = 0
     button.Text = ""
     button.AutoButtonColor = false
     button.ZIndex = 11
-    button.Parent = rightPanel
+    button.Parent = leftPanel
     makeCorner(button, 6)
 
     local stroke = Instance.new("UIStroke")
@@ -703,28 +872,22 @@ local function makeIconButton(name, posX, labelText, fallbackText, fallbackColor
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     layout.VerticalAlignment = Enum.VerticalAlignment.Center
     layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding = UDim.new(0, 6)
+    layout.Padding = UDim.new(0, 8)
     layout.Parent = row
 
-    local image = Instance.new("ImageLabel")
-    image.Name = "Icon"
-    image.Size = UDim2.fromOffset(22, 22)
-    image.BackgroundTransparency = 1
-    image.ScaleType = Enum.ScaleType.Fit
-    image.Visible = false
-    image.LayoutOrder = 1
-    image.ZIndex = 12
-    image.Parent = row
-
-    local fallback = makeLabel(row, "Fallback", fallbackText, UDim2.fromOffset(22, 22), UDim2.fromOffset(0, 0), Enum.Font.GothamBold, fallbackSize, fallbackColor)
-    fallback.TextXAlignment = Enum.TextXAlignment.Center
-    fallback.LayoutOrder = 1
+    local holder = Instance.new("Frame")
+    holder.Name = "Icon"
+    holder.Size = UDim2.fromOffset(iconW, iconH)
+    holder.BackgroundTransparency = 1
+    holder.LayoutOrder = 1
+    holder.ZIndex = 12
+    holder.Parent = row
 
     local nameLabel = makeLabel(row, "Name", labelText, UDim2.fromOffset(0, 22), UDim2.fromOffset(0, 0), Enum.Font.GothamMedium, 12, Color3.fromRGB(235, 235, 235))
     nameLabel.AutomaticSize = Enum.AutomaticSize.X
     nameLabel.LayoutOrder = 2
 
-    return button, stroke, image, fallback
+    return button, stroke, holder
 end
 
 local function addHoverGlow(button, stroke, glowColor, hoverBg)
@@ -764,14 +927,18 @@ local function addHoverGlow(button, stroke, glowColor, hoverBg)
         end
     end
 end
+local DISCORD_W, DISCORD_H = 30, 23
+local YOUTUBE_W, YOUTUBE_H = 34, 24
 
-local discordButton, discordStroke, discordImg, discordFallback = makeIconButton("DiscordCard", 28, "Discord", "◉", Color3.fromRGB(130, 145, 255), 18)
-local websiteButton, websiteStroke, youtubeImg, youtubeFallback = makeIconButton("WebsiteCard", 130, "YouTube", "▶", Color3.fromRGB(255, 60, 60), 16)
+local discordButton, discordStroke, discordHolder = makeIconButton("DiscordCard", 29, "Discord", DISCORD_W, DISCORD_H)
+local websiteButton, websiteStroke, youtubeHolder = makeIconButton("WebsiteCard", 185, "YouTube", YOUTUBE_W, YOUTUBE_H)
+
+applyIcon(discordHolder, DISCORD_W * 2, DISCORD_H * 2, buildDiscordFrames, renderDiscordPixels)
+applyIcon(youtubeHolder, YOUTUBE_W * 2, YOUTUBE_H * 2, buildYouTubeFrames, renderYouTubePixels)
 
 local restoreDiscordHover = addHoverGlow(discordButton, discordStroke, Color3.fromRGB(130, 145, 255))
 local restoreYoutubeHover = addHoverGlow(websiteButton, websiteStroke, Color3.fromRGB(255, 60, 60))
 
--- Get a key
 addHoverGlow(getKeyButton, getStroke, Color3.fromRGB(70, 70, 70), Color3.fromRGB(28, 28, 28))
 
 getKeyButton.MouseEnter:Connect(function()
@@ -781,7 +948,6 @@ getKeyButton.MouseLeave:Connect(function()
     tween(getKeyButton, {TextColor3 = Color3.fromRGB(150, 150, 155)}, 0.15)
 end)
 
--- Submit
 local submitStroke = Instance.new("UIStroke")
 submitStroke.Color = Color3.fromRGB(155, 210, 255)
 submitStroke.Thickness = 1
@@ -789,62 +955,15 @@ submitStroke.Transparency = 1
 submitStroke.Parent = submitButton
 addHoverGlow(submitButton, submitStroke, Color3.fromRGB(200, 235, 255), Color3.fromRGB(190, 230, 255))
 
-task.spawn(function()
-    local image = getWebImage(ICON_URLS.Discord, "icon_discord.png")
-    if image and discordImg.Parent then
-        discordImg.Image = image
-        discordImg.Visible = true
-        discordFallback.Visible = false
-    end
-end)
-
-task.spawn(function()
-    local image = getWebImage(ICON_URLS.YouTube, "icon_youtube.png")
-    if image and youtubeImg.Parent then
-        youtubeImg.Image = image
-        youtubeImg.Visible = true
-        youtubeFallback.Visible = false
-    end
-end)
-
 --============================================================
 -- STATUS AND GAME DETECTION
 --============================================================
 
-local function updateDetectedGame(name, subtitleText, iconId)
-    detectedGameName.Text = tostring(name or "Unknown game")
-    detectedGameSub.Text = tostring(subtitleText or "Universal script")
-    local id = tonumber(iconId) or tonumber(game.GameId) or tonumber(game.PlaceId)
-    if id then
-        gameIcon.Image = "rbxthumb://type=GameIcon&id=" .. tostring(id) .. "&w=150&h=150"
-    end
-end
-
-local function updateKeyStatus(message, color)
-    local lower = string.lower(tostring(message or ""))
-    if color == COLORS.Success or lower:find("hợp lệ", 1, true)
-        or lower:find("đã tải", 1, true) or lower:find("valid", 1, true) then
-        statusValue.Text = "Key valid"
-        statusValue.TextColor3 = COLORS.Success
-    elseif color == COLORS.Info or lower:find("đang", 1, true)
-        or lower:find("checking", 1, true) or lower:find("loading", 1, true) then
-        statusValue.Text = "Checking..."
-        statusValue.TextColor3 = COLORS.Info
-    elseif color == COLORS.Danger or lower:find("không đúng", 1, true)
-        or lower:find("không thể", 1, true) or lower:find("lỗi", 1, true)
-        or lower:find("error", 1, true) then
-        statusValue.Text = "Invalid / error"
-        statusValue.TextColor3 = COLORS.Danger
-    else
-        statusValue.Text = "Key required"
-        statusValue.TextColor3 = COLORS.Warning
-    end
-end
+local function updateDetectedGame() end
 
 local function setStatus(message, color)
     keyStatus.Text = tostring(message or "")
     keyStatus.TextColor3 = color or COLORS.Text
-    updateKeyStatus(message, color)
 end
 
 local function getUniverseId(placeId)
@@ -897,46 +1016,6 @@ local function findGameConfig(placeId, universeId)
     return nil, nil, nil
 end
 
-local function fetchRobloxGameName()
-    local placeId = tonumber(game.PlaceId)
-    local universeId = tonumber(game.GameId)
-
-    for _, config in pairs(GAME_HO_TRO) do
-        if containsId(config.PlaceId, placeId) or containsId(config.UniverseId, universeId) then
-            return config.Name
-        end
-    end
-
-    if universeId and universeId > 0 then
-        local ok, response = pcall(function()
-            return game:HttpGet("https://games.roblox.com/v1/games?universeIds=" .. tostring(universeId))
-        end)
-        if ok and type(response) == "string" then
-            local decodeOK, data = pcall(function()
-                return HttpService:JSONDecode(response)
-            end)
-            if decodeOK and type(data) == "table" and type(data.data) == "table" then
-                local info = data.data[1]
-                if info and type(info.name) == "string" and info.name ~= "" then
-                    local upperName = string.upper(info.name)
-                    if not upperName:find("TITLE UNAVAILABLE", 1, true) then
-                        return info.name
-                    end
-                end
-            end
-        end
-    end
-
-    local ok, info = pcall(function()
-        return MarketplaceService:GetProductInfo(placeId, Enum.InfoType.Asset)
-    end)
-    if ok and type(info) == "table" and type(info.Name) == "string" and info.Name ~= "" then
-        return info.Name
-    end
-
-    return "Place ID " .. tostring(placeId or "Unknown")
-end
-
 local function resolveGame()
     State.PlaceId = tonumber(game.PlaceId)
     if not State.PlaceId or State.PlaceId <= 0 then
@@ -954,7 +1033,7 @@ local function resolveGame()
         State.GameConfig = nil
         State.MainUI = nil
         State.GameKey = nil
-        updateDetectedGame(State.RobloxGameName or ("Place ID " .. tostring(State.PlaceId)), "Universal mode", game.GameId or State.PlaceId)
+        updateDetectedGame()
         return false, "Game không được hỗ trợ."
     end
 
@@ -969,8 +1048,7 @@ local function resolveGame()
     State.GameKey = configKey
     State.GameSupported = true
 
-    local iconId = (type(config.UniverseId) == "table" and config.UniverseId[1]) or game.GameId or State.PlaceId
-    updateDetectedGame(State.RobloxGameName or State.GameName, "Supported game", iconId)
+    updateDetectedGame()
     setStatus("Đã nhận diện: " .. State.GameName .. " (" .. tostring(matchType) .. ")", COLORS.Success)
     return true
 end
@@ -1243,7 +1321,7 @@ local function attemptSubmit()
     State.KeyValid = true
     State.Key = key
     saveKey(key)
-    setStatus("KEY hợp lệ! Đang nhận diện game...", COLORS.Success)
+    setStatus("KEY hợp lệ!", COLORS.Success)
     State.Submitting = false
     loadMainUI()
 end
@@ -1256,32 +1334,8 @@ keyInput.FocusLost:Connect(function(enterPressed)
 end)
 
 --============================================================
--- INITIAL GAME INFO AND AUTO-VERIFY SAVED KEY
+-- AUTO-VERIFY SAVED KEY
 --============================================================
-
-task.spawn(function()
-    local initialConfig = nil
-    for _, config in pairs(GAME_HO_TRO) do
-        if containsId(config.PlaceId, game.PlaceId)
-            or containsId(config.UniverseId, game.GameId) then
-            initialConfig = config
-            break
-        end
-    end
-
-    State.GameSupported = initialConfig ~= nil
-    if initialConfig then
-        updateDetectedGame("Detecting game...", "Supported game", initialConfig.UniverseId and initialConfig.UniverseId[1] or game.GameId or game.PlaceId)
-    else
-        updateDetectedGame("Detecting game...", "Universal mode", game.GameId or game.PlaceId)
-    end
-
-    local actualName = fetchRobloxGameName()
-    State.RobloxGameName = actualName
-    if detectedGameName and detectedGameName.Parent then
-        detectedGameName.Text = actualName
-    end
-end)
 
 task.spawn(function()
     local savedKey = getSavedKey()
