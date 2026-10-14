@@ -510,7 +510,6 @@ local function applyIcon(holder, texW, texH, buildFrames, renderPixels)
     end)
 end
 
-
 --============================================================
 -- KEY FILE
 --============================================================
