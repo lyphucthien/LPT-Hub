@@ -15,8 +15,9 @@ local GET_KEY_LINK = "https://work.ink/34tV/lpt-hub-script-key-mission"
 local DISCORD_LINK = "https://discord.gg/gyZ27Hw9qu"
 local YOUTUBE_LINK = "https://youtube.com/@lyphucthien1803"
 local KEY_API_URL = "https://lyphucthien.vercel.app/api/get-key"
+local RAW_LINK = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/main/"
 
-local UNIVERSAL_SCRIPT_URL ="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/main/Script%20Cho%20Game%20Ko%20H%E1%BB%97%20Tr%E1%BB%A3/Script.lua"
+local UNIVERSAL_SCRIPT = RAW_LINK .. "Script%20Cho%20Game%20Ko%20H%E1%BB%97%20Tr%E1%BB%A3/Script.lua"
 
 local GAME_HO_TRO = {
     ["+1 Speed Keyboard Escape"] = {
@@ -24,7 +25,7 @@ local GAME_HO_TRO = {
         PlaceId = {95082159892680},
         UniverseId = {9584852943},
         WaitForDataLoaded = false,
-        MainUI = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/main/%2B1%20Speed%20Keyboard%20Escape/Main.lua",
+        MainUI = RAW_LINK .. "%2B1%20Speed%20Keyboard%20Escape/Main.lua",
     },
 
     ["Blox Fruits"] = {
@@ -32,7 +33,7 @@ local GAME_HO_TRO = {
         PlaceId = {85211729168715},
         UniverseId = {994732206},
         WaitForDataLoaded = false,
-        MainUI = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/main/Blox%20Fruits/Main.lua",
+        MainUI = RAW_LINK .. "Blox%20Fruits/Main.lua",
     },
 }
 
@@ -1182,7 +1183,7 @@ local function loadMainUI()
 
             setStatus("Universal Mode • Đang tải...", COLORS.Warning)
             task.wait(0.25)
-            executeScript(UNIVERSAL_SCRIPT_URL, "Universal Script")
+            executeScript(UNIVERSAL_SCRIPT, "Universal Script")
             setStatus("Universal đã được tải.", COLORS.Success)
             task.wait(0.2)
             keyFrame.Visible = false
