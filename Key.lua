@@ -1019,9 +1019,6 @@ local function resolveGame()
         return false, "Không lấy được PlaceId."
     end
 
-    setStatus("PlaceId: " .. tostring(State.PlaceId) .. " • Đang nhận diện...", COLORS.Info)
-    task.wait(0.15)
-
     State.UniverseId = getUniverseId(State.PlaceId) or tonumber(game.GameId)
     local config, matchType, configKey = findGameConfig(State.PlaceId, State.UniverseId)
 
@@ -1044,7 +1041,6 @@ local function resolveGame()
     State.GameKey = configKey
     State.GameSupported = true
 
-    setStatus("Đã nhận diện: " .. State.GameName .. " (" .. tostring(matchType) .. ")", COLORS.Success)
     return true
 end
 
@@ -1056,8 +1052,7 @@ local function waitForGameData(config)
     if type(config) ~= "table" or config.WaitForDataLoaded ~= true then
         return true
     end
-
-    setStatus("Đang chờ dữ liệu game...", COLORS.Info)
+    
     local dataLoaded = player:FindFirstChild("DataLoaded")
     if not dataLoaded then
         local ok, result = pcall(function()
@@ -1100,10 +1095,7 @@ local function executeScript(scriptUrl, scriptName)
     local code, err = httpGet(scriptUrl, 3)
 
     if not code then
-        error(
-            scriptName .. ": Không tải được script: " .. tostring(err),
-            0
-        )
+        error(scriptName .. ": Không tải được script: " .. tostring(err),0)
     end
 
     local trimmed = code:gsub("^%s+", ""):gsub("%s+$", "")
@@ -1170,10 +1162,9 @@ local function loadMainUI()
 
     State.Loading = true
     keyFrame.Visible = true
-    setStatus("KEY hợp lệ • Đang nhận diện game...", COLORS.Success)
+    setStatus("Đang Tải Script...", COLORS.Info)
 
     local success, fatalError = pcall(function()
-        task.wait(0.2)
         local resolved, resolveError = resolveGame()
 
         if not resolved then
@@ -1181,26 +1172,17 @@ local function loadMainUI()
                 error(resolveError or "Không nhận diện được game.", 0)
             end
 
-            setStatus("Universal Mode • Đang tải...", COLORS.Warning)
-            task.wait(0.25)
             executeScript(UNIVERSAL_SCRIPT, "Universal Script")
-            setStatus("Universal đã được tải.", COLORS.Success)
-            task.wait(0.2)
             keyFrame.Visible = false
             startExpiryWatcher()
             return
         end
 
-        task.wait(0.25)
         if not waitForGameData(State.GameConfig) then
             error("Game chưa sẵn sàng: DataLoaded chưa hoàn tất.", 0)
         end
 
-        setStatus("Đang tải MainUI...", COLORS.Info)
-        task.wait(0.15)
         executeScript(State.MainUI, "MainUI")
-        setStatus("Đã tải " .. State.GameName, COLORS.Success)
-        task.wait(0.2)
         keyFrame.Visible = false
         startExpiryWatcher()
     end)
@@ -1228,8 +1210,7 @@ local function checkKey(key)
         return false, "Không lấy được HWID của thiết bị."
     end
 
-    local url = KEY_API_URL
-        .. "?type=lpthub" .. "&key=" .. HttpService:UrlEncode(key) .. "&hwid=" .. HttpService:UrlEncode(hwid)
+    local url = KEY_API_URL .. "?type=lpthub" .. "&key=" .. HttpService:UrlEncode(key) .. "&hwid=" .. HttpService:UrlEncode(hwid)
 
     local response, err = httpGet(url)
 
@@ -1323,17 +1304,14 @@ local function attemptSubmit()
     local key = tostring(keyInput.Text or ""):gsub("^%s+", ""):gsub("%s+$", "")
 
     if key == "" then
-        setStatus("Vui lòng nhập KEY.", COLORS.Danger)
+        setStatus("Vui Lòng Nhập Key", COLORS.Danger)
         State.Submitting = false
         return
     end
 
-    setStatus("Đang xác thực KEY...", COLORS.Info)
-    task.wait(0.1)
-
-    local keyIsValid, verifyError = checkKey(key)
+    local keyIsValid = checkKey(key)
     if not keyIsValid then
-        setStatus(verifyError or "Xác thực KEY thất bại.", COLORS.Danger)
+        setStatus("KEY Không Hợp Lệ", COLORS.Danger)
         tween(inputStroke, {Color = COLORS.Danger, Transparency = 0}, 0.1)
         task.wait(0.15)
         tween(inputStroke, {Color = COLORS.Border, Transparency = 0.15}, 0.2)
@@ -1344,8 +1322,9 @@ local function attemptSubmit()
     State.KeyValid = true
     State.Key = key
     saveKey(key)
-    setStatus("KEY hợp lệ!", COLORS.Success)
+    setStatus("Key Hợp Lệ", COLORS.Success)
     State.Submitting = false
+    task.wait(1)
     loadMainUI()
 end
 
@@ -1371,7 +1350,7 @@ task.spawn(function()
         return
     end
     keyInput.Text = savedKey
-    setStatus("Đang xác thực KEY đã lưu...", COLORS.Info)
-    task.wait(0.2)
+    setStatus("Đang Load KEY...", COLORS.Info)
+    task.wait(1)
     attemptSubmit()
 end)
