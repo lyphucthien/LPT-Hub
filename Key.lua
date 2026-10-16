@@ -15,7 +15,8 @@ local GET_KEY_LINK = "https://work.ink/34tV/lpt-hub-script-key-mission"
 local DISCORD_LINK = "https://discord.gg/gyZ27Hw9qu"
 local YOUTUBE_LINK = "https://youtube.com/@lyphucthien1803"
 local KEY_API_URL = "https://lyphucthien.vercel.app/api/get-key"
-local SCRIPT_API_URL = "https://lyphucthien.vercel.app/api/get-script"
+
+local UNIVERSAL_SCRIPT_URL ="https://raw.githubusercontent.com/lyphucthien/LPT-Hub/main/Script%20Cho%20Game%20Ko%20H%E1%BB%97%20Tr%E1%BB%A3/Script.lua"
 
 local GAME_HO_TRO = {
     ["+1 Speed Keyboard Escape"] = {
@@ -23,24 +24,16 @@ local GAME_HO_TRO = {
         PlaceId = {95082159892680},
         UniverseId = {9584852943},
         WaitForDataLoaded = false,
-        MainUI = "server",
+        MainUI = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/main/%2B1%20Speed%20Keyboard%20Escape/Main.lua",
     },
+
     ["Blox Fruits"] = {
         Name = "Blox Fruits",
         PlaceId = {85211729168715},
         UniverseId = {994732206},
         WaitForDataLoaded = false,
-        MainUI = "server",
+        MainUI = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/main/Blox%20Fruits/Main.lua",
     },
-}
-
-local SERVER_ERRORS = {
-    ["invalid key"] = "KEY không hợp lệ.",
-    ["key expired"] = "KEY đã hết hạn. Hãy lấy key mới.",
-    ["key bound to another device"] = "KEY đã gắn với thiết bị khác.",
-    ["bad request"] = "Yêu cầu gửi lên server không hợp lệ.",
-    ["upstream error"] = "Server không lấy được script từ kho. Hãy báo admin.",
-    ["server error"] = "Lỗi máy chủ. Hãy thử lại sau.",
 }
 
 local LPT_HUB_FOLDER = "LPT Hub"
@@ -201,7 +194,12 @@ local function getHWID()
     local ok, id = pcall(function()
         return game:GetService("RbxAnalyticsService"):GetClientId()
     end)
-    return ok and id or "unknown"
+
+    if not ok or type(id) ~= "string" or id == "" then
+        return nil
+    end
+
+    return id
 end
 
 local DISCORD_RGB = {88 / 255, 101 / 255, 242 / 255}
@@ -959,8 +957,6 @@ addHoverGlow(submitButton, submitStroke, Color3.fromRGB(200, 235, 255), Color3.f
 -- STATUS AND GAME DETECTION
 --============================================================
 
-local function updateDetectedGame() end
-
 local function setStatus(message, color)
     keyStatus.Text = tostring(message or "")
     keyStatus.TextColor3 = color or COLORS.Text
@@ -1033,7 +1029,6 @@ local function resolveGame()
         State.GameConfig = nil
         State.MainUI = nil
         State.GameKey = nil
-        updateDetectedGame()
         return false, "Game không được hỗ trợ."
     end
 
@@ -1048,7 +1043,6 @@ local function resolveGame()
     State.GameKey = configKey
     State.GameSupported = true
 
-    updateDetectedGame()
     setStatus("Đã nhận diện: " .. State.GameName .. " (" .. tostring(matchType) .. ")", COLORS.Success)
     return true
 end
@@ -1084,57 +1078,70 @@ local function waitForGameData(config)
     return true
 end
 
-local function executeScript(scriptId, scriptName)
+--============================================================
+-- LOCAL SCRIPT LOADERS
+--============================================================
+
+local RAW_PREFIX = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/main/"
+
+local function executeScript(scriptUrl, scriptName)
     scriptName = tostring(scriptName or "Script")
-    if not State.Key then
-        error(scriptName .. ": Chưa có KEY.", 0)
-    end
-    if type(scriptId) ~= "string" or scriptId == "" then
-        error(scriptName .. ": Thiếu ID script.", 0)
+
+    if not State.KeyValid or not State.Key then
+        error(scriptName .. ": KEY chưa được xác thực.", 0)
     end
 
-    local url = SCRIPT_API_URL
-        .. "?key=" .. HttpService:UrlEncode(State.Key)
-        .. "&hwid=" .. HttpService:UrlEncode(getHWID())
-        .. "&script=" .. HttpService:UrlEncode(scriptId)
+    if type(scriptUrl) ~= "string"
+        or scriptUrl:sub(1, #RAW_PREFIX) ~= RAW_PREFIX then
+        error(scriptName .. ": URL raw không hợp lệ.", 0)
+    end
 
-    local code, err = httpGet(url)
+    local code, err = httpGet(scriptUrl, 3)
+
     if not code then
-        error(scriptName .. ": Lỗi tải dữ liệu: " .. tostring(err), 0)
-    end
-    if code:match("^%s*$") then
-        error(scriptName .. ": Nội dung tải về rỗng.", 0)
+        error(
+            scriptName .. ": Không tải được script: " .. tostring(err),
+            0
+        )
     end
 
     local trimmed = code:gsub("^%s+", ""):gsub("%s+$", "")
-    local serverMessage = SERVER_ERRORS[string.lower(trimmed)]
-    if serverMessage then
-        error(scriptName .. ": " .. serverMessage, 0)
+
+    if trimmed == "" then
+        error(scriptName .. ": File raw rỗng.", 0)
     end
 
     local prefix = string.lower(code:sub(1, 512))
-    if prefix:match("^%s*<!doctype") or prefix:match("^%s*<html") then
-        error(scriptName .. ": Máy chủ trả về HTML thay vì mã Luau.", 0)
-    end
-    if type(loadstring) ~= "function" then
-        error(scriptName .. ": Môi trường hiện tại không hỗ trợ loadstring.", 0)
+
+    if prefix:match("^%s*<!doctype")
+        or prefix:match("^%s*<html") then
+        error(scriptName .. ": URL trả về HTML thay vì mã Luau.", 0)
     end
 
-    local compileCallOK, chunk, compileError = pcall(loadstring, code)
-    if not compileCallOK then
+    if trimmed == "404: Not Found" then
+        error(scriptName .. ": Không tìm thấy file trên GitHub.", 0)
+    end
+
+    if type(loadstring) ~= "function" then
+        error(scriptName .. ": Môi trường không hỗ trợ loadstring.", 0)
+    end
+
+    local compileOK, chunk, compileError = pcall(loadstring, code)
+
+    if not compileOK then
         error(scriptName .. ": Lỗi biên dịch: " .. tostring(chunk), 0)
     end
+
     if type(chunk) ~= "function" then
-        if #trimmed < 80 and not trimmed:find("\n", 1, true) then
-            error(scriptName .. ": Server trả về: " .. trimmed, 0)
-        end
-        error(scriptName .. ": Mã Luau không hợp lệ: " .. tostring(compileError), 0)
+        error(scriptName .. ": Mã Luau không hợp lệ: " .. tostring(compileError),0)
     end
 
     local runOK, runError = pcall(chunk)
+
     if not runOK then
         error(scriptName .. ": Lỗi khi chạy: " .. tostring(runError), 0)
     end
+
     return true
 end
 
@@ -1175,7 +1182,7 @@ local function loadMainUI()
 
             setStatus("Universal Mode • Đang tải...", COLORS.Warning)
             task.wait(0.25)
-            executeScript("universal", "Universal Script")
+            executeScript(UNIVERSAL_SCRIPT_URL, "Universal Script")
             setStatus("Universal đã được tải.", COLORS.Success)
             task.wait(0.2)
             keyFrame.Visible = false
@@ -1190,7 +1197,7 @@ local function loadMainUI()
 
         setStatus("Đang tải MainUI...", COLORS.Info)
         task.wait(0.15)
-        executeScript(State.GameKey, "MainUI")
+        executeScript(State.MainUI, "MainUI")
         setStatus("Đã tải " .. State.GameName, COLORS.Success)
         task.wait(0.2)
         keyFrame.Visible = false
@@ -1214,22 +1221,37 @@ local function checkKey(key)
         return false, "Vui lòng nhập KEY."
     end
 
-    local response = httpGet(KEY_API_URL .. "?type=lpthub&key=" .. HttpService:UrlEncode(key))
+    local hwid = getHWID()
+
+    if not hwid then
+        return false, "Không lấy được HWID của thiết bị."
+    end
+
+    local url = KEY_API_URL
+        .. "?type=lpthub" .. "&key=" .. HttpService:UrlEncode(key) .. "&hwid=" .. HttpService:UrlEncode(hwid)
+
+    local response, err = httpGet(url)
+
     if not response then
-        return false, "Không kết nối được máy chủ xác thực."
+        return false, "Không đọc được phản hồi xác thực từ máy chủ."
     end
 
     local decodeOK, data = pcall(function()
         return HttpService:JSONDecode(response)
     end)
+
     if not decodeOK or type(data) ~= "table" then
         return false, "Phản hồi xác thực không hợp lệ."
     end
+
     if data.valid ~= true then
         if data.expired == true then
             return false, "KEY đã hết hạn. Hãy lấy key mới."
         end
-        return false, "KEY không đúng hoặc không còn hợp lệ."
+
+        return false, tostring(
+            data.error or "KEY không hợp lệ hoặc đã gắn với thiết bị khác."
+        )
     end
 
     State.ExpiresAt = tonumber(data.expiresAt)
