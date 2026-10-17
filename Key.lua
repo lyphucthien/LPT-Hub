@@ -544,15 +544,13 @@ local function getSavedKey()
             return nil
         end
 
-        if savedAt then
-            local now = os.time()
-            if savedAt > now + 60 or now - savedAt > KEY_DURATION then
-                if type(delfile) == "function" then
-                    pcall(delfile, KEY_FILE)
-                end
-                return nil
+        if savedAt and savedAt > os.time() + 60 then
+            if type(delfile) == "function" then
+                pcall(delfile, KEY_FILE)
             end
+            return nil
         end
+
         return key
     end
 
@@ -576,6 +574,21 @@ local function saveKey(key)
         writefile(KEY_FILE, content)
     end)
     return writeOK
+end
+
+local function deleteSavedKey()
+    if type(delfile) ~= "function" then
+        warn("LPT Hub: Executor không hỗ trợ delfile.")
+        return false
+    end
+
+    local ok = pcall(function()
+        if type(isfile) ~= "function" or isfile(KEY_FILE) then
+            delfile(KEY_FILE)
+        end
+    end)
+
+    return ok
 end
 
 --============================================================
@@ -1078,17 +1091,15 @@ end
 -- LOCAL SCRIPT LOADERS
 --============================================================
 
-local RAW_PREFIX = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/main/"
-
 local function executeScript(scriptUrl, scriptName)
-    scriptName = tostring(scriptName or "Script")
+    scriptName = tostring(scriptName or "LPT Hub")
 
     if not State.KeyValid or not State.Key then
         error(scriptName .. ": KEY chưa được xác thực.", 0)
     end
 
     if type(scriptUrl) ~= "string"
-        or scriptUrl:sub(1, #RAW_PREFIX) ~= RAW_PREFIX then
+        or scriptUrl:sub(1, #RAW_LINK) ~= RAW_LINK then
         error(scriptName .. ": URL raw không hợp lệ.", 0)
     end
 
@@ -1147,7 +1158,7 @@ local function startExpiryWatcher()
     task.spawn(function()
         while screenGui and screenGui.Parent do
             task.wait(1)
-            if State.ExpiresAt and State.ExpiresAt / 1000 - os.time() <= 0 then
+            if State.ExpiresAt and State.ExpiresAt - os.time() <= 0 then
                 showExpiredOverlay()
                 break
             end
@@ -1174,7 +1185,6 @@ local function loadMainUI()
 
             executeScript(UNIVERSAL_SCRIPT, "Universal Script")
             keyFrame.Visible = false
-            startExpiryWatcher()
             return
         end
 
@@ -1184,7 +1194,6 @@ local function loadMainUI()
 
         executeScript(State.MainUI, "MainUI")
         keyFrame.Visible = false
-        startExpiryWatcher()
     end)
 
     if not success then
@@ -1201,13 +1210,13 @@ end
 
 local function checkKey(key)
     if type(key) ~= "string" or key == "" then
-        return false, "Vui lòng nhập KEY."
+        return false, "Vui lòng nhập KEY", false
     end
 
     local hwid = getHWID()
 
     if not hwid then
-        return false, "Không lấy được HWID của thiết bị."
+        return false, "Không lấy được HWID của thiết bị", false
     end
 
     local url = KEY_API_URL .. "?type=lpthub" .. "&key=" .. HttpService:UrlEncode(key) .. "&hwid=" .. HttpService:UrlEncode(hwid)
@@ -1215,7 +1224,7 @@ local function checkKey(key)
     local response, err = httpGet(url)
 
     if not response then
-        return false, "Không đọc được phản hồi xác thực từ máy chủ."
+        return false, "Không đọc được phản hồi xác thực từ máy chủ", false
     end
 
     local decodeOK, data = pcall(function()
@@ -1223,21 +1232,34 @@ local function checkKey(key)
     end)
 
     if not decodeOK or type(data) ~= "table" then
-        return false, "Phản hồi xác thực không hợp lệ."
+        return false, "Phản hồi xác thực không hợp lệ", false
+    end
+
+    if data.expired == true then
+        return false, "Key Đã Hết Hạn", true
     end
 
     if data.valid ~= true then
-        if data.expired == true then
-            return false, "KEY đã hết hạn. Hãy lấy key mới."
-        end
-
-        return false, tostring(
-            data.error or "KEY không hợp lệ hoặc đã gắn với thiết bị khác."
-        )
+        return false, tostring(data.error or "KEY không hợp lệ hoặc đã gắn với thiết bị khác"), false
     end
 
-    State.ExpiresAt = tonumber(data.expiresAt)
-    return true
+    local expiresAt = tonumber(data.expiresAt)
+
+    if expiresAt then
+        if expiresAt > 100000000000 then
+            expiresAt = math.floor(expiresAt / 1000)
+        end
+
+        State.ExpiresAt = expiresAt
+
+        if expiresAt <= os.time() then
+            return false, "Key Đã Hết Hạn", true
+        end
+    else
+        State.ExpiresAt = nil
+    end
+
+    return true, nil, false
 end
 
 --============================================================
@@ -1309,22 +1331,37 @@ local function attemptSubmit()
         return
     end
 
-    local keyIsValid = checkKey(key)
-    if not keyIsValid then
-        setStatus("KEY Không Hợp Lệ", COLORS.Danger)
-        tween(inputStroke, {Color = COLORS.Danger, Transparency = 0}, 0.1)
-        task.wait(0.15)
-        tween(inputStroke, {Color = COLORS.Border, Transparency = 0.15}, 0.2)
-        State.Submitting = false
-        return
+    local keyIsValid, keyError, keyExpired = checkKey(key)
+
+if not keyIsValid then
+    if keyExpired then
+        State.KeyValid = false
+        State.Key = nil
+        State.ExpiresAt = nil
+
+        setStatus("Key Đã Hết Hạn", COLORS.Danger)
+        showExpiredOverlay()
+        deleteSavedKey()
+
+        keyInput.Text = ""
+    else
+        setStatus(keyError or "KEY Không Hợp Lệ", COLORS.Danger)
     end
+
+    tween(inputStroke, {Color = COLORS.Danger,Transparency = 0}, 0.1)
+    task.wait(0.15)
+    tween(inputStroke, {Color = COLORS.Border,Transparency = 0.15}, 0.2)
+
+    State.Submitting = false
+    return
+end
 
     State.KeyValid = true
     State.Key = key
     saveKey(key)
     setStatus("Key Hợp Lệ", COLORS.Success)
     State.Submitting = false
-    task.wait(1)
+    task.wait(0.7)
     loadMainUI()
 end
 
@@ -1351,6 +1388,6 @@ task.spawn(function()
     end
     keyInput.Text = savedKey
     setStatus("Đang Load KEY...", COLORS.Info)
-    task.wait(1)
+    task.wait(0.7)
     attemptSubmit()
 end)
