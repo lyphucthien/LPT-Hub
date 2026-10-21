@@ -193,7 +193,7 @@ local FightingStyleFallbackPositions = {
         ["Death Step"] = { Name = "Castle on the Sea", Position = Vector3.new(-5097, 330, -3177) },
         ["Sharkman Karate"] = { Name = "Castle on the Sea", Position = Vector3.new(-5097, 330, -3177) },
         ["Electric Claw"] = { Name = "Floating Turtle", Position = Vector3.new(-12164, 380, -8454) },
-        ["Dragon Talon"] = { Name = "Haunted Castle", Position = Vector3.new(-9512, 160, 5548) },
+        ["Dragon Talon"] = { Name = "Hydra Island - Dragon Dojo", Position = Vector3.new(5660, 610, -280) },
         ["God Human"] = { Name = "Floating Turtle", Position = Vector3.new(-12164, 380, -8454) },
         ["Sanguine Art"] = { Name = "Tiki Outpost", Position = Vector3.new(-16200, 50, 450) },
     },
@@ -203,6 +203,43 @@ local function getFightingStyleFallback(styleName)
     local seaFallbacks = FightingStyleFallbackPositions[game.PlaceId]
     return seaFallbacks and seaFallbacks[styleName] or nil
 end
+
+
+-- Third Sea's native Portal network. The entrance points below are portal/area
+-- landmarks used by the game's requestEntrance route. The server still decides
+-- whether the route is unlocked and available.
+local ThirdSeaPortalRoutes = {
+    ["Castle on the Sea"] = {
+        IslandCenter = Vector3.new(-5097, 315, -3130),
+        Entrance = Vector3.new(-5092, 315, -3130),
+    },
+    ["Floating Turtle"] = {
+        IslandCenter = Vector3.new(-12164, 380, -8454),
+        Entrance = Vector3.new(-12471.17, 374.94, -7551.68), -- Mansion portal
+    },
+    ["Hydra Island"] = {
+        IslandCenter = Vector3.new(5229, 610, 345),
+        Entrance = Vector3.new(5756, 610, -282), -- Hydra portal
+    },
+    ["Tiki Outpost"] = {
+        IslandCenter = Vector3.new(-16500, 50, 450),
+        Entrance = Vector3.new(-16218.68, 9.09, 445.62), -- Tiki portal area
+    },
+}
+
+local ThirdSeaStyleDestinations = {
+    ["Dark Step"] = "Castle on the Sea",
+    ["Electric"] = "Castle on the Sea",
+    ["Water Kung Fu"] = "Castle on the Sea",
+    ["Dragon Breath"] = "Castle on the Sea",
+    ["Superhuman"] = "Castle on the Sea",
+    ["Death Step"] = "Castle on the Sea",
+    ["Sharkman Karate"] = "Castle on the Sea",
+    ["Electric Claw"] = "Floating Turtle",
+    ["Dragon Talon"] = "Hydra Island",
+    ["God Human"] = "Floating Turtle",
+    ["Sanguine Art"] = "Tiki Outpost",
+}
 
 -- Tool names used by the game can differ slightly from the UI labels.
 local FightingStyleToolNames = {
@@ -313,6 +350,75 @@ local function getFightingStyleRemote()
     end
 
     return nil
+end
+
+local function tryNativeThirdSeaPortal(styleName)
+    if destroyed or game.PlaceId ~= 7449423635 then
+        return false
+    end
+
+    local destinationName = ThirdSeaStyleDestinations[styleName]
+    local route = destinationName and ThirdSeaPortalRoutes[destinationName]
+    if not route then
+        return false
+    end
+
+    local character = getCharacter()
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not root or not humanoid or humanoid.Health <= 0 then
+        return false
+    end
+
+    -- If already on the destination island, do not attempt a portal trip.
+    if (root.Position - route.IslandCenter).Magnitude <= 1100 then
+        return false
+    end
+
+    local remote = getFightingStyleRemote()
+    if not remote then
+        return false
+    end
+
+    local startPosition = root.Position
+    notify("Đang thử cổng dịch chuyển trong game tới " .. destinationName)
+
+    local ok, result = pcall(function()
+        return remote:InvokeServer("requestEntrance", route.Entrance)
+    end)
+
+    if not ok then
+        notify("Cổng game không nhận yêu cầu tới " .. destinationName .. "; sẽ thử đường bay thẳng")
+        return false
+    end
+
+    -- The server may apply the transition shortly after the remote returns.
+    local deadline = os.clock() + 2.5
+    repeat
+        if destroyed then
+            return false
+        end
+
+        character = getCharacter()
+        root = character and character:FindFirstChild("HumanoidRootPart")
+        if not root then
+            task.wait(0.1)
+        else
+            local distanceToDestination = (root.Position - route.IslandCenter).Magnitude
+            local displacement = (root.Position - startPosition).Magnitude
+
+            if distanceToDestination <= 1600 and displacement >= 250 then
+                notify("Đã dùng cổng game tới " .. destinationName)
+                task.wait(0.6)
+                return true
+            end
+
+            task.wait(0.1)
+        end
+    until os.clock() >= deadline
+
+    -- Do not claim a teleport happened merely because the remote call returned.
+    return false
 end
 
 local function findFightingStyleTool(styleName)
@@ -539,7 +645,7 @@ function ShopModule:FindFightingStyleNPC(styleName, silent)
 end
 
 --========================================================
--- LONG-DISTANCE FLIGHT
+-- DIRECT FLIGHT (SHORTEST STRAIGHT-LINE ROUTE)
 --========================================================
 
 local FLY_SPEED = 200
@@ -564,60 +670,42 @@ function ShopModule:FlyToPosition(destination, label, tolerance)
         return true
     end
 
-    local deadline = os.clock() + math.max(initialDistance / FLY_SPEED * 2.5, 25)
-    local cruiseY = math.max(root.Position.Y, destination.Y, 250) + 140
-    local liftPoint = Vector3.new(root.Position.X, cruiseY, root.Position.Z)
-    local cruisePoint = Vector3.new(destination.X, cruiseY, destination.Z)
-
-    notify("Bay đường dài tới " .. tostring(label or "điểm đến")
+    local deadline = os.clock() + math.max(initialDistance / FLY_SPEED * 2.5, 20)
+    notify("Bay thẳng tới " .. tostring(label or "điểm đến")
         .. " • " .. tostring(math.floor(initialDistance)) .. " studs")
 
-    local function moveLeg(target)
-        while not destroyed and os.clock() < deadline do
-            if player.Character ~= character
-                or not root.Parent
-                or humanoid.Health <= 0 then
-                return false
-            end
-
-            local delta = target - root.Position
-            local distance = delta.Magnitude
-            if distance <= tolerance then
-                return true
-            end
-
-            local dt = RunService.Heartbeat:Wait()
-            if not dt or dt <= 0 then
-                dt = 1 / 60
-            end
-
-            local step = math.min(distance, FLY_SPEED * dt)
-            local nextPosition = root.Position + delta.Unit * step
-
-            -- Preserve current rotation so the character doesn't spin wildly.
-            root.CFrame = CFrame.new(nextPosition) * root.CFrame.Rotation
-            root.AssemblyLinearVelocity = Vector3.zero
+    while not destroyed and os.clock() < deadline do
+        if player.Character ~= character
+            or not root.Parent
+            or humanoid.Health <= 0 then
+            return false
         end
 
-        return false
+        local delta = destination - root.Position
+        local distance = delta.Magnitude
+        if distance <= tolerance then
+            return true
+        end
+
+        local dt = RunService.Heartbeat:Wait()
+        if not dt or dt <= 0 then
+            dt = 1 / 60
+        end
+
+        local step = math.min(distance, FLY_SPEED * dt)
+        local nextPosition = root.Position + delta.Unit * step
+
+        -- Advance directly toward the goal without adding an altitude offset.
+        root.CFrame = CFrame.new(nextPosition) * root.CFrame.Rotation
+        root.AssemblyLinearVelocity = Vector3.zero
     end
 
-    if not moveLeg(liftPoint) then
-        notify("Không thể rời vị trí hiện tại để bay tới " .. tostring(label or "điểm đến"))
-        return false
+    if not destroyed then
+        notify("Hết thời gian di chuyển tới " .. tostring(label or "điểm đến"))
     end
 
-    if not moveLeg(cruisePoint) then
-        notify("Không thể bay đường dài tới " .. tostring(label or "điểm đến"))
-        return false
-    end
-
-    if not moveLeg(destination) then
-        notify("Không thể hạ xuống tại " .. tostring(label or "điểm đến"))
-        return false
-    end
-
-    return player.Character == character
+    return not destroyed
+        and player.Character == character
         and root.Parent ~= nil
         and (root.Position - destination).Magnitude <= math.max(tolerance * 2, 16)
 end
@@ -734,7 +822,13 @@ function ShopModule:GetFightingStyle(styleName)
         return false
     end
 
-    -- First try the currently streamed world.
+    -- In Third Sea, first try the game's own Portal entrance for destinations
+    -- connected to the Portal network. The server can reject locked/unavailable
+    -- routes; in that case this module continues with its normal fallback.
+    tryNativeThirdSeaPortal(styleName)
+
+    -- Scan after the portal attempt, because a successful transition may load
+    -- the destination NPC into Workspace.
     local npc = self:FindFightingStyleNPC(styleName, true)
 
     -- If not present, move to the known region for the current Sea so Roblox
