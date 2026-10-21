@@ -2,7 +2,7 @@ local ShopModule = {}
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 
@@ -159,6 +159,50 @@ local FightingStyleCommands = {
         { "BuySanguineArt" },
     },
 }
+
+-- Fallback landmarks are used when StreamingEnabled means the target NPC
+-- is not yet replicated into Workspace. These are island-area coordinates,
+-- not exact NPC coordinates; after arriving, the module scans again for the rig.
+local FightingStyleFallbackPositions = {
+    -- Blox Fruits First Sea
+    [2753915549] = {
+        ["Dark Step"] = { Name = "Pirate Village", Position = Vector3.new(-1152, 25, 3826) },
+        ["Electric"] = { Name = "lower Skylands", Position = Vector3.new(-4851, 400, -2561) },
+        ["Water Kung Fu"] = { Name = "Underwater City", Position = Vector3.new(61000, 25, 1800) },
+    },
+
+    -- Blox Fruits Second Sea
+    [4442272183] = {
+        ["Dark Step"] = { Name = "Hot and Cold", Position = Vector3.new(-6224, 60, -4902) },
+        ["Electric"] = { Name = "Hot and Cold", Position = Vector3.new(-6224, 60, -4902) },
+        ["Water Kung Fu"] = { Name = "Hot and Cold", Position = Vector3.new(-6224, 60, -4902) },
+        ["Dragon Breath"] = { Name = "Kingdom of Rose", Position = Vector3.new(-2247, 100, -1671) },
+        ["Superhuman"] = { Name = "Snow Mountain", Position = Vector3.new(609, 400, -5258) },
+        ["Death Step"] = { Name = "Ice Castle", Position = Vector3.new(6170, 290, -6734) },
+        ["Sharkman Karate"] = { Name = "Forgotten Island", Position = Vector3.new(-3053, 240, -10112) },
+    },
+
+    -- Blox Fruits Third Sea. First- and Second-Sea teachers are also present
+    -- at Castle on the Sea in this Sea.
+    [7449423635] = {
+        ["Dark Step"] = { Name = "Castle on the Sea", Position = Vector3.new(-5097, 330, -3177) },
+        ["Electric"] = { Name = "Castle on the Sea", Position = Vector3.new(-5097, 330, -3177) },
+        ["Water Kung Fu"] = { Name = "Castle on the Sea", Position = Vector3.new(-5097, 330, -3177) },
+        ["Dragon Breath"] = { Name = "Castle on the Sea", Position = Vector3.new(-5097, 330, -3177) },
+        ["Superhuman"] = { Name = "Castle on the Sea", Position = Vector3.new(-5097, 330, -3177) },
+        ["Death Step"] = { Name = "Castle on the Sea", Position = Vector3.new(-5097, 330, -3177) },
+        ["Sharkman Karate"] = { Name = "Castle on the Sea", Position = Vector3.new(-5097, 330, -3177) },
+        ["Electric Claw"] = { Name = "Floating Turtle", Position = Vector3.new(-12164, 380, -8454) },
+        ["Dragon Talon"] = { Name = "Haunted Castle", Position = Vector3.new(-9512, 160, 5548) },
+        ["God Human"] = { Name = "Floating Turtle", Position = Vector3.new(-12164, 380, -8454) },
+        ["Sanguine Art"] = { Name = "Tiki Outpost", Position = Vector3.new(-16200, 50, 450) },
+    },
+}
+
+local function getFightingStyleFallback(styleName)
+    local seaFallbacks = FightingStyleFallbackPositions[game.PlaceId]
+    return seaFallbacks and seaFallbacks[styleName] or nil
+end
 
 -- Tool names used by the game can differ slightly from the UI labels.
 local FightingStyleToolNames = {
@@ -356,21 +400,25 @@ end
 -- FIND FIGHTING STYLE NPC
 --========================================================
 
-function ShopModule:FindFightingStyleNPC(styleName)
+function ShopModule:FindFightingStyleNPC(styleName, silent)
     if destroyed then
         return nil
     end
 
     local keywords = FightingStyleKeywords[styleName]
     if not keywords then
-        notify("Không có dữ liệu quét NPC cho: " .. tostring(styleName))
+        if not silent then
+            notify("Không có dữ liệu quét NPC cho: " .. tostring(styleName))
+        end
         return nil
     end
 
     local character = getCharacter()
     local playerRoot = character and getRoot(character)
     if not playerRoot then
-        notify("Chưa tìm được nhân vật hoặc HumanoidRootPart của bạn")
+        if not silent then
+            notify("Chưa tìm được nhân vật hoặc HumanoidRootPart của bạn")
+        end
         return nil
     end
 
@@ -463,19 +511,21 @@ function ShopModule:FindFightingStyleNPC(styleName)
     end
 
     if not bestNPC then
-        if #matchedNames > 0 then
-            notify(
-                "Có tên khớp NPC " .. styleName
-                .. " nhưng không tìm được rig hợp lệ: "
-                .. table.concat(matchedNames, ", ")
-            )
-        else
-            notify(
-                "Không tìm thấy NPC bán " .. styleName
-                .. " trong Workspace hiện tại (đã quét "
-                .. tostring(scannedModels) .. " Model)."
-                .. " Có thể NPC chưa tải, ở Sea khác, hoặc tên NPC không khớp."
-            )
+        if not silent then
+            if #matchedNames > 0 then
+                notify(
+                    "Có tên khớp NPC " .. styleName
+                    .. " nhưng không tìm được rig hợp lệ: "
+                    .. table.concat(matchedNames, ", ")
+                )
+            else
+                notify(
+                    "Không tìm thấy NPC bán " .. styleName
+                    .. " trong Workspace hiện tại (đã quét "
+                    .. tostring(scannedModels) .. " Model)."
+                    .. " Có thể NPC chưa tải, ở Sea khác, hoặc tên NPC không khớp."
+                )
+            end
         end
         return nil
     end
@@ -489,142 +539,127 @@ function ShopModule:FindFightingStyleNPC(styleName)
 end
 
 --========================================================
--- FLY TO NPC
+-- LONG-DISTANCE FLIGHT
 --========================================================
 
--- Fly in short segments instead of one long Tween. This makes long-distance
--- trips more reliable than trying to tween the character across the whole map.
-local FLY_SPEED = 250
-local FLY_SEGMENT_DISTANCE = 160
+-- A direct CFrame movement loop avoids relying on a single Tween completing.
+-- It lifts above the starting point, travels at a safe altitude, then descends.
+local FLY_SPEED = 420
 
+function ShopModule:FlyToPosition(destination, label, tolerance)
+    if destroyed or typeof(destination) ~= "Vector3" then
+        return false
+    end
+
+    local character = getCharacter()
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+    if not character or not root or not humanoid or humanoid.Health <= 0 then
+        notify("Không thể bay: nhân vật chưa sẵn sàng")
+        return false
+    end
+
+    tolerance = tolerance or 8
+    local initialDistance = (root.Position - destination).Magnitude
+    if initialDistance <= tolerance then
+        return true
+    end
+
+    -- Long trip timeout scales with distance; this matters for far-away regions
+    -- such as Underwater City in the First Sea.
+    local deadline = os.clock() + math.max(initialDistance / FLY_SPEED * 2.5, 25)
+    local cruiseY = math.max(root.Position.Y, destination.Y, 250) + 140
+    local liftPoint = Vector3.new(root.Position.X, cruiseY, root.Position.Z)
+    local cruisePoint = Vector3.new(destination.X, cruiseY, destination.Z)
+
+    notify("Bay đường dài tới " .. tostring(label or "điểm đến")
+        .. " • " .. tostring(math.floor(initialDistance)) .. " studs")
+
+    local function moveLeg(target)
+        while not destroyed and os.clock() < deadline do
+            if player.Character ~= character
+                or not root.Parent
+                or humanoid.Health <= 0 then
+                return false
+            end
+
+            local delta = target - root.Position
+            local distance = delta.Magnitude
+            if distance <= tolerance then
+                return true
+            end
+
+            local dt = RunService.Heartbeat:Wait()
+            if not dt or dt <= 0 then
+                dt = 1 / 60
+            end
+
+            local step = math.min(distance, FLY_SPEED * dt)
+            local nextPosition = root.Position + delta.Unit * step
+
+            -- Preserve current rotation so the character doesn't spin wildly.
+            root.CFrame = CFrame.new(nextPosition) * root.CFrame.Rotation
+            root.AssemblyLinearVelocity = Vector3.zero
+        end
+
+        return false
+    end
+
+    if not moveLeg(liftPoint) then
+        notify("Không thể rời vị trí hiện tại để bay tới " .. tostring(label or "điểm đến"))
+        return false
+    end
+
+    if not moveLeg(cruisePoint) then
+        notify("Không thể bay đường dài tới " .. tostring(label or "điểm đến"))
+        return false
+    end
+
+    if not moveLeg(destination) then
+        notify("Không thể hạ xuống tại " .. tostring(label or "điểm đến"))
+        return false
+    end
+
+    return player.Character == character
+        and root.Parent ~= nil
+        and (root.Position - destination).Magnitude <= math.max(tolerance * 2, 16)
+end
+
+-- Final approach to the NPC. Re-read its live position because the NPC rig may
+-- stream in after reaching the fallback landmark.
 function ShopModule:FlyToNPC(npc)
     if destroyed or not npc or not npc.Parent then
         return false
     end
 
-    local character = getCharacter()
-    if not character then
-        return false
-    end
-
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    local root = character:FindFirstChild("HumanoidRootPart")
     local npcRoot = getRoot(npc)
-
-    if not humanoid or humanoid.Health <= 0 or not root or not npcRoot then
+    if not npcRoot then
         return false
     end
 
-    local function getTargetPosition()
-        if not npc.Parent then
-            return nil
-        end
+    local targetPosition = npcRoot.Position
+        - npcRoot.CFrame.LookVector * 4
+        + Vector3.new(0, 2, 0)
 
-        local currentNpcRoot = getRoot(npc)
-        if not currentNpcRoot then
-            return nil
-        end
-
-        return currentNpcRoot.Position
-            - currentNpcRoot.CFrame.LookVector * 4
-            + Vector3.new(0, 2, 0), currentNpcRoot
-    end
-
-    local firstTarget = getTargetPosition()
-    if not firstTarget then
+    local moved = self:FlyToPosition(targetPosition, npc.Name, 5)
+    if not moved then
         return false
     end
 
-    local initialDistance = (root.Position - firstTarget).Magnitude
-    if initialDistance <= 5 then
-        return true
+    -- Confirm the NPC still exists and we actually arrived close enough.
+    if not npc.Parent then
+        return false
     end
 
-    -- Allow enough time for long trips while retaining a timeout in case the
-    -- character gets stuck or the target becomes unavailable.
-    local deadline = os.clock() + math.max(initialDistance / FLY_SPEED, 5) + 12
-    notify("Đang bay tới " .. npc.Name .. " (" .. math.floor(initialDistance) .. " studs)")
-
-    while not destroyed and os.clock() < deadline do
-        if player.Character ~= character
-            or not root.Parent
-            or not npc.Parent
-            or humanoid.Health <= 0 then
-            return false
-        end
-
-        local targetPosition, currentNpcRoot = getTargetPosition()
-        if not targetPosition or not currentNpcRoot then
-            notify("NPC không còn được tải: " .. npc.Name)
-            return false
-        end
-
-        local offset = targetPosition - root.Position
-        local distance = offset.Magnitude
-        if distance <= 5 then
-            return true
-        end
-
-        local segmentDistance = math.min(distance, FLY_SEGMENT_DISTANCE)
-        local direction = offset.Unit
-        local waypoint = root.Position + direction * segmentDistance
-        local targetCFrame = CFrame.lookAt(waypoint, currentNpcRoot.Position)
-        local duration = math.max(segmentDistance / FLY_SPEED, 0.05)
-
-        local tween = TweenService:Create(
-            root,
-            TweenInfo.new(duration, Enum.EasingStyle.Linear),
-            { CFrame = targetCFrame }
-        )
-
-        local completed = false
-        local playbackState = nil
-        local connection = tween.Completed:Connect(function(state)
-            completed = true
-            playbackState = state
-        end)
-
-        tween:Play()
-
-        while not completed and not destroyed do
-            if player.Character ~= character
-                or not root.Parent
-                or not npc.Parent
-                or humanoid.Health <= 0 then
-                tween:Cancel()
-                break
-            end
-            task.wait(0.03)
-        end
-
-        if not completed then
-            tween:Cancel()
-        end
-        connection:Disconnect()
-
-        if destroyed
-            or player.Character ~= character
-            or not root.Parent
-            or humanoid.Health <= 0 then
-            return false
-        end
-
-        if playbackState ~= Enum.PlaybackState.Completed then
-            -- Retry the remaining distance in another segment if a tween was
-            -- interrupted; the main deadline prevents an endless loop.
-            task.wait(0.05)
-        end
+    npcRoot = getRoot(npc)
+    local character = getCharacter()
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not npcRoot or not root then
+        return false
     end
 
-    if not destroyed and npc.Parent and root.Parent then
-        local lastTarget = getTargetPosition()
-        if lastTarget and (root.Position - lastTarget).Magnitude <= 10 then
-            return true
-        end
-    end
-
-    notify("Bay chưa tới được NPC " .. npc.Name .. ". Hãy thử lại hoặc kiểm tra khu vực/Sea.")
-    return false
+    return (root.Position - npcRoot.Position).Magnitude <= 12
 end
 
 --========================================================
@@ -703,14 +738,54 @@ function ShopModule:GetFightingStyle(styleName)
         return false
     end
 
-    local npc = self:FindFightingStyleNPC(styleName)
+    -- First try the currently streamed world.
+    local npc = self:FindFightingStyleNPC(styleName, true)
+
+    -- If not present, move to the known region for the current Sea so Roblox
+    -- has a chance to stream that island and NPC into Workspace.
     if not npc then
-        notify("Không tìm thấy NPC bán võ: " .. styleName)
+        local fallback = getFightingStyleFallback(styleName)
+        if not fallback then
+            notify(
+                "Không có điểm dự phòng cho " .. styleName
+                .. " ở Sea hiện tại (PlaceId " .. tostring(game.PlaceId) .. ")."
+                .. " Hãy vào Sea có NPC này rồi bật lại."
+            )
+            return false
+        end
+
+        notify("NPC chưa được tải; đang bay tới khu vực " .. fallback.Name)
+        if not self:FlyToPosition(fallback.Position, fallback.Name, 40) then
+            return false
+        end
+
+        -- Give StreamingEnabled a moment, then rescan repeatedly.
+        task.wait(1)
+        for attempt = 1, 10 do
+            if destroyed then
+                return false
+            end
+
+            npc = self:FindFightingStyleNPC(styleName, true)
+            if npc then
+                break
+            end
+
+            task.wait(0.5)
+        end
+    end
+
+    if not npc then
+        notify(
+            "Đã tới khu vực dự phòng nhưng chưa tìm thấy NPC " .. styleName
+            .. ". Tọa độ khu vực có thể đã thay đổi hoặc NPC chưa được tải."
+        )
         return false
     end
 
+    notify("Tìm thấy NPC " .. npc.Name .. "; đang bay tới đúng vị trí")
     if not self:FlyToNPC(npc) then
-        notify("Không thể bay tới NPC " .. npc.Name)
+        notify("Không thể tới gần NPC " .. npc.Name)
         return false
     end
 
@@ -744,7 +819,6 @@ function ShopModule:GetFightingStyle(styleName)
 
             if equipOK then
                 task.wait(0.1)
-
                 if tool.Parent == character then
                     return true
                 end
