@@ -72,6 +72,7 @@ local ShopConfig = {
     ["Dragon Talon"] = { Type = "Toggle" },
     ["God Human"] = { Type = "Toggle" },
     ["Sanguine Art"] = { Type = "Toggle" },
+    ["NoClip"] = { Type = "Toggle" },
 
     ["Sky Jump"] = {
         Type = "Button",
@@ -258,7 +259,53 @@ local FightingStyleToolNames = {
 
 local State = {
     FightingStyleEnabled = {},
+    NoClipEnabled = false,
 }
+
+-- NoClip stores each character part's original collision state so it can be
+-- restored exactly when the toggle is disabled, the character respawns, or
+-- the module is destroyed.
+local noClipConnection = nil
+local noClipCharacter = nil
+local noClipOriginalCollisions = {}
+
+local function restoreNoClipCollisions()
+    for part, originalCanCollide in pairs(noClipOriginalCollisions) do
+        if part and part.Parent then
+            pcall(function()
+                part.CanCollide = originalCanCollide
+            end)
+        end
+    end
+
+    table.clear(noClipOriginalCollisions)
+    noClipCharacter = nil
+end
+
+local function applyNoClipToCharacter()
+    local character = player.Character
+
+    if character ~= noClipCharacter then
+        restoreNoClipCollisions()
+        noClipCharacter = character
+    end
+
+    if not character then
+        return
+    end
+
+    for _, object in ipairs(character:GetDescendants()) do
+        if object:IsA("BasePart") then
+            if noClipOriginalCollisions[object] == nil then
+                noClipOriginalCollisions[object] = object.CanCollide
+            end
+
+            if object.CanCollide then
+                object.CanCollide = false
+            end
+        end
+    end
+end
 
 local destroyed = false
 local Callbacks = {
@@ -370,11 +417,157 @@ local function tryNativeThirdSeaPortal(styleName)
         return false
     end
 
-    -- If already on the destination island, do not attempt a portal trip.
+    -- If already at the destination island, do not leave it to visit a portal.
     if (root.Position - route.IslandCenter).Magnitude <= 1100 then
         return false
     end
 
+    -- Water Kung Fu is sold at Castle on the Sea in Third Sea. The physical
+    -- portals on Tiki Outpost, Hydra Island, and the Floating Turtle/Mansion
+    -- connect back to Castle on the Sea. Fly into the closest of those portals
+    -- first; do not merely requestEntrance at the Castle's destination point.
+    if destinationName == "Castle on the Sea" then
+        local returnPortals = {
+            {
+                Name = "Mansion Portal (Floating Turtle)",
+                Position = ThirdSeaPortalRoutes["Floating Turtle"].Entrance,
+            },
+            {
+                Name = "Hydra Island Portal",
+                Position = ThirdSeaPortalRoutes["Hydra Island"].Entrance,
+            },
+            {
+                Name = "Tiki Outpost Portal",
+                Position = ThirdSeaPortalRoutes["Tiki Outpost"].Entrance,
+            },
+        }
+
+        local selectedPortal = nil
+        local nearestDistance = math.huge
+        for _, portal in ipairs(returnPortals) do
+            local distance = (root.Position - portal.Position).Magnitude
+            if distance < nearestDistance then
+                nearestDistance = distance
+                selectedPortal = portal
+            end
+        end
+
+        if not selectedPortal then
+            return false
+        end
+
+        local startPosition = root.Position
+        local startedAwayFromCastle =
+            (startPosition - route.IslandCenter).Magnitude > 1600
+
+        notify("Đang bay tới cổng " .. selectedPortal.Name .. " để về Castle on the Sea")
+
+        -- Move toward the portal while watching for the portal's server-side
+        -- teleport. If it triggers mid-flight, stop immediately so the flight
+        -- loop does not accidentally carry the character back out of the portal.
+        local flightDeadline = os.clock()
+            + math.max(nearestDistance / 250 * 2.5, 20)
+
+        while not destroyed and os.clock() < flightDeadline do
+            character = getCharacter()
+            root = character and character:FindFirstChild("HumanoidRootPart")
+            humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+            if not character or not root or not humanoid or humanoid.Health <= 0 then
+                return false
+            end
+
+            if startedAwayFromCastle
+                and (root.Position - route.IslandCenter).Magnitude <= 1600
+                and (root.Position - startPosition).Magnitude >= 250 then
+                notify("Đã dịch chuyển bằng cổng về Castle on the Sea")
+                task.wait(0.5)
+                return true
+            end
+
+            local delta = selectedPortal.Position - root.Position
+            local distance = delta.Magnitude
+            if distance <= 3 then
+                break
+            end
+
+            local dt = RunService.Heartbeat:Wait()
+            if not dt or dt <= 0 then
+                dt = 1 / 60
+            end
+
+            local step = math.min(distance, 250 * dt)
+            root.CFrame = CFrame.new(root.Position + delta.Unit * step)
+                * root.CFrame.Rotation
+            root.AssemblyLinearVelocity = Vector3.zero
+        end
+
+        if destroyed then
+            return false
+        end
+
+        -- Stand at the center of the portal and allow its normal game touch
+        -- logic a moment to trigger.
+        character = getCharacter()
+        root = character and character:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = CFrame.new(selectedPortal.Position) * root.CFrame.Rotation
+            root.AssemblyLinearVelocity = Vector3.zero
+        end
+
+        local portalDeadline = os.clock() + 3
+        repeat
+            if destroyed then
+                return false
+            end
+
+            character = getCharacter()
+            root = character and character:FindFirstChild("HumanoidRootPart")
+            if root and startedAwayFromCastle
+                and (root.Position - route.IslandCenter).Magnitude <= 1600
+                and (root.Position - startPosition).Magnitude >= 250 then
+                notify("Đã dịch chuyển bằng cổng về Castle on the Sea")
+                task.wait(0.5)
+                return true
+            end
+
+            task.wait(0.1)
+        until os.clock() >= portalDeadline
+
+        -- Some versions of the game do not trigger the physical portal from a
+        -- client-side movement alone. After physically reaching it, request the
+        -- game's own entrance transition as a fallback and verify the result.
+        local remote = getFightingStyleRemote()
+        if remote then
+            pcall(function()
+                remote:InvokeServer("requestEntrance", route.Entrance)
+            end)
+
+            local teleportDeadline = os.clock() + 2.5
+            repeat
+                if destroyed then
+                    return false
+                end
+
+                character = getCharacter()
+                root = character and character:FindFirstChild("HumanoidRootPart")
+                if root and startedAwayFromCastle
+                    and (root.Position - route.IslandCenter).Magnitude <= 1600
+                    and (root.Position - startPosition).Magnitude >= 250 then
+                    notify("Đã dịch chuyển tới Castle on the Sea")
+                    task.wait(0.5)
+                    return true
+                end
+
+                task.wait(0.1)
+            until os.clock() >= teleportDeadline
+        end
+
+        notify("Cổng chưa kích hoạt được; sẽ dùng đường bay dự phòng")
+        return false
+    end
+
+    -- For other Third Sea destinations, retain the native entrance request.
     local remote = getFightingStyleRemote()
     if not remote then
         return false
@@ -383,8 +576,8 @@ local function tryNativeThirdSeaPortal(styleName)
     local startPosition = root.Position
     notify("Đang thử cổng dịch chuyển trong game tới " .. destinationName)
 
-    local ok, result = pcall(function()
-        return remote:InvokeServer("requestEntrance", route.Entrance)
+    local ok = pcall(function()
+        remote:InvokeServer("requestEntrance", route.Entrance)
     end)
 
     if not ok then
@@ -392,7 +585,6 @@ local function tryNativeThirdSeaPortal(styleName)
         return false
     end
 
-    -- The server may apply the transition shortly after the remote returns.
     local deadline = os.clock() + 2.5
     repeat
         if destroyed then
@@ -401,9 +593,7 @@ local function tryNativeThirdSeaPortal(styleName)
 
         character = getCharacter()
         root = character and character:FindFirstChild("HumanoidRootPart")
-        if not root then
-            task.wait(0.1)
-        else
+        if root then
             local distanceToDestination = (root.Position - route.IslandCenter).Magnitude
             local displacement = (root.Position - startPosition).Magnitude
 
@@ -412,12 +602,11 @@ local function tryNativeThirdSeaPortal(styleName)
                 task.wait(0.6)
                 return true
             end
-
-            task.wait(0.1)
         end
+
+        task.wait(0.1)
     until os.clock() >= deadline
 
-    -- Do not claim a teleport happened merely because the remote call returned.
     return false
 end
 
@@ -645,7 +834,7 @@ function ShopModule:FindFightingStyleNPC(styleName, silent)
 end
 
 --========================================================
--- DIRECT FLIGHT
+-- DIRECT FLIGHT (SHORTEST STRAIGHT-LINE ROUTE)
 --========================================================
 
 local FLY_SPEED = 170
@@ -962,7 +1151,11 @@ function ShopModule:Get(name)
     end
 
     if config.Type == "Toggle" then
-        result.Enabled = State.FightingStyleEnabled[name] == true
+        if name == "NoClip" then
+            result.Enabled = State.NoClipEnabled == true
+        else
+            result.Enabled = State.FightingStyleEnabled[name] == true
+        end
     end
 
     return result
@@ -981,7 +1174,66 @@ function ShopModule:GetState(name)
         return nil
     end
 
+    if name == "NoClip" then
+        return State.NoClipEnabled == true
+    end
+
     return State.FightingStyleEnabled[name] == true
+end
+
+--========================================================
+-- NOCLIP TOGGLE
+--========================================================
+
+function ShopModule:SetNoClip(enabled)
+    if destroyed then
+        return false
+    end
+
+    enabled = enabled == true
+
+    if enabled then
+        State.NoClipEnabled = true
+
+        if not noClipConnection then
+            noClipConnection = RunService.Stepped:Connect(function()
+                if destroyed or not State.NoClipEnabled then
+                    return
+                end
+
+                local ok, err = pcall(applyNoClipToCharacter)
+                if not ok then
+                    warn("[LPT Hub Shop] NoClip error: " .. tostring(err))
+                end
+            end)
+        end
+
+        local ok, err = pcall(applyNoClipToCharacter)
+        if not ok then
+            State.NoClipEnabled = false
+            if noClipConnection then
+                noClipConnection:Disconnect()
+                noClipConnection = nil
+            end
+            restoreNoClipCollisions()
+            notify("Không thể bật NoClip: " .. tostring(err))
+            return false
+        end
+
+        notify("NoClip đã bật")
+        return true
+    end
+
+    State.NoClipEnabled = false
+
+    if noClipConnection then
+        noClipConnection:Disconnect()
+        noClipConnection = nil
+    end
+
+    restoreNoClipCollisions()
+    notify("NoClip đã tắt; va chạm đã được khôi phục")
+    return true
 end
 
 --========================================================
@@ -1062,6 +1314,10 @@ function ShopModule:Set(name, enabled)
 
     enabled = enabled == true
 
+    if name == "NoClip" then
+        return self:SetNoClip(enabled)
+    end
+
     if not enabled then
         State.FightingStyleEnabled[name] = false
         notify("Đã tắt: " .. name)
@@ -1110,7 +1366,7 @@ function ShopModule:Toggle(name)
         return false
     end
 
-    local current = State.FightingStyleEnabled[name] == true
+    local current = self:GetState(name) == true
     return self:Set(name, not current)
 end
 
@@ -1208,6 +1464,14 @@ function ShopModule:Destroy()
     if destroyed then
         return
     end
+
+    -- Always restore collisions before marking the module destroyed.
+    State.NoClipEnabled = false
+    if noClipConnection then
+        noClipConnection:Disconnect()
+        noClipConnection = nil
+    end
+    restoreNoClipCollisions()
 
     destroyed = true
 
