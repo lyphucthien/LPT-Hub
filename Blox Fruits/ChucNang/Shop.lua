@@ -542,9 +542,7 @@ end
 -- LONG-DISTANCE FLIGHT
 --========================================================
 
--- A direct CFrame movement loop avoids relying on a single Tween completing.
--- It lifts above the starting point, travels at a safe altitude, then descends.
-local FLY_SPEED = 420
+local FLY_SPEED = 250
 
 function ShopModule:FlyToPosition(destination, label, tolerance)
     if destroyed or typeof(destination) ~= "Vector3" then
