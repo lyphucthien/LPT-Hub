@@ -1153,65 +1153,45 @@ function ShopModule:GetFightingStyle(styleName)
         return false
     end
 
-    -- Water Kung Fu in First Sea uses the physical Whirlpool entrance.
-    -- A failed entrance attempt must not fall through to the hidden island
-    -- coordinates, because that would skip the game's normal entrance.
+    -- Giữ lối vào vật lý ở First Sea cho Water Kung Fu (xoáy nước), như script cũ.
+    -- Nếu cửa vào không kích hoạt được thì dừng, không bay tới tọa độ ẩn của đảo.
     local underwaterRouteResult = tryFirstSeaUnderwaterEntrance(self, styleName)
     if underwaterRouteResult == false then
         return false
     end
 
-    -- In Third Sea, prefer a physical portal when it is a shorter available route.
-    -- This path does not call requestEntrance remotely and never enables NoClip.
+    -- Giữ nguyên hệ thống đi qua portal vật lý ở Third Sea khi tuyến portal hợp lý.
+    -- Hàm này tự kiểm tra khoảng cách và chỉ dùng portal theo logic của script cũ.
     tryThirdSeaPhysicalPortal(self, styleName)
 
-    -- Scan after any successful portal transition, because streaming may have
-    -- loaded the destination NPC only after entering the island.
+    -- Sau khi qua portal, quét NPC trong Workspace đã tải.
     local npc = self:FindFightingStyleNPC(styleName, true)
 
-    -- If not present, move to the known region for the current Sea so Roblox
-    -- has a chance to stream that island and NPC into Workspace.
+    -- Chờ ngắn để NPC có thời gian được Roblox tải, nhưng không bay tới đảo dự phòng.
     if not npc then
-        local fallback = getFightingStyleFallback(styleName)
-        if not fallback then
-            notify(
-                "Không có điểm dự phòng cho " .. styleName
-                .. " ở Sea hiện tại (PlaceId " .. tostring(game.PlaceId) .. ")."
-                .. " Hãy vào Sea có NPC này rồi bật lại."
-            )
-            return false
-        end
-
-        notify("NPC chưa được tải; đang bay tới khu vực " .. fallback.Name)
-        if not self:FlyToPosition(fallback.Position, fallback.Name, 40) then
-            return false
-        end
-
-        -- Give StreamingEnabled a moment, then rescan repeatedly.
-        task.wait(1)
-        for attempt = 1, 10 do
+        for attempt = 1, 5 do
             if destroyed then
                 return false
             end
 
+            task.wait(0.3)
             npc = self:FindFightingStyleNPC(styleName, true)
             if npc then
                 break
             end
-
-            task.wait(0.5)
         end
     end
 
     if not npc then
         notify(
-            "Đã tới khu vực dự phòng nhưng chưa tìm thấy NPC " .. styleName
-            .. ". Tọa độ khu vực có thể đã thay đổi hoặc NPC chưa được tải."
+            "Chưa tìm thấy NPC " .. styleName .. " trong khu vực đã tải. "
+            .. "Không bay tới đảo theo yêu cầu; hãy đến gần khu vực có NPC rồi bật lại."
         )
         return false
     end
 
-    notify("Tìm thấy NPC " .. npc.Name .. "; đang bay tới đúng vị trí")
+    -- FlyToNPC dùng FlyToPosition để bay thẳng theo đoạn 3D ngắn nhất tới NPC.
+    notify("Tìm thấy NPC " .. npc.Name .. "; đang bay thẳng tới NPC")
     if not self:FlyToNPC(npc) then
         notify("Không thể tới gần NPC " .. npc.Name)
         return false
@@ -1221,15 +1201,14 @@ function ShopModule:GetFightingStyle(styleName)
     self:InteractNPC(npc)
     task.wait(0.15)
 
-    -- Buy/relearn through the game's normal server command. The game decides
-    -- whether this is a first purchase or a re-equip of a previously learned style.
+    -- Gửi yêu cầu mua/trang bị võ bằng lệnh bình thường của game.
     local requestOK, requestResult = invokeFightingStyleCommands(styleName)
     if not requestOK then
         notify("Không thể gửi yêu cầu cho " .. styleName .. ": " .. tostring(requestResult))
         return false
     end
 
-    -- Confirm that the fighting-style Tool appeared, then equip it.
+    -- Xác nhận Tool đã xuất hiện rồi trang bị.
     local deadline = os.clock() + 5
     repeat
         if destroyed then
