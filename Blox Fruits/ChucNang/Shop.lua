@@ -221,7 +221,9 @@ local function getRoot(model)
         return nil
     end
 
-    return model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+    -- NPCs can have nested model structures, so search recursively too.
+    return model:FindFirstChild("HumanoidRootPart", true)
+        or model.PrimaryPart
 end
 
 local function normalizeName(name)
@@ -341,13 +343,13 @@ local function isNPCModel(obj)
         return false
     end
 
-    local humanoid = obj:FindFirstChildOfClass("Humanoid")
+    -- Use recursive lookups to support NPC rigs with nested models.
+    local humanoid = obj:FindFirstChildWhichIsA("Humanoid", true)
     if not humanoid or humanoid.Health <= 0 then
         return false
     end
 
-    local root = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart
-    return root ~= nil
+    return getRoot(obj) ~= nil
 end
 
 --========================================================
@@ -366,56 +368,119 @@ function ShopModule:FindFightingStyleNPC(styleName)
     end
 
     local character = getCharacter()
-    if not character then
-        return nil
-    end
-
-    local playerRoot = character:FindFirstChild("HumanoidRootPart")
+    local playerRoot = character and getRoot(character)
     if not playerRoot then
+        notify("Chưa tìm được nhân vật hoặc HumanoidRootPart của bạn")
         return nil
     end
 
     local bestNPC = nil
     local bestScore = -math.huge
     local bestDistance = math.huge
+    local scannedModels = 0
+    local matchedNames = {}
+    local matchedNameSet = {}
 
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if isNPCModel(obj) then
-            local npcRoot = getRoot(obj)
-            if npcRoot then
-                local score = 0
-                local normalized = normalizeName(obj.Name)
+    local function scoreName(rawName)
+        local normalized = normalizeName(rawName)
+        local score = 0
 
-                for _, keyword in ipairs(keywords) do
-                    local normalizedKeyword = normalizeName(keyword)
-
-                    if normalized == normalizedKeyword then
-                        score += 1000
-                    elseif string.find(normalized, normalizedKeyword, 1, true) then
-                        score += 500
-                    end
-                end
-
-                if string.find(normalized, "teacher", 1, true) then
-                    score += 100
-                end
-
-                if string.find(normalized, "npc", 1, true) then
-                    score += 10
-                end
-
-                if score > 0 then
-                    local distance = (playerRoot.Position - npcRoot.Position).Magnitude
-
-                    if score > bestScore or (score == bestScore and distance < bestDistance) then
-                        bestNPC = obj
-                        bestScore = score
-                        bestDistance = distance
-                    end
+        for _, keyword in ipairs(keywords) do
+            local normalizedKeyword = normalizeName(keyword)
+            if normalizedKeyword ~= "" then
+                if normalized == normalizedKeyword then
+                    score = math.max(score, 1000)
+                elseif string.find(normalized, normalizedKeyword, 1, true) then
+                    score = math.max(score, 600)
                 end
             end
         end
+
+        return score, normalized
     end
+
+    local function findNPCAncestor(instance)
+        local current = instance
+        while current and current ~= workspace do
+            if current:IsA("Model") and isNPCModel(current) then
+                return current
+            end
+            current = current.Parent
+        end
+        return nil
+    end
+
+    local function considerCandidate(npc, score, matchedName)
+        if matchedName and not matchedNameSet[matchedName] then
+            matchedNameSet[matchedName] = true
+            table.insert(matchedNames, matchedName)
+        end
+
+        if not npc then
+            return
+        end
+
+        local npcRoot = getRoot(npc)
+        if not npcRoot then
+            return
+        end
+
+        local normalized = normalizeName(npc.Name)
+        if string.find(normalized, "teacher", 1, true) then
+            score += 100
+        end
+
+        local distance = (playerRoot.Position - npcRoot.Position).Magnitude
+        if score > bestScore or (score == bestScore and distance < bestDistance) then
+            bestNPC = npc
+            bestScore = score
+            bestDistance = distance
+        end
+    end
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") then
+            scannedModels += 1
+        end
+
+        local rawName = nil
+        if obj:IsA("Model") then
+            rawName = obj.Name
+        elseif obj:IsA("TextLabel") or obj:IsA("TextButton") then
+            rawName = obj.Text
+        end
+
+        if rawName then
+            local score = scoreName(rawName)
+            if score > 0 then
+                local npc = findNPCAncestor(obj)
+                considerCandidate(npc, score, tostring(rawName))
+            end
+        end
+    end
+
+    if not bestNPC then
+        if #matchedNames > 0 then
+            notify(
+                "Có tên khớp NPC " .. styleName
+                .. " nhưng không tìm được rig hợp lệ: "
+                .. table.concat(matchedNames, ", ")
+            )
+        else
+            notify(
+                "Không tìm thấy NPC bán " .. styleName
+                .. " trong Workspace hiện tại (đã quét "
+                .. tostring(scannedModels) .. " Model)."
+                .. " Có thể NPC chưa tải, ở Sea khác, hoặc tên NPC không khớp."
+            )
+        end
+        return nil
+    end
+
+    notify(
+        "Đã tìm thấy NPC " .. bestNPC.Name
+        .. " (khoảng cách " .. tostring(math.floor(bestDistance)) .. ")"
+    )
 
     return bestNPC
 end
@@ -509,7 +574,6 @@ function ShopModule:InteractNPC(npc)
         return false
     end
 
-    -- Try a ProximityPrompt when the runtime supports it.
     for _, obj in ipairs(npc:GetDescendants()) do
         if obj:IsA("ProximityPrompt") then
             local triggered = false
@@ -528,7 +592,6 @@ function ShopModule:InteractNPC(npc)
         end
     end
 
-    -- Try a ClickDetector when supported.
     for _, obj in ipairs(npc:GetDescendants()) do
         if obj:IsA("ClickDetector") then
             local clicked = false
@@ -547,8 +610,6 @@ function ShopModule:InteractNPC(npc)
         end
     end
 
-    -- Some game versions handle these NPCs entirely through CommF_, so a
-    -- missing prompt/click detector should not prevent the server request.
     return false
 end
 
@@ -901,6 +962,9 @@ function ShopModule:GetAll()
     return result
 end
 
+--========================================================
+-- DESTROY
+--========================================================
 
 function ShopModule:Destroy()
     if destroyed then
