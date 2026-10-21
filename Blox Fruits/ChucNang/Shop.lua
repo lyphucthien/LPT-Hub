@@ -122,8 +122,6 @@ local FightingStyleKeywords = {
     ["Sanguine Art"] = { "shafi" },
 }
 
--- Each style uses the game's usual server command to buy/relearn it.
--- Some styles need a short command sequence rather than one command.
 local FightingStyleCommands = {
     ["Dark Step"] = {
         { "BuyBlackLeg" },
@@ -162,9 +160,6 @@ local FightingStyleCommands = {
     },
 }
 
--- Fallback landmarks are used when StreamingEnabled means the target NPC
--- is not yet replicated into Workspace. These are island-area coordinates,
--- not exact NPC coordinates; after arriving, the module scans again for the rig.
 local FightingStyleFallbackPositions = {
     -- Blox Fruits First Sea
     [2753915549] = {
@@ -173,7 +168,6 @@ local FightingStyleFallbackPositions = {
         ["Water Kung Fu"] = { Name = "Underwater City", Position = Vector3.new(61000, 25, 1800) },
     },
 
-    -- Blox Fruits Second Sea
     [4442272183] = {
         ["Dark Step"] = { Name = "Hot and Cold", Position = Vector3.new(-6224, 60, -4902) },
         ["Electric"] = { Name = "Hot and Cold", Position = Vector3.new(-6224, 60, -4902) },
@@ -184,8 +178,6 @@ local FightingStyleFallbackPositions = {
         ["Sharkman Karate"] = { Name = "Forgotten Island", Position = Vector3.new(-3053, 240, -10112) },
     },
 
-    -- Blox Fruits Third Sea. First- and Second-Sea teachers are also present
-    -- at Castle on the Sea in this Sea.
     [7449423635] = {
         ["Dark Step"] = { Name = "Castle on the Sea", Position = Vector3.new(-5097, 330, -3177) },
         ["Electric"] = { Name = "Castle on the Sea", Position = Vector3.new(-5097, 330, -3177) },
@@ -207,8 +199,6 @@ local function getFightingStyleFallback(styleName)
 end
 
 
--- Third Sea Portal network. These are map landmarks for the physical portals;
--- Castle's outgoing portal is detected from the loaded Workspace when possible.
 local ThirdSeaPortalRoutes = {
     ["Castle on the Sea"] = {
         IslandCenter = Vector3.new(-5097, 315, -3130),
@@ -216,15 +206,15 @@ local ThirdSeaPortalRoutes = {
     },
     ["Floating Turtle"] = {
         IslandCenter = Vector3.new(-12164, 380, -8454),
-        Entrance = Vector3.new(-12471.17, 374.94, -7551.68), -- Mansion portal
+        Entrance = Vector3.new(-12471.17, 374.94, -7551.68),
     },
     ["Hydra Island"] = {
         IslandCenter = Vector3.new(5229, 610, 345),
-        Entrance = Vector3.new(5756, 610, -282), -- Hydra portal
+        Entrance = Vector3.new(5756, 610, -282),
     },
     ["Tiki Outpost"] = {
         IslandCenter = Vector3.new(-16500, 50, 450),
-        Entrance = Vector3.new(-16218.68, 9.09, 445.62), -- Tiki portal area
+        Entrance = Vector3.new(-16218.68, 9.09, 445.62),
     },
 }
 
@@ -242,7 +232,6 @@ local ThirdSeaStyleDestinations = {
     ["Sanguine Art"] = "Tiki Outpost",
 }
 
--- Tool names used by the game can differ slightly from the UI labels.
 local FightingStyleToolNames = {
     ["Dark Step"] = { "Black Leg", "Dark Step" },
     ["Electric"] = { "Electro", "Electric" },
@@ -264,9 +253,6 @@ local State = {
     NoClipEnabled = false,
 }
 
--- NoClip stores each character part's original collision state so it can be
--- restored exactly when the toggle is disabled, the character respawns, or
--- the module is destroyed.
 local noClipConnection = nil
 local noClipCharacter = nil
 local noClipOriginalCollisions = {}
@@ -351,7 +337,6 @@ local function getRoot(model)
         return nil
     end
 
-    -- NPCs can have nested model structures, so search recursively too.
     return model:FindFirstChild("HumanoidRootPart", true)
         or model.PrimaryPart
 end
@@ -447,9 +432,6 @@ local function moveThroughPhysicalPortal(module, portalPosition, portalLabel, de
         return false
     end
 
-    -- Enter the portal's trigger volume rather than invoking requestEntrance.
-    -- The small vertical adjustment helps when the stored point is at the base
-    -- of the visible portal column.
     local character = getCharacter()
     root = character and character:FindFirstChild("HumanoidRootPart")
     if root then
@@ -475,7 +457,6 @@ local function getPortalMetadata(instance)
     local current = instance
     local portalRoot = nil
 
-    -- Include nearby ancestor names because portal parts are often nested in Models.
     for _ = 1, 5 do
         if not current or current == workspace then
             break
@@ -574,7 +555,7 @@ end
 
 local function tryFirstSeaUnderwaterEntrance(module, styleName)
     if destroyed or game.PlaceId ~= 2753915549 or styleName ~= "Water Kung Fu" then
-        return nil -- Not applicable; let the normal route logic run.
+        return nil
     end
 
     local underwaterCity = Vector3.new(61163.85, 11.68, 1819.78)
@@ -585,12 +566,9 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName)
     end
 
     if (root.Position - underwaterCity).Magnitude <= 2600 then
-        return true -- Already in/near Underwater City.
+        return true
     end
 
-    -- The First Sea entrance is a physical whirlpool near Frozen Village and Prison.
-    -- Prefer a streamed landmark with a matching name; use the documented map
-    -- coordinate as a fallback if the landmark is not named in Workspace.
     local whirlpoolFallback = Vector3.new(3865, 5, -1926)
     local whirlpoolPosition = nil
     local bestDistance = math.huge
@@ -617,9 +595,6 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName)
         return false
     end
 
-    -- Wait for the game's natural entrance trigger to transition the character.
-    -- Do not invoke requestEntrance remotely; if the whirlpool does not trigger,
-    -- stop here instead of moving directly to the hidden destination coordinates.
     local deadline = os.clock() + 5
     repeat
         if destroyed then
@@ -658,7 +633,7 @@ local function tryThirdSeaPhysicalPortal(module, styleName)
 
     local targetDistance = (root.Position - destinationRoute.IslandCenter).Magnitude
     if targetDistance <= 1100 then
-        return false -- Already near the target island; scan for the NPC locally.
+        return false
     end
 
     local castleRoute = ThirdSeaPortalRoutes["Castle on the Sea"]
@@ -709,8 +684,6 @@ local function tryThirdSeaPhysicalPortal(module, styleName)
         )
     end
 
-    -- Destination is Castle on the Sea: use the nearest physical return portal
-    -- only when it is shorter than flying directly to Castle.
     if destinationName == "Castle on the Sea" then
         local portal, portalDistance = nearestReturnPortal(root.Position)
         if portal and portalDistance + 500 < targetDistance then
@@ -725,13 +698,10 @@ local function tryThirdSeaPhysicalPortal(module, styleName)
         return false
     end
 
-    -- If already on Castle on the Sea, use its physical portal for the target island.
     if (root.Position - castleRoute.IslandCenter).Magnitude <= 1450 then
         return tryFromCastleToDestination()
     end
 
-    -- Otherwise compare the nearest return portal against a direct flight.
-    -- Only take the two-portal route when it plausibly saves distance.
     local portal, portalDistance = nearestReturnPortal(root.Position)
     if not portal or portalDistance + 1200 >= targetDistance then
         return false
@@ -748,8 +718,6 @@ local function tryThirdSeaPhysicalPortal(module, styleName)
         return false
     end
 
-    -- After the first portal transition, the Castle portal models/text may only
-    -- now be streamed in, so scan again and activate the destination portal.
     task.wait(0.35)
     return tryFromCastleToDestination()
 end
@@ -795,12 +763,9 @@ local function invokeFightingStyleCommands(styleName)
             task.wait(0.15)
         end
 
-        -- The game may return text instead of boolean true. Tool verification
-        -- after this function determines whether equipping actually succeeded.
         return true, lastResult
     end
 
-    -- Optional fallback for environments that provide the custom ShopRemotes.
     local shopRemote = getRemote("BuyItem")
     if shopRemote and shopRemote:IsA("RemoteFunction") then
         local ok, result = pcall(function()
@@ -925,9 +890,6 @@ function ShopModule:FindFightingStyleNPC(styleName, silent)
         end
     end
 
-    -- Scan all currently replicated descendants. Match both Model names and
-    -- overhead UI text, then climb to the nearest valid NPC rig. This handles
-    -- nested rigs and NPCs whose visible name differs from the container name.
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("Model") then
             scannedModels += 1
@@ -981,8 +943,6 @@ end
 -- DIRECT FLIGHT (SHORTEST STRAIGHT-LINE ROUTE)
 --========================================================
 
--- Follows one straight 3D segment to the target. There is no lift-to-sky,
--- high-altitude cruise, or automatic descent detour.
 function ShopModule:FlyToPosition(destination, label, tolerance, shouldCancel)
     if destroyed or typeof(destination) ~= "Vector3" then
         return false
@@ -1039,7 +999,6 @@ function ShopModule:FlyToPosition(destination, label, tolerance, shouldCancel)
         local step = math.min(distance, FLY_SPEED * dt)
         local nextPosition = root.Position + delta.Unit * step
 
-        -- Advance directly toward the goal without adding an altitude offset.
         root.CFrame = CFrame.new(nextPosition) * root.CFrame.Rotation
         root.AssemblyLinearVelocity = Vector3.zero
     end
@@ -1055,8 +1014,6 @@ function ShopModule:FlyToPosition(destination, label, tolerance, shouldCancel)
         and (root.Position - destination).Magnitude <= math.max(tolerance * 2, 16)
 end
 
--- Final approach to the NPC. Re-read its live position because the NPC rig may
--- stream in after reaching the fallback landmark.
 function ShopModule:FlyToNPC(npc)
     if destroyed or not npc or not npc.Parent then
         return false
@@ -1076,7 +1033,6 @@ function ShopModule:FlyToNPC(npc)
         return false
     end
 
-    -- Confirm the NPC still exists and we actually arrived close enough.
     if not npc.Parent then
         return false
     end
@@ -1091,9 +1047,6 @@ function ShopModule:FlyToNPC(npc)
     return (root.Position - npcRoot.Position).Magnitude <= 12
 end
 
--- Repeatedly flies between the three vertices of an equilateral triangle
--- centered on the NPC. The horizontal radius is 8 studs. The loop is cancelled
--- immediately when this fighting-style toggle is turned off or another style is selected.
 function ShopModule:StartTriangleOrbit(styleName, npc)
     if destroyed or not npc or not npc.Parent then
         return false
@@ -1108,7 +1061,7 @@ function ShopModule:StartTriangleOrbit(styleName, npc)
 
     State.TriangleOrbitTokens[styleName] = (State.TriangleOrbitTokens[styleName] or 0) + 1
     local token = State.TriangleOrbitTokens[styleName]
-    local orbitRadius = 8
+    local orbitRadius = 6
     local offset = root.Position - npcRoot.Position
     local startAngle = math.atan2(offset.Z, offset.X)
 
@@ -1242,21 +1195,15 @@ function ShopModule:GetFightingStyle(styleName)
         return false
     end
 
-    -- Giữ lối vào vật lý ở First Sea cho Water Kung Fu (xoáy nước), như script cũ.
-    -- Nếu cửa vào không kích hoạt được thì dừng, không bay tới tọa độ ẩn của đảo.
     local underwaterRouteResult = tryFirstSeaUnderwaterEntrance(self, styleName)
     if underwaterRouteResult == false then
         return false
     end
 
-    -- Giữ nguyên hệ thống đi qua portal vật lý ở Third Sea khi tuyến portal hợp lý.
-    -- Hàm này tự kiểm tra khoảng cách và chỉ dùng portal theo logic của script cũ.
     tryThirdSeaPhysicalPortal(self, styleName)
 
-    -- Sau khi qua portal, quét NPC trong Workspace đã tải.
     local npc = self:FindFightingStyleNPC(styleName, true)
 
-    -- Chờ ngắn để NPC có thời gian được Roblox tải, nhưng không bay tới đảo dự phòng.
     if not npc then
         for attempt = 1, 5 do
             if destroyed then
@@ -1279,8 +1226,6 @@ function ShopModule:GetFightingStyle(styleName)
         return false
     end
 
-    -- Fly directly to the NPC and complete the normal interaction/purchase first.
-    -- The continuous triangle orbit starts after the toggle has entered the ON state.
     State.FightingStyleNPCs[styleName] = npc
     notify("Tìm thấy NPC " .. npc.Name .. "; đang bay thẳng tới NPC")
     if not self:FlyToNPC(npc) then
@@ -1293,14 +1238,12 @@ function ShopModule:GetFightingStyle(styleName)
     self:InteractNPC(npc)
     task.wait(0.15)
 
-    -- Gửi yêu cầu mua/trang bị võ bằng lệnh bình thường của game.
     local requestOK, requestResult = invokeFightingStyleCommands(styleName)
     if not requestOK then
         notify("Không thể gửi yêu cầu cho " .. styleName .. ": " .. tostring(requestResult))
         return false
     end
 
-    -- Xác nhận Tool đã xuất hiện rồi trang bị.
     local deadline = os.clock() + 5
     repeat
         if destroyed then
@@ -1550,8 +1493,6 @@ function ShopModule:Set(name, enabled)
         return true
     end
 
-    -- Stop any previous style's orbit before starting a new trip to its NPC.
-    -- This prevents two movement loops from fighting over the character position.
     for otherStyle in pairs(FightingStyleKeywords) do
         if otherStyle ~= name then
             State.FightingStyleEnabled[otherStyle] = false
@@ -1571,8 +1512,6 @@ function ShopModule:Set(name, enabled)
         return false
     end
 
-    -- Only one fighting style can be equipped at a time, so keep the UI state
-    -- consistent with the style that was successfully equipped.
     for styleName in pairs(FightingStyleKeywords) do
         State.FightingStyleEnabled[styleName] = styleName == name
         if styleName ~= name then
