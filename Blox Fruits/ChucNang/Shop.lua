@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
+local FLY_SPEED = 170
 
 local BuyItemRemote = nil
 local RedeemCodeRemote = nil
@@ -206,9 +207,8 @@ local function getFightingStyleFallback(styleName)
 end
 
 
--- Third Sea's native Portal network. The entrance points below are portal/area
--- landmarks used by the game's requestEntrance route. The server still decides
--- whether the route is unlocked and available.
+-- Third Sea Portal network. These are map landmarks for the physical portals;
+-- Castle's outgoing portal is detected from the loaded Workspace when possible.
 local ThirdSeaPortalRoutes = {
     ["Castle on the Sea"] = {
         IslandCenter = Vector3.new(-5097, 315, -3130),
@@ -399,207 +399,27 @@ local function getFightingStyleRemote()
     return nil
 end
 
-local function tryNativeThirdSeaPortal(styleName)
-    if destroyed or game.PlaceId ~= 7449423635 then
-        return false
-    end
-
-    local destinationName = ThirdSeaStyleDestinations[styleName]
-    local route = destinationName and ThirdSeaPortalRoutes[destinationName]
-    if not route then
-        return false
-    end
-
+local function getCurrentRoot()
     local character = getCharacter()
-    local root = character and character:FindFirstChild("HumanoidRootPart")
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    if not root or not humanoid or humanoid.Health <= 0 then
-        return false
-    end
+    return character and character:FindFirstChild("HumanoidRootPart")
+end
 
-    -- If already at the destination island, do not leave it to visit a portal.
-    if (root.Position - route.IslandCenter).Magnitude <= 1100 then
-        return false
-    end
+local function waitForIslandTransition(route, startPosition, timeout, label)
+    local deadline = os.clock() + (timeout or 4)
 
-    -- Water Kung Fu is sold at Castle on the Sea in Third Sea. The physical
-    -- portals on Tiki Outpost, Hydra Island, and the Floating Turtle/Mansion
-    -- connect back to Castle on the Sea. Fly into the closest of those portals
-    -- first; do not merely requestEntrance at the Castle's destination point.
-    if destinationName == "Castle on the Sea" then
-        local returnPortals = {
-            {
-                Name = "Mansion Portal (Floating Turtle)",
-                Position = ThirdSeaPortalRoutes["Floating Turtle"].Entrance,
-            },
-            {
-                Name = "Hydra Island Portal",
-                Position = ThirdSeaPortalRoutes["Hydra Island"].Entrance,
-            },
-            {
-                Name = "Tiki Outpost Portal",
-                Position = ThirdSeaPortalRoutes["Tiki Outpost"].Entrance,
-            },
-        }
-
-        local selectedPortal = nil
-        local nearestDistance = math.huge
-        for _, portal in ipairs(returnPortals) do
-            local distance = (root.Position - portal.Position).Magnitude
-            if distance < nearestDistance then
-                nearestDistance = distance
-                selectedPortal = portal
-            end
-        end
-
-        if not selectedPortal then
-            return false
-        end
-
-        local startPosition = root.Position
-        local startedAwayFromCastle =
-            (startPosition - route.IslandCenter).Magnitude > 1600
-
-        notify("Đang bay tới cổng " .. selectedPortal.Name .. " để về Castle on the Sea")
-
-        -- Move toward the portal while watching for the portal's server-side
-        -- teleport. If it triggers mid-flight, stop immediately so the flight
-        -- loop does not accidentally carry the character back out of the portal.
-        local flightDeadline = os.clock()
-            + math.max(nearestDistance / 250 * 2.5, 20)
-
-        while not destroyed and os.clock() < flightDeadline do
-            character = getCharacter()
-            root = character and character:FindFirstChild("HumanoidRootPart")
-            humanoid = character and character:FindFirstChildOfClass("Humanoid")
-
-            if not character or not root or not humanoid or humanoid.Health <= 0 then
-                return false
-            end
-
-            if startedAwayFromCastle
-                and (root.Position - route.IslandCenter).Magnitude <= 1600
-                and (root.Position - startPosition).Magnitude >= 250 then
-                notify("Đã dịch chuyển bằng cổng về Castle on the Sea")
-                task.wait(0.5)
-                return true
-            end
-
-            local delta = selectedPortal.Position - root.Position
-            local distance = delta.Magnitude
-            if distance <= 3 then
-                break
-            end
-
-            local dt = RunService.Heartbeat:Wait()
-            if not dt or dt <= 0 then
-                dt = 1 / 60
-            end
-
-            local step = math.min(distance, 250 * dt)
-            root.CFrame = CFrame.new(root.Position + delta.Unit * step)
-                * root.CFrame.Rotation
-            root.AssemblyLinearVelocity = Vector3.zero
-        end
-
-        if destroyed then
-            return false
-        end
-
-        -- Stand at the center of the portal and allow its normal game touch
-        -- logic a moment to trigger.
-        character = getCharacter()
-        root = character and character:FindFirstChild("HumanoidRootPart")
-        if root then
-            root.CFrame = CFrame.new(selectedPortal.Position) * root.CFrame.Rotation
-            root.AssemblyLinearVelocity = Vector3.zero
-        end
-
-        local portalDeadline = os.clock() + 3
-        repeat
-            if destroyed then
-                return false
-            end
-
-            character = getCharacter()
-            root = character and character:FindFirstChild("HumanoidRootPart")
-            if root and startedAwayFromCastle
-                and (root.Position - route.IslandCenter).Magnitude <= 1600
-                and (root.Position - startPosition).Magnitude >= 250 then
-                notify("Đã dịch chuyển bằng cổng về Castle on the Sea")
-                task.wait(0.5)
-                return true
-            end
-
-            task.wait(0.1)
-        until os.clock() >= portalDeadline
-
-        -- Some versions of the game do not trigger the physical portal from a
-        -- client-side movement alone. After physically reaching it, request the
-        -- game's own entrance transition as a fallback and verify the result.
-        local remote = getFightingStyleRemote()
-        if remote then
-            pcall(function()
-                remote:InvokeServer("requestEntrance", route.Entrance)
-            end)
-
-            local teleportDeadline = os.clock() + 2.5
-            repeat
-                if destroyed then
-                    return false
-                end
-
-                character = getCharacter()
-                root = character and character:FindFirstChild("HumanoidRootPart")
-                if root and startedAwayFromCastle
-                    and (root.Position - route.IslandCenter).Magnitude <= 1600
-                    and (root.Position - startPosition).Magnitude >= 250 then
-                    notify("Đã dịch chuyển tới Castle on the Sea")
-                    task.wait(0.5)
-                    return true
-                end
-
-                task.wait(0.1)
-            until os.clock() >= teleportDeadline
-        end
-
-        notify("Cổng chưa kích hoạt được; sẽ dùng đường bay dự phòng")
-        return false
-    end
-
-    -- For other Third Sea destinations, retain the native entrance request.
-    local remote = getFightingStyleRemote()
-    if not remote then
-        return false
-    end
-
-    local startPosition = root.Position
-    notify("Đang thử cổng dịch chuyển trong game tới " .. destinationName)
-
-    local ok = pcall(function()
-        remote:InvokeServer("requestEntrance", route.Entrance)
-    end)
-
-    if not ok then
-        notify("Cổng game không nhận yêu cầu tới " .. destinationName .. "; sẽ thử đường bay thẳng")
-        return false
-    end
-
-    local deadline = os.clock() + 2.5
     repeat
         if destroyed then
             return false
         end
 
-        character = getCharacter()
-        root = character and character:FindFirstChild("HumanoidRootPart")
+        local root = getCurrentRoot()
         if root then
             local distanceToDestination = (root.Position - route.IslandCenter).Magnitude
             local displacement = (root.Position - startPosition).Magnitude
 
-            if distanceToDestination <= 1600 and displacement >= 250 then
-                notify("Đã dùng cổng game tới " .. destinationName)
-                task.wait(0.6)
+            if distanceToDestination <= 1450 and displacement >= 250 then
+                notify("Đã vào khu vực " .. tostring(label or route.Name or "đích đến") .. " bằng cổng trong game")
+                task.wait(0.35)
                 return true
             end
         end
@@ -608,6 +428,328 @@ local function tryNativeThirdSeaPortal(styleName)
     until os.clock() >= deadline
 
     return false
+end
+
+local function moveThroughPhysicalPortal(module, portalPosition, portalLabel, destinationRoute, destinationName)
+    if destroyed or not portalPosition or not destinationRoute then
+        return false
+    end
+
+    local root = getCurrentRoot()
+    if not root then
+        return false
+    end
+
+    local startPosition = root.Position
+    if not module:FlyToPosition(portalPosition, portalLabel, 2) then
+        return false
+    end
+
+    -- Enter the portal's trigger volume rather than invoking requestEntrance.
+    -- The small vertical adjustment helps when the stored point is at the base
+    -- of the visible portal column.
+    local character = getCharacter()
+    root = character and character:FindFirstChild("HumanoidRootPart")
+    if root then
+        module:FlyToPosition(portalPosition + Vector3.new(0, 3, 0), portalLabel, 2)
+    end
+
+    if waitForIslandTransition(destinationRoute, startPosition, 3.5, destinationName) then
+        return true
+    end
+
+    notify("Đã tới " .. portalLabel .. " nhưng cổng chưa dịch chuyển; có thể chưa mở khóa hoặc điểm vào đã đổi")
+    return false
+end
+
+local PortalDestinationKeywords = {
+    ["Floating Turtle"] = { "mansion", "floating turtle" },
+    ["Hydra Island"] = { "hydra" },
+    ["Tiki Outpost"] = { "tiki" },
+}
+
+local function getPortalMetadata(instance)
+    local pieces = {}
+    local current = instance
+    local portalRoot = nil
+
+    -- Include nearby ancestor names because portal parts are often nested in Models.
+    for _ = 1, 5 do
+        if not current or current == workspace then
+            break
+        end
+
+        table.insert(pieces, tostring(current.Name or ""))
+        local lowerName = normalizeName(current.Name)
+        if not portalRoot and (string.find(lowerName, "portal", 1, true)
+            or string.find(lowerName, "indra", 1, true)) then
+            portalRoot = current
+        end
+        current = current.Parent
+    end
+
+    if portalRoot and portalRoot:IsA("BasePart") then
+        local ancestorModel = portalRoot:FindFirstAncestorOfClass("Model")
+        if ancestorModel then
+            portalRoot = ancestorModel
+        end
+    end
+
+    if portalRoot and portalRoot:IsA("Model") then
+        for _, descendant in ipairs(portalRoot:GetDescendants()) do
+            if descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
+                if descendant.Text and descendant.Text ~= "" then
+                    table.insert(pieces, descendant.Text)
+                end
+            end
+        end
+    end
+
+    return normalizeName(table.concat(pieces, " ")), portalRoot
+end
+
+local function findCastlePortalFor(destinationName)
+    local keywords = PortalDestinationKeywords[destinationName]
+    if not keywords then
+        return nil
+    end
+
+    local castleCenter = ThirdSeaPortalRoutes["Castle on the Sea"].IslandCenter
+    local bestPosition = nil
+    local bestDistance = math.huge
+    local seenRoots = {}
+
+    for _, instance in ipairs(workspace:GetDescendants()) do
+        if instance:IsA("BasePart") or instance:IsA("Model") then
+            local position
+            if instance:IsA("BasePart") then
+                position = instance.Position
+            else
+                position = instance:GetPivot().Position
+            end
+
+            if (position - castleCenter).Magnitude <= 1450 then
+                local metadata, portalRoot = getPortalMetadata(instance)
+                local isPortal = string.find(metadata, "portal", 1, true)
+                    or string.find(metadata, "indra", 1, true)
+
+                if isPortal then
+                    local matchesDestination = false
+                    for _, keyword in ipairs(keywords) do
+                        if string.find(metadata, normalizeName(keyword), 1, true) then
+                            matchesDestination = true
+                            break
+                        end
+                    end
+
+                    if matchesDestination then
+                        local candidate = portalRoot or instance
+                        if not seenRoots[candidate] then
+                            seenRoots[candidate] = true
+                            local candidatePosition
+                            if candidate:IsA("BasePart") then
+                                candidatePosition = candidate.Position
+                            elseif candidate:IsA("Model") then
+                                candidatePosition = candidate:GetPivot().Position
+                            end
+
+                            if candidatePosition then
+                                local distance = (candidatePosition - castleCenter).Magnitude
+                                if distance < bestDistance then
+                                    bestDistance = distance
+                                    bestPosition = candidatePosition
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return bestPosition
+end
+
+local function tryFirstSeaUnderwaterEntrance(module, styleName)
+    if destroyed or game.PlaceId ~= 2753915549 or styleName ~= "Water Kung Fu" then
+        return nil -- Not applicable; let the normal route logic run.
+    end
+
+    local underwaterCity = Vector3.new(61163.85, 11.68, 1819.78)
+    local root = getCurrentRoot()
+    if not root then
+        notify("Chưa tìm được nhân vật để đi tới Underwater City")
+        return false
+    end
+
+    if (root.Position - underwaterCity).Magnitude <= 2600 then
+        return true -- Already in/near Underwater City.
+    end
+
+    -- The First Sea entrance is a physical whirlpool near Frozen Village and Prison.
+    -- Prefer a streamed landmark with a matching name; use the documented map
+    -- coordinate as a fallback if the landmark is not named in Workspace.
+    local whirlpoolFallback = Vector3.new(3865, 5, -1926)
+    local whirlpoolPosition = nil
+    local bestDistance = math.huge
+
+    for _, instance in ipairs(workspace:GetDescendants()) do
+        if instance:IsA("BasePart") or instance:IsA("Model") then
+            local normalized = normalizeName(instance.Name)
+            if string.find(normalized, "whirlpool", 1, true) then
+                local position = instance:IsA("BasePart") and instance.Position
+                    or instance:GetPivot().Position
+                local distance = (position - whirlpoolFallback).Magnitude
+                if distance < bestDistance and distance <= 1800 then
+                    bestDistance = distance
+                    whirlpoolPosition = position
+                end
+            end
+        end
+    end
+
+    whirlpoolPosition = whirlpoolPosition or whirlpoolFallback
+    notify("Đang tới xoáy nước vào Underwater City")
+
+    if not module:FlyToPosition(whirlpoolPosition, "Whirlpool — Underwater City", 3) then
+        return false
+    end
+
+    -- Wait for the game's natural entrance trigger to transition the character.
+    -- Do not invoke requestEntrance remotely; if the whirlpool does not trigger,
+    -- stop here instead of moving directly to the hidden destination coordinates.
+    local deadline = os.clock() + 5
+    repeat
+        if destroyed then
+            return false
+        end
+
+        root = getCurrentRoot()
+        if root and (root.Position - underwaterCity).Magnitude <= 2600 then
+            notify("Đã vào Underwater City qua xoáy nước")
+            task.wait(0.35)
+            return true
+        end
+
+        task.wait(0.1)
+    until os.clock() >= deadline
+
+    notify("Đã tới xoáy nước nhưng chưa được đưa vào Underwater City. Hãy kiểm tra vị trí xoáy nước trong game hoặc điều kiện khu vực.")
+    return false
+end
+
+local function tryThirdSeaPhysicalPortal(module, styleName)
+    if destroyed or game.PlaceId ~= 7449423635 then
+        return false
+    end
+
+    local destinationName = ThirdSeaStyleDestinations[styleName]
+    local destinationRoute = destinationName and ThirdSeaPortalRoutes[destinationName]
+    if not destinationRoute then
+        return false
+    end
+
+    local root = getCurrentRoot()
+    if not root then
+        return false
+    end
+
+    local targetDistance = (root.Position - destinationRoute.IslandCenter).Magnitude
+    if targetDistance <= 1100 then
+        return false -- Already near the target island; scan for the NPC locally.
+    end
+
+    local castleRoute = ThirdSeaPortalRoutes["Castle on the Sea"]
+    local returnPortals = {
+        {
+            Name = "Mansion Portal",
+            Island = "Floating Turtle",
+            Position = ThirdSeaPortalRoutes["Floating Turtle"].Entrance,
+        },
+        {
+            Name = "Hydra Island Portal",
+            Island = "Hydra Island",
+            Position = ThirdSeaPortalRoutes["Hydra Island"].Entrance,
+        },
+        {
+            Name = "Tiki Outpost Portal",
+            Island = "Tiki Outpost",
+            Position = ThirdSeaPortalRoutes["Tiki Outpost"].Entrance,
+        },
+    }
+
+    local function nearestReturnPortal(position)
+        local selected = nil
+        local distance = math.huge
+        for _, portal in ipairs(returnPortals) do
+            local currentDistance = (position - portal.Position).Magnitude
+            if currentDistance < distance then
+                distance = currentDistance
+                selected = portal
+            end
+        end
+        return selected, distance
+    end
+
+    local function tryFromCastleToDestination()
+        local portalPosition = findCastlePortalFor(destinationName)
+        if not portalPosition then
+            notify("Chưa nhận diện được cổng đi tới " .. destinationName .. " ở Castle on the Sea; sẽ dùng đường bay thẳng nếu cần")
+            return false
+        end
+
+        return moveThroughPhysicalPortal(
+            module,
+            portalPosition,
+            "Portal tới " .. destinationName,
+            destinationRoute,
+            destinationName
+        )
+    end
+
+    -- Destination is Castle on the Sea: use the nearest physical return portal
+    -- only when it is shorter than flying directly to Castle.
+    if destinationName == "Castle on the Sea" then
+        local portal, portalDistance = nearestReturnPortal(root.Position)
+        if portal and portalDistance + 500 < targetDistance then
+            return moveThroughPhysicalPortal(
+                module,
+                portal.Position,
+                portal.Name,
+                castleRoute,
+                "Castle on the Sea"
+            )
+        end
+        return false
+    end
+
+    -- If already on Castle on the Sea, use its physical portal for the target island.
+    if (root.Position - castleRoute.IslandCenter).Magnitude <= 1450 then
+        return tryFromCastleToDestination()
+    end
+
+    -- Otherwise compare the nearest return portal against a direct flight.
+    -- Only take the two-portal route when it plausibly saves distance.
+    local portal, portalDistance = nearestReturnPortal(root.Position)
+    if not portal or portalDistance + 1200 >= targetDistance then
+        return false
+    end
+
+    local reachedCastle = moveThroughPhysicalPortal(
+        module,
+        portal.Position,
+        portal.Name,
+        castleRoute,
+        "Castle on the Sea"
+    )
+    if not reachedCastle then
+        return false
+    end
+
+    -- After the first portal transition, the Castle portal models/text may only
+    -- now be streamed in, so scan again and activate the destination portal.
+    task.wait(0.35)
+    return tryFromCastleToDestination()
 end
 
 local function findFightingStyleTool(styleName)
@@ -837,8 +979,8 @@ end
 -- DIRECT FLIGHT (SHORTEST STRAIGHT-LINE ROUTE)
 --========================================================
 
-local FLY_SPEED = 170
-
+-- Follows one straight 3D segment to the target. There is no lift-to-sky,
+-- high-altitude cruise, or automatic descent detour.
 function ShopModule:FlyToPosition(destination, label, tolerance)
     if destroyed or typeof(destination) ~= "Vector3" then
         return false
@@ -1011,13 +1153,20 @@ function ShopModule:GetFightingStyle(styleName)
         return false
     end
 
-    -- In Third Sea, first try the game's own Portal entrance for destinations
-    -- connected to the Portal network. The server can reject locked/unavailable
-    -- routes; in that case this module continues with its normal fallback.
-    tryNativeThirdSeaPortal(styleName)
+    -- Water Kung Fu in First Sea uses the physical Whirlpool entrance.
+    -- A failed entrance attempt must not fall through to the hidden island
+    -- coordinates, because that would skip the game's normal entrance.
+    local underwaterRouteResult = tryFirstSeaUnderwaterEntrance(self, styleName)
+    if underwaterRouteResult == false then
+        return false
+    end
 
-    -- Scan after the portal attempt, because a successful transition may load
-    -- the destination NPC into Workspace.
+    -- In Third Sea, prefer a physical portal when it is a shorter available route.
+    -- This path does not call requestEntrance remotely and never enables NoClip.
+    tryThirdSeaPhysicalPortal(self, styleName)
+
+    -- Scan after any successful portal transition, because streaming may have
+    -- loaded the destination NPC only after entering the island.
     local npc = self:FindFightingStyleNPC(styleName, true)
 
     -- If not present, move to the known region for the current Sea so Roblox
@@ -1465,7 +1614,6 @@ function ShopModule:Destroy()
         return
     end
 
-    -- Always restore collisions before marking the module destroyed.
     State.NoClipEnabled = false
     if noClipConnection then
         noClipConnection:Disconnect()
