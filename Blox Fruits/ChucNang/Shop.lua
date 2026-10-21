@@ -648,7 +648,7 @@ end
 -- DIRECT FLIGHT (SHORTEST STRAIGHT-LINE ROUTE)
 --========================================================
 
-local FLY_SPEED = 200
+local FLY_SPEED = 180
 
 function ShopModule:FlyToPosition(destination, label, tolerance)
     if destroyed or typeof(destination) ~= "Vector3" then
