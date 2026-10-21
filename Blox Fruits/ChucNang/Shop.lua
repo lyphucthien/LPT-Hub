@@ -542,7 +542,7 @@ end
 -- LONG-DISTANCE FLIGHT
 --========================================================
 
-local FLY_SPEED = 250
+local FLY_SPEED = 220
 
 function ShopModule:FlyToPosition(destination, label, tolerance)
     if destroyed or typeof(destination) ~= "Vector3" then
@@ -564,8 +564,6 @@ function ShopModule:FlyToPosition(destination, label, tolerance)
         return true
     end
 
-    -- Long trip timeout scales with distance; this matters for far-away regions
-    -- such as Underwater City in the First Sea.
     local deadline = os.clock() + math.max(initialDistance / FLY_SPEED * 2.5, 25)
     local cruiseY = math.max(root.Position.Y, destination.Y, 250) + 140
     local liftPoint = Vector3.new(root.Position.X, cruiseY, root.Position.Z)
