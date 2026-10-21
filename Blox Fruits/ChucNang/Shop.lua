@@ -5,7 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
-local FLY_SPEED = 175
+local FLY_SPEED = 172
 
 local BuyItemRemote = nil
 local RedeemCodeRemote = nil
