@@ -542,7 +542,7 @@ end
 -- LONG-DISTANCE FLIGHT
 --========================================================
 
-local FLY_SPEED = 220
+local FLY_SPEED = 200
 
 function ShopModule:FlyToPosition(destination, label, tolerance)
     if destroyed or typeof(destination) ~= "Vector3" then
