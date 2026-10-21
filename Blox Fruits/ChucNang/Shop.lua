@@ -1077,6 +1077,88 @@ function ShopModule:FlyToNPC(npc)
     return (root.Position - npcRoot.Position).Magnitude <= 12
 end
 
+-- Move once around the NPC along the three sides of a triangle, then return
+-- to the first vertex. The next step flies back to the NPC for interaction.
+function ShopModule:FlyTriangleAroundNPC(npc)
+    if destroyed or not npc or not npc.Parent then
+        return false
+    end
+
+    local npcRoot = getRoot(npc)
+    local character = getCharacter()
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not npcRoot or not root then
+        return false
+    end
+
+    local orbitRadius = 12
+    local center = npcRoot.Position + Vector3.new(0, 2, 0)
+    local offset = root.Position - center
+    local startAngle = math.atan2(offset.Z, offset.X)
+    local points = {}
+
+    -- Three equally spaced vertices make an equilateral triangular route.
+    for i = 0, 2 do
+        local angle = startAngle + (i * 2 * math.pi / 3)
+        points[i + 1] = center + Vector3.new(
+            math.cos(angle) * orbitRadius,
+            0,
+            math.sin(angle) * orbitRadius
+        )
+    end
+
+    notify("Đang bay theo đường tam giác quanh NPC " .. npc.Name)
+
+    -- Visit vertices 1 -> 2 -> 3 -> 1 to complete one triangular circuit.
+    for step = 1, 4 do
+        if destroyed or not npc.Parent then
+            return false
+        end
+
+        npcRoot = getRoot(npc)
+        if not npcRoot then
+            return false
+        end
+
+        -- Keep the triangle centered on the NPC's current position.
+        center = npcRoot.Position + Vector3.new(0, 2, 0)
+        offset = root.Position - center
+        if step == 1 then
+            startAngle = math.atan2(offset.Z, offset.X)
+            for i = 0, 2 do
+                local angle = startAngle + (i * 2 * math.pi / 3)
+                points[i + 1] = center + Vector3.new(
+                    math.cos(angle) * orbitRadius,
+                    0,
+                    math.sin(angle) * orbitRadius
+                )
+            end
+        else
+            -- Reposition the remaining vertices if the NPC has moved slightly.
+            local angle = startAngle + (((step - 1) % 3) * 2 * math.pi / 3)
+            points[((step - 1) % 3) + 1] = center + Vector3.new(
+                math.cos(angle) * orbitRadius,
+                0,
+                math.sin(angle) * orbitRadius
+            )
+        end
+
+        local pointIndex = ((step - 1) % 3) + 1
+        if not self:FlyToPosition(points[pointIndex], "tam giác quanh " .. npc.Name, 3) then
+            return false
+        end
+
+        -- Keep the root reference valid after character changes/respawns.
+        character = getCharacter()
+        root = character and character:FindFirstChild("HumanoidRootPart")
+        if not root then
+            return false
+        end
+    end
+
+    return true
+end
+
 --========================================================
 -- INTERACT WITH NPC
 --========================================================
@@ -1190,10 +1272,21 @@ function ShopModule:GetFightingStyle(styleName)
         return false
     end
 
-    -- FlyToNPC dùng FlyToPosition để bay thẳng theo đoạn 3D ngắn nhất tới NPC.
+    -- Bay thẳng tới NPC, bay một vòng tam giác quanh NPC, rồi quay lại để tương tác.
     notify("Tìm thấy NPC " .. npc.Name .. "; đang bay thẳng tới NPC")
     if not self:FlyToNPC(npc) then
         notify("Không thể tới gần NPC " .. npc.Name)
+        return false
+    end
+
+    if not self:FlyTriangleAroundNPC(npc) then
+        notify("Không thể hoàn thành đường bay tam giác quanh NPC " .. npc.Name)
+        return false
+    end
+
+    -- Return close to the NPC so the normal interaction/buy request can run.
+    if not self:FlyToNPC(npc) then
+        notify("Đã bay tam giác nhưng không thể quay lại gần NPC " .. npc.Name)
         return false
     end
 
