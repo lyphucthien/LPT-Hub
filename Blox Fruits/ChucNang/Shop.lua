@@ -645,10 +645,10 @@ function ShopModule:FindFightingStyleNPC(styleName, silent)
 end
 
 --========================================================
--- DIRECT FLIGHT (SHORTEST STRAIGHT-LINE ROUTE)
+-- DIRECT FLIGHT
 --========================================================
 
-local FLY_SPEED = 180
+local FLY_SPEED = 170
 
 function ShopModule:FlyToPosition(destination, label, tolerance)
     if destroyed or typeof(destination) ~= "Vector3" then
