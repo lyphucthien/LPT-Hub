@@ -259,6 +259,8 @@ local FightingStyleToolNames = {
 
 local State = {
     FightingStyleEnabled = {},
+    FightingStyleNPCs = {},
+    TriangleOrbitTokens = {},
     NoClipEnabled = false,
 }
 
@@ -981,7 +983,7 @@ end
 
 -- Follows one straight 3D segment to the target. There is no lift-to-sky,
 -- high-altitude cruise, or automatic descent detour.
-function ShopModule:FlyToPosition(destination, label, tolerance)
+function ShopModule:FlyToPosition(destination, label, tolerance, shouldCancel)
     if destroyed or typeof(destination) ~= "Vector3" then
         return false
     end
@@ -995,6 +997,14 @@ function ShopModule:FlyToPosition(destination, label, tolerance)
         return false
     end
 
+    local function cancelled()
+        return type(shouldCancel) == "function" and shouldCancel() == true
+    end
+
+    if cancelled() then
+        return false
+    end
+
     tolerance = tolerance or 8
     local initialDistance = (root.Position - destination).Magnitude
     if initialDistance <= tolerance then
@@ -1005,7 +1015,7 @@ function ShopModule:FlyToPosition(destination, label, tolerance)
     notify("Bay thẳng tới " .. tostring(label or "điểm đến")
         .. " • " .. tostring(math.floor(initialDistance)) .. " studs")
 
-    while not destroyed and os.clock() < deadline do
+    while not destroyed and not cancelled() and os.clock() < deadline do
         if player.Character ~= character
             or not root.Parent
             or humanoid.Health <= 0 then
@@ -1019,6 +1029,9 @@ function ShopModule:FlyToPosition(destination, label, tolerance)
         end
 
         local dt = RunService.Heartbeat:Wait()
+        if cancelled() then
+            return false
+        end
         if not dt or dt <= 0 then
             dt = 1 / 60
         end
@@ -1031,11 +1044,12 @@ function ShopModule:FlyToPosition(destination, label, tolerance)
         root.AssemblyLinearVelocity = Vector3.zero
     end
 
-    if not destroyed then
+    if not destroyed and not cancelled() then
         notify("Hết thời gian di chuyển tới " .. tostring(label or "điểm đến"))
     end
 
     return not destroyed
+        and not cancelled()
         and player.Character == character
         and root.Parent ~= nil
         and (root.Position - destination).Magnitude <= math.max(tolerance * 2, 16)
@@ -1077,9 +1091,10 @@ function ShopModule:FlyToNPC(npc)
     return (root.Position - npcRoot.Position).Magnitude <= 12
 end
 
--- Move once around the NPC along the three sides of a triangle, then return
--- to the first vertex. The next step flies back to the NPC for interaction.
-function ShopModule:FlyTriangleAroundNPC(npc)
+-- Repeatedly flies between the three vertices of an equilateral triangle
+-- centered on the NPC. The horizontal radius is 8 studs. The loop is cancelled
+-- immediately when this fighting-style toggle is turned off or another style is selected.
+function ShopModule:StartTriangleOrbit(styleName, npc)
     if destroyed or not npc or not npc.Parent then
         return false
     end
@@ -1091,70 +1106,62 @@ function ShopModule:FlyTriangleAroundNPC(npc)
         return false
     end
 
-    local orbitRadius = 12
-    local center = npcRoot.Position + Vector3.new(0, 2, 0)
-    local offset = root.Position - center
+    State.TriangleOrbitTokens[styleName] = (State.TriangleOrbitTokens[styleName] or 0) + 1
+    local token = State.TriangleOrbitTokens[styleName]
+    local orbitRadius = 8
+    local offset = root.Position - npcRoot.Position
     local startAngle = math.atan2(offset.Z, offset.X)
-    local points = {}
 
-    -- Three equally spaced vertices make an equilateral triangular route.
-    for i = 0, 2 do
-        local angle = startAngle + (i * 2 * math.pi / 3)
-        points[i + 1] = center + Vector3.new(
-            math.cos(angle) * orbitRadius,
-            0,
-            math.sin(angle) * orbitRadius
-        )
+    local function shouldStop()
+        return destroyed
+            or State.FightingStyleEnabled[styleName] ~= true
+            or State.TriangleOrbitTokens[styleName] ~= token
+            or not npc.Parent
     end
 
-    notify("Đang bay theo đường tam giác quanh NPC " .. npc.Name)
+    task.spawn(function()
+        notify("Đang bay tam giác quanh " .. npc.Name .. " (bán kính 8 studs). Tắt " .. styleName .. " để dừng.")
+        local vertexIndex = 0
 
-    -- Visit vertices 1 -> 2 -> 3 -> 1 to complete one triangular circuit.
-    for step = 1, 4 do
-        if destroyed or not npc.Parent then
-            return false
-        end
+        while not shouldStop() do
+            npcRoot = getRoot(npc)
+            character = getCharacter()
+            root = character and character:FindFirstChild("HumanoidRootPart")
 
-        npcRoot = getRoot(npc)
-        if not npcRoot then
-            return false
-        end
-
-        -- Keep the triangle centered on the NPC's current position.
-        center = npcRoot.Position + Vector3.new(0, 2, 0)
-        offset = root.Position - center
-        if step == 1 then
-            startAngle = math.atan2(offset.Z, offset.X)
-            for i = 0, 2 do
-                local angle = startAngle + (i * 2 * math.pi / 3)
-                points[i + 1] = center + Vector3.new(
-                    math.cos(angle) * orbitRadius,
-                    0,
-                    math.sin(angle) * orbitRadius
+            if not npcRoot or not root then
+                task.wait(0.15)
+            else
+                local angle = startAngle + (vertexIndex * 2 * math.pi / 3)
+                local center = npcRoot.Position
+                local destination = Vector3.new(
+                    center.X + math.cos(angle) * orbitRadius,
+                    center.Y + 2,
+                    center.Z + math.sin(angle) * orbitRadius
                 )
+
+                local moved = self:FlyToPosition(
+                    destination,
+                    "tam giác quanh " .. npc.Name,
+                    2,
+                    shouldStop
+                )
+
+                if shouldStop() then
+                    break
+                end
+
+                if moved then
+                    vertexIndex = (vertexIndex + 1) % 3
+                else
+                    task.wait(0.1)
+                end
             end
-        else
-            -- Reposition the remaining vertices if the NPC has moved slightly.
-            local angle = startAngle + (((step - 1) % 3) * 2 * math.pi / 3)
-            points[((step - 1) % 3) + 1] = center + Vector3.new(
-                math.cos(angle) * orbitRadius,
-                0,
-                math.sin(angle) * orbitRadius
-            )
         end
 
-        local pointIndex = ((step - 1) % 3) + 1
-        if not self:FlyToPosition(points[pointIndex], "tam giác quanh " .. npc.Name, 3) then
-            return false
+        if not destroyed then
+            notify("Đã dừng bay tam giác quanh " .. npc.Name)
         end
-
-        -- Keep the root reference valid after character changes/respawns.
-        character = getCharacter()
-        root = character and character:FindFirstChild("HumanoidRootPart")
-        if not root then
-            return false
-        end
-    end
+    end)
 
     return true
 end
@@ -1272,21 +1279,13 @@ function ShopModule:GetFightingStyle(styleName)
         return false
     end
 
-    -- Bay thẳng tới NPC, bay một vòng tam giác quanh NPC, rồi quay lại để tương tác.
+    -- Fly directly to the NPC and complete the normal interaction/purchase first.
+    -- The continuous triangle orbit starts after the toggle has entered the ON state.
+    State.FightingStyleNPCs[styleName] = npc
     notify("Tìm thấy NPC " .. npc.Name .. "; đang bay thẳng tới NPC")
     if not self:FlyToNPC(npc) then
+        State.FightingStyleNPCs[styleName] = nil
         notify("Không thể tới gần NPC " .. npc.Name)
-        return false
-    end
-
-    if not self:FlyTriangleAroundNPC(npc) then
-        notify("Không thể hoàn thành đường bay tam giác quanh NPC " .. npc.Name)
-        return false
-    end
-
-    -- Return close to the NPC so the normal interaction/buy request can run.
-    if not self:FlyToNPC(npc) then
-        notify("Đã bay tam giác nhưng không thể quay lại gần NPC " .. npc.Name)
         return false
     end
 
@@ -1541,12 +1540,24 @@ function ShopModule:Set(name, enabled)
 
     if not enabled then
         State.FightingStyleEnabled[name] = false
-        notify("Đã tắt: " .. name)
+        State.TriangleOrbitTokens[name] = (State.TriangleOrbitTokens[name] or 0) + 1
+        State.FightingStyleNPCs[name] = nil
+        notify("Đã tắt: " .. name .. " (đã dừng bay tam giác)")
         return true
     end
 
     if State.FightingStyleEnabled[name] == true then
         return true
+    end
+
+    -- Stop any previous style's orbit before starting a new trip to its NPC.
+    -- This prevents two movement loops from fighting over the character position.
+    for otherStyle in pairs(FightingStyleKeywords) do
+        if otherStyle ~= name then
+            State.FightingStyleEnabled[otherStyle] = false
+            State.TriangleOrbitTokens[otherStyle] = (State.TriangleOrbitTokens[otherStyle] or 0) + 1
+            State.FightingStyleNPCs[otherStyle] = nil
+        end
     end
 
     local styleSuccess = self:GetFightingStyle(name)
@@ -1564,6 +1575,17 @@ function ShopModule:Set(name, enabled)
     -- consistent with the style that was successfully equipped.
     for styleName in pairs(FightingStyleKeywords) do
         State.FightingStyleEnabled[styleName] = styleName == name
+        if styleName ~= name then
+            State.TriangleOrbitTokens[styleName] = (State.TriangleOrbitTokens[styleName] or 0) + 1
+            State.FightingStyleNPCs[styleName] = nil
+        end
+    end
+
+    local orbitNPC = State.FightingStyleNPCs[name]
+    if orbitNPC and orbitNPC.Parent then
+        self:StartTriangleOrbit(name, orbitNPC)
+    else
+        notify("Đã trang bị " .. name .. " nhưng không có NPC hợp lệ để bay vòng")
     end
 
     notify("Đã trang bị: " .. name)
@@ -1699,6 +1721,8 @@ function ShopModule:Destroy()
     RedeemCodeRemote = nil
 
     table.clear(State.FightingStyleEnabled)
+    table.clear(State.FightingStyleNPCs)
+    table.clear(State.TriangleOrbitTokens)
 
     for key in pairs(Callbacks) do
         Callbacks[key] = nil
