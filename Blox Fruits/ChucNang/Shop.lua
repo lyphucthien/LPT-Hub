@@ -10,16 +10,16 @@ local BuyItemRemote = nil
 local RedeemCodeRemote = nil
 
 local function refreshRemotes()
-    local RemotesFolder = ReplicatedStorage:FindFirstChild("ShopRemotes")
+    local remotesFolder = ReplicatedStorage:FindFirstChild("ShopRemotes")
 
-    if not RemotesFolder then
+    if not remotesFolder then
         BuyItemRemote = nil
         RedeemCodeRemote = nil
         return false
     end
 
-    BuyItemRemote = RemotesFolder:FindFirstChild("BuyItem")
-    RedeemCodeRemote = RemotesFolder:FindFirstChild("RedeemCode")
+    BuyItemRemote = remotesFolder:FindFirstChild("BuyItem")
+    RedeemCodeRemote = remotesFolder:FindFirstChild("RedeemCode")
 
     return true
 end
@@ -37,99 +37,153 @@ local ShopConfig = {
         Type = "Button",
         Cost = 2500,
         Currency = "Fragments",
-    	Color = LIGHT_BLUE
+        Color = LIGHT_BLUE,
     },
 
     ["Reset Stats"] = {
         Type = "Button",
         Cost = 3000,
         Currency = "Fragments",
-    	Color = LIGHT_BLUE
+        Color = LIGHT_BLUE,
     },
 
     ["Buy Race Cyborg"] = {
         Type = "Button",
         Cost = 3000,
         Currency = "Fragments",
-    	Color = LIGHT_BLUE
+        Color = LIGHT_BLUE,
     },
 
     ["Buy Race Ghoul"] = {
         Type = "Button",
         Cost = 3000,
         Currency = "Fragments",
-    	Color = LIGHT_BLUE
+        Color = LIGHT_BLUE,
     },
 
-    ["Dark Step"] = {Type = "Toggle"},
-    ["Electric"] = {Type = "Toggle"},
-    ["Water Kung Fu"] = {Type = "Toggle"},
-    ["Dragon Breath"] = {Type = "Toggle"},
-    ["Superhuman"] = {Type = "Toggle"},
-    ["Death Step"] = {Type = "Toggle"},
-    ["Sharkman Karate"] = {Type = "Toggle"},
-    ["Electric Claw"] = {Type = "Toggle"},
-    ["Dragon Talon"] = {Type = "Toggle"},
-    ["God Human"] = {Type = "Toggle"},
-    ["Sanguine Art"] = {Type = "Toggle"},
+    ["Dark Step"] = { Type = "Toggle" },
+    ["Electric"] = { Type = "Toggle" },
+    ["Water Kung Fu"] = { Type = "Toggle" },
+    ["Dragon Breath"] = { Type = "Toggle" },
+    ["Superhuman"] = { Type = "Toggle" },
+    ["Death Step"] = { Type = "Toggle" },
+    ["Sharkman Karate"] = { Type = "Toggle" },
+    ["Electric Claw"] = { Type = "Toggle" },
+    ["Dragon Talon"] = { Type = "Toggle" },
+    ["God Human"] = { Type = "Toggle" },
+    ["Sanguine Art"] = { Type = "Toggle" },
 
     ["Sky Jump"] = {
         Type = "Button",
         Cost = 10000,
         Currency = "Beli",
-    	Color = LIGHT_BLUE
+        Color = LIGHT_BLUE,
     },
 
     ["Buso Haki"] = {
         Type = "Button",
         Cost = 25000,
         Currency = "Beli",
-    	Color = LIGHT_BLUE
+        Color = LIGHT_BLUE,
     },
 
     ["Flash Step"] = {
         Type = "Button",
         Cost = 100000,
         Currency = "Beli",
-    	Color = LIGHT_BLUE
+        Color = LIGHT_BLUE,
     },
 
     ["Observation Haki"] = {
         Type = "Button",
         Cost = 750000,
         Currency = "Beli",
-    	Color = LIGHT_BLUE
-    }
+        Color = LIGHT_BLUE,
+    },
 }
 
 --========================================================
--- FIGHTING STYLE SCAN CONFIG
+-- FIGHTING STYLE NPC SCAN CONFIG
 --========================================================
 
 local FightingStyleKeywords = {
-    ["Dark Step"] = {"dark step teacher"},
-    ["Electric"] = {"mad scientist"},
-    ["Water Kung Fu"] = {"water kung fu teacher"},
-    ["Dragon Breath"] = {"sabi"},
-    ["Superhuman"] = {"martial arts master"},
-    ["Death Step"] = {"phoeyu", "reformed"},
-    ["Sharkman Karate"] = {"sharkman teacher", "daigrock"},
-    ["Electric Claw"] = {"previous hero"},
-    ["Dragon Talon"] = {"uzoth"},
-    ["God Human"] = {"ancient monk"},
-    ["Sanguine Art"] = {"shafi"}
+    ["Dark Step"] = { "dark step teacher" },
+    ["Electric"] = { "mad scientist" },
+    ["Water Kung Fu"] = { "water kung fu teacher" },
+    ["Dragon Breath"] = { "sabi" },
+    ["Superhuman"] = { "martial arts master" },
+    ["Death Step"] = { "phoeyu", "reformed" },
+    ["Sharkman Karate"] = { "sharkman teacher", "daigrock" },
+    ["Electric Claw"] = { "previous hero" },
+    ["Dragon Talon"] = { "uzoth" },
+    ["God Human"] = { "ancient monk" },
+    ["Sanguine Art"] = { "shafi" },
+}
+
+-- Each style uses the game's usual server command to buy/relearn it.
+-- Some styles need a short command sequence rather than one command.
+local FightingStyleCommands = {
+    ["Dark Step"] = {
+        { "BuyBlackLeg" },
+    },
+    ["Electric"] = {
+        { "BuyElectro" },
+    },
+    ["Water Kung Fu"] = {
+        { "BuyFishmanKarate" },
+    },
+    ["Dragon Breath"] = {
+        { "BlackbeardReward", "DragonClaw", "1" },
+        { "BlackbeardReward", "DragonClaw", "2" },
+    },
+    ["Superhuman"] = {
+        { "BuySuperhuman" },
+    },
+    ["Death Step"] = {
+        { "BuyDeathStep" },
+    },
+    ["Sharkman Karate"] = {
+        { "BuySharkmanKarate", true },
+        { "BuySharkmanKarate" },
+    },
+    ["Electric Claw"] = {
+        { "BuyElectricClaw" },
+    },
+    ["Dragon Talon"] = {
+        { "BuyDragonTalon" },
+    },
+    ["God Human"] = {
+        { "BuyGodhuman" },
+    },
+    ["Sanguine Art"] = {
+        { "BuySanguineArt" },
+    },
+}
+
+-- Tool names used by the game can differ slightly from the UI labels.
+local FightingStyleToolNames = {
+    ["Dark Step"] = { "Black Leg", "Dark Step" },
+    ["Electric"] = { "Electro", "Electric" },
+    ["Water Kung Fu"] = { "Fishman Karate", "Water Kung Fu" },
+    ["Dragon Breath"] = { "Dragon Breath", "Dragon Claw" },
+    ["Superhuman"] = { "Superhuman" },
+    ["Death Step"] = { "Death Step" },
+    ["Sharkman Karate"] = { "Sharkman Karate" },
+    ["Electric Claw"] = { "Electric Claw" },
+    ["Dragon Talon"] = { "Dragon Talon" },
+    ["God Human"] = { "Godhuman", "God Human" },
+    ["Sanguine Art"] = { "Sanguine Art" },
 }
 
 local State = {
-    FightingStyleEnabled = {}
+    FightingStyleEnabled = {},
 }
 
 local destroyed = false
-
 local Callbacks = {
     Success = nil,
     Failed = nil,
-    Notification = nil
+    Notification = nil,
 }
 
 --========================================================
@@ -151,8 +205,7 @@ local function notify(message)
 end
 
 local function validItem(name)
-    return type(name) == "string"
-        and ShopConfig[name] ~= nil
+    return type(name) == "string" and ShopConfig[name] ~= nil
 end
 
 local function getCharacter()
@@ -168,8 +221,7 @@ local function getRoot(model)
         return nil
     end
 
-    return model:FindFirstChild("HumanoidRootPart")
-        or model.PrimaryPart
+    return model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
 end
 
 local function normalizeName(name)
@@ -190,13 +242,94 @@ local function getRemote(name)
 
     if name == "BuyItem" then
         return BuyItemRemote
-    end
-
-    if name == "RedeemCode" then
+    elseif name == "RedeemCode" then
         return RedeemCodeRemote
     end
 
     return nil
+end
+
+local function getFightingStyleRemote()
+    if destroyed then
+        return nil
+    end
+
+    local remotesFolder = ReplicatedStorage:FindFirstChild("Remotes")
+    if not remotesFolder then
+        return nil
+    end
+
+    local remote = remotesFolder:FindFirstChild("CommF_")
+        or remotesFolder:FindFirstChild("CommF")
+
+    if remote and remote:IsA("RemoteFunction") then
+        return remote
+    end
+
+    return nil
+end
+
+local function findFightingStyleTool(styleName)
+    local aliases = FightingStyleToolNames[styleName] or { styleName }
+    local character = getCharacter()
+    local backpack = player:FindFirstChildOfClass("Backpack")
+
+    for _, toolName in ipairs(aliases) do
+        local tool = (character and character:FindFirstChild(toolName))
+            or (backpack and backpack:FindFirstChild(toolName))
+
+        if tool and tool:IsA("Tool") then
+            return tool
+        end
+    end
+
+    return nil
+end
+
+local function invokeFightingStyleCommands(styleName)
+    local remote = getFightingStyleRemote()
+    local commands = FightingStyleCommands[styleName]
+
+    if remote and commands then
+        local lastResult = nil
+
+        for _, args in ipairs(commands) do
+            if destroyed then
+                return false, "Module đã bị hủy"
+            end
+
+            local ok, result = pcall(function()
+                return remote:InvokeServer(table.unpack(args))
+            end)
+
+            if not ok then
+                return false, result
+            end
+
+            lastResult = result
+            task.wait(0.15)
+        end
+
+        -- The game may return text instead of boolean true. Tool verification
+        -- after this function determines whether equipping actually succeeded.
+        return true, lastResult
+    end
+
+    -- Optional fallback for environments that provide the custom ShopRemotes.
+    local shopRemote = getRemote("BuyItem")
+    if shopRemote and shopRemote:IsA("RemoteFunction") then
+        local ok, result = pcall(function()
+            return shopRemote:InvokeServer(styleName, "Toggle", true)
+        end)
+
+        if ok then
+            return true, result
+        end
+
+        return false, result
+    end
+
+    return false, "Không tìm thấy Remote mua võ (CommF_ hoặc ShopRemotes.BuyItem)"
 end
 
 --========================================================
@@ -204,19 +337,16 @@ end
 --========================================================
 
 local function isNPCModel(obj)
-    if not obj:IsA("Model") then
+    if not obj or not obj:IsA("Model") then
         return false
     end
 
     local humanoid = obj:FindFirstChildOfClass("Humanoid")
-
     if not humanoid or humanoid.Health <= 0 then
         return false
     end
 
-    local root = obj:FindFirstChild("HumanoidRootPart")
-        or obj.PrimaryPart
-
+    local root = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart
     return root ~= nil
 end
 
@@ -230,20 +360,17 @@ function ShopModule:FindFightingStyleNPC(styleName)
     end
 
     local keywords = FightingStyleKeywords[styleName]
-
     if not keywords then
         notify("Không có dữ liệu quét NPC cho: " .. tostring(styleName))
         return nil
     end
 
     local character = getCharacter()
-
     if not character then
         return nil
     end
 
     local playerRoot = character:FindFirstChild("HumanoidRootPart")
-
     if not playerRoot then
         return nil
     end
@@ -255,7 +382,6 @@ function ShopModule:FindFightingStyleNPC(styleName)
     for _, obj in ipairs(workspace:GetDescendants()) do
         if isNPCModel(obj) then
             local npcRoot = getRoot(obj)
-
             if npcRoot then
                 local score = 0
                 local normalized = normalizeName(obj.Name)
@@ -265,12 +391,7 @@ function ShopModule:FindFightingStyleNPC(styleName)
 
                     if normalized == normalizedKeyword then
                         score += 1000
-                    elseif string.find(
-                        normalized,
-                        normalizedKeyword,
-                        1,
-                        true
-                    ) then
+                    elseif string.find(normalized, normalizedKeyword, 1, true) then
                         score += 500
                     end
                 end
@@ -284,15 +405,9 @@ function ShopModule:FindFightingStyleNPC(styleName)
                 end
 
                 if score > 0 then
-                    local distance =
-                        (playerRoot.Position - npcRoot.Position).Magnitude
+                    local distance = (playerRoot.Position - npcRoot.Position).Magnitude
 
-                    if score > bestScore
-                        or (
-                            score == bestScore
-                            and distance < bestDistance
-                        ) then
-
+                    if score > bestScore or (score == bestScore and distance < bestDistance) then
                         bestNPC = obj
                         bestScore = score
                         bestDistance = distance
@@ -317,7 +432,6 @@ function ShopModule:FlyToNPC(npc)
     end
 
     local character = getCharacter()
-
     if not character then
         return false
     end
@@ -326,44 +440,28 @@ function ShopModule:FlyToNPC(npc)
     local root = character:FindFirstChild("HumanoidRootPart")
     local npcRoot = getRoot(npc)
 
-    if not humanoid
-        or humanoid.Health <= 0
-        or not root
-        or not npcRoot then
-
+    if not humanoid or humanoid.Health <= 0 or not root or not npcRoot then
         return false
     end
 
-    -- Vị trí dừng phía trước NPC
-    local targetPosition =
-        npcRoot.Position
+    local targetPosition = npcRoot.Position
         - npcRoot.CFrame.LookVector * 4
         + Vector3.new(0, 2, 0)
 
     local distance = (root.Position - targetPosition).Magnitude
-
     if distance <= 5 then
         return true
     end
 
     local duration = math.max(distance / FLY_SPEED, 0.15)
-
-    local targetCFrame = CFrame.lookAt(
-        targetPosition,
-        npcRoot.Position
-    )
+    local targetCFrame = CFrame.lookAt(targetPosition, npcRoot.Position)
 
     notify("Đang bay tới " .. npc.Name)
 
     local tween = TweenService:Create(
         root,
-        TweenInfo.new(
-            duration,
-            Enum.EasingStyle.Linear
-        ),
-        {
-            CFrame = targetCFrame
-        }
+        TweenInfo.new(duration, Enum.EasingStyle.Linear),
+        { CFrame = targetCFrame }
     )
 
     local finished = false
@@ -377,16 +475,11 @@ function ShopModule:FlyToNPC(npc)
     tween:Play()
 
     local deadline = os.clock() + duration + 2
-
-    while not finished
-        and not destroyed
-        and os.clock() < deadline do
-
+    while not finished and not destroyed and os.clock() < deadline do
         if player.Character ~= character
             or not root.Parent
             or not npc.Parent
             or humanoid.Health <= 0 then
-
             tween:Cancel()
             break
         end
@@ -400,15 +493,11 @@ function ShopModule:FlyToNPC(npc)
 
     connection:Disconnect()
 
-    if destroyed
-        or player.Character ~= character
-        or not root.Parent then
-
+    if destroyed or player.Character ~= character or not root.Parent then
         return false
     end
 
-    return reached
-        and (root.Position - targetPosition).Magnitude <= 10
+    return reached and (root.Position - targetPosition).Magnitude <= 10
 end
 
 --========================================================
@@ -420,7 +509,7 @@ function ShopModule:InteractNPC(npc)
         return false
     end
 
-    -- Proximity Prompt
+    -- Try a ProximityPrompt when the runtime supports it.
     for _, obj in ipairs(npc:GetDescendants()) do
         if obj:IsA("ProximityPrompt") then
             local triggered = false
@@ -439,7 +528,7 @@ function ShopModule:InteractNPC(npc)
         end
     end
 
-    -- Click Detector
+    -- Try a ClickDetector when supported.
     for _, obj in ipairs(npc:GetDescendants()) do
         if obj:IsA("ClickDetector") then
             local clicked = false
@@ -458,12 +547,13 @@ function ShopModule:InteractNPC(npc)
         end
     end
 
-    notify("Không tìm thấy cách tương tác tại " .. npc.Name)
+    -- Some game versions handle these NPCs entirely through CommF_, so a
+    -- missing prompt/click detector should not prevent the server request.
     return false
 end
 
 --========================================================
--- GET FIGHTING STYLE
+-- GET / EQUIP FIGHTING STYLE
 --========================================================
 
 function ShopModule:GetFightingStyle(styleName)
@@ -481,10 +571,15 @@ function ShopModule:GetFightingStyle(styleName)
         return false
     end
 
-    local npc = self:FindFightingStyleNPC(styleName)
+    if not FightingStyleCommands[styleName] then
+        notify("Chưa có lệnh cho: " .. styleName)
+        return false
+    end
 
+    local npc = self:FindFightingStyleNPC(styleName)
     if not npc then
-        return nil
+        notify("Không tìm thấy NPC bán võ: " .. styleName)
+        return false
     end
 
     if not self:FlyToNPC(npc) then
@@ -493,24 +588,61 @@ function ShopModule:GetFightingStyle(styleName)
     end
 
     task.wait(0.25)
+    self:InteractNPC(npc)
+    task.wait(0.15)
 
-    if not self:InteractNPC(npc) then
+    -- Buy/relearn through the game's normal server command. The game decides
+    -- whether this is a first purchase or a re-equip of a previously learned style.
+    local requestOK, requestResult = invokeFightingStyleCommands(styleName)
+    if not requestOK then
+        notify("Không thể gửi yêu cầu cho " .. styleName .. ": " .. tostring(requestResult))
         return false
     end
 
-    return true
+    -- Confirm that the fighting-style Tool appeared, then equip it.
+    local deadline = os.clock() + 5
+    repeat
+        if destroyed then
+            return false
+        end
+
+        local character = getCharacter()
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        local tool = findFightingStyleTool(styleName)
+
+        if tool and humanoid and character then
+            local equipOK = pcall(function()
+                humanoid:EquipTool(tool)
+            end)
+
+            if equipOK then
+                task.wait(0.1)
+
+                if tool.Parent == character then
+                    return true
+                end
+            end
+        end
+
+        task.wait(0.1)
+    until os.clock() >= deadline
+
+    local resultText = type(requestResult) == "string" and requestResult or ""
+    if resultText ~= "" then
+        notify("Chưa xác nhận được " .. styleName .. ". Phản hồi: " .. resultText)
+    else
+        notify("Chưa xác nhận được " .. styleName .. ". Có thể thiếu tiền, điều kiện hoặc Remote đã thay đổi.")
+    end
+
+    return false
 end
 
 --========================================================
--- CALLBACK
+-- CALLBACKS
 --========================================================
 
 function ShopModule:SetCallback(name, callback)
-    if destroyed then
-        return false
-    end
-
-    if Callbacks[name] == nil then
+    if destroyed or Callbacks[name] == nil then
         return false
     end
 
@@ -519,12 +651,11 @@ function ShopModule:SetCallback(name, callback)
     end
 
     Callbacks[name] = callback
-
     return true
 end
 
 --========================================================
--- GET
+-- GET ITEM CONFIG
 --========================================================
 
 function ShopModule:Get(name)
@@ -540,8 +671,7 @@ function ShopModule:Get(name)
     end
 
     if config.Type == "Toggle" then
-        result.Enabled =
-            State.FightingStyleEnabled[name] == true
+        result.Enabled = State.FightingStyleEnabled[name] == true
     end
 
     return result
@@ -564,7 +694,7 @@ function ShopModule:GetState(name)
 end
 
 --========================================================
--- BUY ITEM
+-- BUY ITEM BUTTON
 --========================================================
 
 function ShopModule:Buy(name)
@@ -578,14 +708,12 @@ function ShopModule:Buy(name)
     end
 
     local config = ShopConfig[name]
-
     if config.Type ~= "Button" then
         notify("Item này không phải Button: " .. name)
         return false
     end
 
     local remote = getRemote("BuyItem")
-
     if not remote then
         notify("BuyItem remote chưa sẵn sàng")
         return false
@@ -621,7 +749,6 @@ function ShopModule:Buy(name)
     end
 
     notify("Mua thất bại: " .. name)
-
     if type(Callbacks.Failed) == "function" then
         pcall(Callbacks.Failed, name, result)
     end
@@ -630,7 +757,7 @@ function ShopModule:Buy(name)
 end
 
 --========================================================
--- SET FIGHTING STYLE
+-- SET FIGHTING STYLE TOGGLE
 --========================================================
 
 function ShopModule:Set(name, enabled)
@@ -638,39 +765,23 @@ function ShopModule:Set(name, enabled)
         return false
     end
 
-    if not validItem(name) then
-        return false
-    end
-
-    if ShopConfig[name].Type ~= "Toggle" then
+    if not validItem(name) or ShopConfig[name].Type ~= "Toggle" then
         return false
     end
 
     enabled = enabled == true
 
-    -- Tắt Fighting Style
     if not enabled then
         State.FightingStyleEnabled[name] = false
-
         notify("Đã tắt: " .. name)
-
         return true
     end
 
-    -- Đã bật
     if State.FightingStyleEnabled[name] == true then
         return true
     end
 
-    -- Quét NPC và bay tới
     local styleSuccess = self:GetFightingStyle(name)
-
-    -- Không có NPC: không làm gì thêm
-    if styleSuccess == nil then
-        State.FightingStyleEnabled[name] = false
-        return false
-    end
-
     if not styleSuccess then
         State.FightingStyleEnabled[name] = false
 
@@ -681,51 +792,11 @@ function ShopModule:Set(name, enabled)
         return false
     end
 
-    -- Gửi yêu cầu tới server sau khi tìm thấy và tương tác NPC
-    local remote = getRemote("BuyItem")
-
-    if not remote then
-        State.FightingStyleEnabled[name] = false
-        notify("BuyItem remote chưa sẵn sàng")
-        return false
+    for styleName in pairs(FightingStyleKeywords) do
+        State.FightingStyleEnabled[styleName] = styleName == name
     end
 
-    if not remote:IsA("RemoteFunction") then
-        State.FightingStyleEnabled[name] = false
-        notify("BuyItem không phải RemoteFunction")
-        return false
-    end
-
-    local remoteSuccess, result = pcall(function()
-        return remote:InvokeServer(name, "Toggle", true)
-    end)
-
-    if not remoteSuccess then
-        State.FightingStyleEnabled[name] = false
-        notify("Không thể gửi yêu cầu: " .. name)
-
-        if type(Callbacks.Failed) == "function" then
-            pcall(Callbacks.Failed, name)
-        end
-
-        return false
-    end
-
-    if result ~= true then
-        State.FightingStyleEnabled[name] = false
-        notify("Server từ chối: " .. name)
-
-        if type(Callbacks.Failed) == "function" then
-            pcall(Callbacks.Failed, name, result)
-        end
-
-        return false
-    end
-
-    State.FightingStyleEnabled[name] = true
-
-    notify("Đã bật: " .. name)
-
+    notify("Đã trang bị: " .. name)
     if type(Callbacks.Success) == "function" then
         pcall(Callbacks.Success, name)
     end
@@ -738,11 +809,7 @@ end
 --========================================================
 
 function ShopModule:Toggle(name)
-    if destroyed then
-        return false
-    end
-
-    if not validItem(name) then
+    if destroyed or not validItem(name) then
         return false
     end
 
@@ -750,9 +817,7 @@ function ShopModule:Toggle(name)
         return false
     end
 
-    local current =
-        State.FightingStyleEnabled[name] == true
-
+    local current = State.FightingStyleEnabled[name] == true
     return self:Set(name, not current)
 end
 
@@ -784,7 +849,7 @@ local RedeemCodes = {
     "Axiore",
     "Chandler",
     "Fudd10",
-    "Fudd10_v2"
+    "Fudd10_v2",
 }
 
 function ShopModule:RedeemCode()
@@ -793,8 +858,8 @@ function ShopModule:RedeemCode()
     end
 
     local remote = getRemote("RedeemCode")
-
     if not remote or not remote:IsA("RemoteFunction") then
+        notify("RedeemCode remote chưa sẵn sàng")
         return false
     end
 
@@ -820,7 +885,7 @@ function ShopModule:RedeemCode()
 end
 
 --========================================================
--- GET ALL
+-- GET ALL ITEMS
 --========================================================
 
 function ShopModule:GetAll()
@@ -829,13 +894,13 @@ function ShopModule:GetAll()
     end
 
     local result = {}
-
     for name in pairs(ShopConfig) do
         result[name] = self:Get(name)
     end
 
     return result
 end
+
 
 function ShopModule:Destroy()
     if destroyed then
