@@ -438,6 +438,9 @@ function ShopModule:FindFightingStyleNPC(styleName)
         end
     end
 
+    -- Scan all currently replicated descendants. Match both Model names and
+    -- overhead UI text, then climb to the nearest valid NPC rig. This handles
+    -- nested rigs and NPCs whose visible name differs from the container name.
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("Model") then
             scannedModels += 1
@@ -489,7 +492,10 @@ end
 -- FLY TO NPC
 --========================================================
 
+-- Fly in short segments instead of one long Tween. This makes long-distance
+-- trips more reliable than trying to tween the character across the whole map.
 local FLY_SPEED = 250
+local FLY_SEGMENT_DISTANCE = 160
 
 function ShopModule:FlyToNPC(npc)
     if destroyed or not npc or not npc.Parent then
@@ -509,60 +515,116 @@ function ShopModule:FlyToNPC(npc)
         return false
     end
 
-    local targetPosition = npcRoot.Position
-        - npcRoot.CFrame.LookVector * 4
-        + Vector3.new(0, 2, 0)
+    local function getTargetPosition()
+        if not npc.Parent then
+            return nil
+        end
 
-    local distance = (root.Position - targetPosition).Magnitude
-    if distance <= 5 then
+        local currentNpcRoot = getRoot(npc)
+        if not currentNpcRoot then
+            return nil
+        end
+
+        return currentNpcRoot.Position
+            - currentNpcRoot.CFrame.LookVector * 4
+            + Vector3.new(0, 2, 0), currentNpcRoot
+    end
+
+    local firstTarget = getTargetPosition()
+    if not firstTarget then
+        return false
+    end
+
+    local initialDistance = (root.Position - firstTarget).Magnitude
+    if initialDistance <= 5 then
         return true
     end
 
-    local duration = math.max(distance / FLY_SPEED, 0.15)
-    local targetCFrame = CFrame.lookAt(targetPosition, npcRoot.Position)
+    -- Allow enough time for long trips while retaining a timeout in case the
+    -- character gets stuck or the target becomes unavailable.
+    local deadline = os.clock() + math.max(initialDistance / FLY_SPEED, 5) + 12
+    notify("Đang bay tới " .. npc.Name .. " (" .. math.floor(initialDistance) .. " studs)")
 
-    notify("Đang bay tới " .. npc.Name)
-
-    local tween = TweenService:Create(
-        root,
-        TweenInfo.new(duration, Enum.EasingStyle.Linear),
-        { CFrame = targetCFrame }
-    )
-
-    local finished = false
-    local reached = false
-
-    local connection = tween.Completed:Connect(function(playbackState)
-        finished = true
-        reached = playbackState == Enum.PlaybackState.Completed
-    end)
-
-    tween:Play()
-
-    local deadline = os.clock() + duration + 2
-    while not finished and not destroyed and os.clock() < deadline do
+    while not destroyed and os.clock() < deadline do
         if player.Character ~= character
             or not root.Parent
             or not npc.Parent
             or humanoid.Health <= 0 then
-            tween:Cancel()
-            break
+            return false
         end
 
-        task.wait(0.05)
+        local targetPosition, currentNpcRoot = getTargetPosition()
+        if not targetPosition or not currentNpcRoot then
+            notify("NPC không còn được tải: " .. npc.Name)
+            return false
+        end
+
+        local offset = targetPosition - root.Position
+        local distance = offset.Magnitude
+        if distance <= 5 then
+            return true
+        end
+
+        local segmentDistance = math.min(distance, FLY_SEGMENT_DISTANCE)
+        local direction = offset.Unit
+        local waypoint = root.Position + direction * segmentDistance
+        local targetCFrame = CFrame.lookAt(waypoint, currentNpcRoot.Position)
+        local duration = math.max(segmentDistance / FLY_SPEED, 0.05)
+
+        local tween = TweenService:Create(
+            root,
+            TweenInfo.new(duration, Enum.EasingStyle.Linear),
+            { CFrame = targetCFrame }
+        )
+
+        local completed = false
+        local playbackState = nil
+        local connection = tween.Completed:Connect(function(state)
+            completed = true
+            playbackState = state
+        end)
+
+        tween:Play()
+
+        while not completed and not destroyed do
+            if player.Character ~= character
+                or not root.Parent
+                or not npc.Parent
+                or humanoid.Health <= 0 then
+                tween:Cancel()
+                break
+            end
+            task.wait(0.03)
+        end
+
+        if not completed then
+            tween:Cancel()
+        end
+        connection:Disconnect()
+
+        if destroyed
+            or player.Character ~= character
+            or not root.Parent
+            or humanoid.Health <= 0 then
+            return false
+        end
+
+        if playbackState ~= Enum.PlaybackState.Completed then
+            -- Retry the remaining distance in another segment if a tween was
+            -- interrupted; the main deadline prevents an endless loop.
+            task.wait(0.05)
+        end
     end
 
-    if not finished then
-        tween:Cancel()
+    if not destroyed and npc.Parent and root.Parent then
+        local lastTarget = getTargetPosition()
+        if lastTarget and (root.Position - lastTarget).Magnitude <= 10 then
+            return true
+        end
     end
 
-    connection:Disconnect()
-
-    if destroyed or player.Character ~= character or not root.Parent then
-        return false
-    end
-
-    return reached and (root.Position - targetPosition).Magnitude <= 10
+    notify("Bay chưa tới được NPC " .. npc.Name .. ". Hãy thử lại hoặc kiểm tra khu vực/Sea.")
+    return false
 end
 
 --========================================================
@@ -574,6 +636,7 @@ function ShopModule:InteractNPC(npc)
         return false
     end
 
+    -- Try a ProximityPrompt when the runtime supports it.
     for _, obj in ipairs(npc:GetDescendants()) do
         if obj:IsA("ProximityPrompt") then
             local triggered = false
@@ -592,6 +655,7 @@ function ShopModule:InteractNPC(npc)
         end
     end
 
+    -- Try a ClickDetector when supported.
     for _, obj in ipairs(npc:GetDescendants()) do
         if obj:IsA("ClickDetector") then
             local clicked = false
@@ -610,6 +674,8 @@ function ShopModule:InteractNPC(npc)
         end
     end
 
+    -- Some game versions handle these NPCs entirely through CommF_, so a
+    -- missing prompt/click detector should not prevent the server request.
     return false
 end
 
@@ -853,6 +919,8 @@ function ShopModule:Set(name, enabled)
         return false
     end
 
+    -- Only one fighting style can be equipped at a time, so keep the UI state
+    -- consistent with the style that was successfully equipped.
     for styleName in pairs(FightingStyleKeywords) do
         State.FightingStyleEnabled[styleName] = styleName == name
     end
@@ -940,6 +1008,12 @@ function ShopModule:RedeemCode()
         end
 
         task.wait(0.15)
+    end
+
+    if anySuccess then
+        notify("Đã đổi được ít nhất một code")
+    else
+        notify("Không đổi được code nào; có thể code đã hết hạn hoặc đã dùng")
     end
 
     return anySuccess
