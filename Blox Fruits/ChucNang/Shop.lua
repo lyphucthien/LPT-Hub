@@ -1754,10 +1754,31 @@ function ShopModule:Set(name, enabled)
     end
 
     if not styleSuccess then
+        local orbitNPC = State.FightingStyleNPCs[name]
+
+        if orbitNPC and orbitNPC.Parent then
+            State.FightingStyleEnabled[name] = true
+            State.ActiveFightingStyle = name
+
+            publishFightingStyleStates()
+
+            notify("Đang bắt đầu bay tam giác quanh NPC " .. orbitNPC.Name)
+
+            local started = self:StartTriangleOrbit(name, orbitNPC)
+
+            if not started then
+                notify("Không thể bắt đầu bay tam giác quanh NPC " .. orbitNPC.Name)
+            end
+
+            return true
+        end
+
         State.FightingStyleEnabled[name] = false
+
         if State.ActiveFightingStyle == name then
             State.ActiveFightingStyle = nil
         end
+
         invalidateStyleOperation(name)
         State.FightingStyleNPCs[name] = nil
         publishFightingStyleStates()
