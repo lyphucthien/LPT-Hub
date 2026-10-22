@@ -161,6 +161,53 @@ local FightingStyleCommands = {
 }
 
 local FightingStyleFallbackPositions = {
+    -- Tọa độ đã lấy từ log của game PlaceId 85211729168715 (khu vực Sea 1–3).
+    [85211729168715] = {
+        ["Dark Step"] = {
+            Name = "Dark Step Teacher",
+            Position = Vector3.new(-990.73, 26.03, 4025.69),
+        },
+        ["Electric"] = {
+            Name = "Mad Scientist",
+            Position = Vector3.new(-4628.89, 12.13, -355.72),
+        },
+        ["Water Kung Fu"] = {
+            Name = "Water Kung-fu Teacher",
+            Position = Vector3.new(61715.23, 53.00, 871.93),
+        },
+        ["Dragon Breath"] = {
+            Name = "Sabi",
+            Position = Vector3.new(699.03, 185.66, 654.90),
+        },
+        ["Superhuman"] = {
+            Name = "Martial Arts Master",
+            Position = Vector3.new(1377.12, 246.54, -5189.95),
+        },
+        ["Death Step"] = {
+            Name = "Phoeyu, the Reformed",
+            Position = Vector3.new(6356.47, 296.10, -6762.77),
+        },
+        ["Sharkman Karate"] = {
+            Name = "Sharkman Teacher",
+            Position = Vector3.new(-2599.62, 238.20, -10316.00),
+        },
+        ["Electric Claw"] = {
+            Name = "Previous Hero",
+            Position = Vector3.new(-10371.47, 330.76, -10131.42),
+        },
+        ["Dragon Talon"] = {
+            Name = "Uzoth",
+            Position = Vector3.new(5661.90, 1210.88, 863.18),
+        },
+        ["God Human"] = {
+            Name = "Ancient Monk",
+            Position = Vector3.new(-13774.09, 333.73, -9879.91),
+        },
+        ["Sanguine Art"] = {
+            Name = "Shafi",
+            Position = Vector3.new(-16515.07, 22.81, -188.57),
+        },
+    },
     [2753915549] = {
         ["Dark Step"] = { Name = "Pirate Village", Position = Vector3.new(-1152, 25, 3826) },
         ["Electric"] = { Name = "lower Skylands", Position = Vector3.new(-4851, 400, -2561) },
@@ -249,6 +296,7 @@ local State = {
     FightingStyleEnabled = {},
     FightingStyleNPCs = {},
     TriangleOrbitTokens = {},
+    TriangleOrbitNPCs = {},
     StyleOperationTokens = {},
     ActiveFightingStyle = nil,
     NoClipEnabled = false,
@@ -377,6 +425,7 @@ end
 local function invalidateStyleOperation(styleName)
     State.StyleOperationTokens[styleName] = (State.StyleOperationTokens[styleName] or 0) + 1
     State.TriangleOrbitTokens[styleName] = (State.TriangleOrbitTokens[styleName] or 0) + 1
+    State.TriangleOrbitNPCs[styleName] = nil
 end
 
 local function validItem(name)
@@ -1222,6 +1271,13 @@ function ShopModule:StartTriangleOrbit(styleName, npc)
         return false
     end
 
+    -- If this NPC already has an active orbit, keep it running instead of restarting it.
+    if State.TriangleOrbitNPCs[styleName] == npc
+        and State.FightingStyleEnabled[styleName] == true
+        and State.ActiveFightingStyle == styleName then
+        return true
+    end
+
     local npcRoot = getRoot(npc)
     local character = getCharacter()
     local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -1231,10 +1287,13 @@ function ShopModule:StartTriangleOrbit(styleName, npc)
 
     State.TriangleOrbitTokens[styleName] = (State.TriangleOrbitTokens[styleName] or 0) + 1
     local token = State.TriangleOrbitTokens[styleName]
+    State.TriangleOrbitNPCs[styleName] = npc
+
     local orbitRadius = 6
     local orbitSpeed = 55
     local offset = root.Position - npcRoot.Position
     local startAngle = math.atan2(offset.Z, offset.X)
+    local debugPrintedVertices = {}
 
     local function shouldStop()
         return destroyed
@@ -1247,7 +1306,6 @@ function ShopModule:StartTriangleOrbit(styleName, npc)
     task.spawn(function()
         notify("Đang bay tam giác liên tục quanh " .. npc.Name .. " (bán kính 6 studs). Tắt " .. styleName .. " để dừng.")
         local vertexIndex = 0
-        local debugPrintedVertices = {}
 
         while not shouldStop() do
             npcRoot = getRoot(npc)
@@ -1257,30 +1315,27 @@ function ShopModule:StartTriangleOrbit(styleName, npc)
             if not npcRoot or not root or not root.Parent then
                 task.wait(0.15)
             else
-                local angle = startAngle + (vertexIndex * 2 * math.pi / 3)
                 local center = npcRoot.Position
+                local angle = startAngle + (vertexIndex * 2 * math.pi / 3)
                 local destination = Vector3.new(
                     center.X + math.cos(angle) * orbitRadius,
                     center.Y + 2,
                     center.Z + math.sin(angle) * orbitRadius
                 )
 
-if not debugPrintedVertices[vertexIndex] then
-    debugPrintedVertices[vertexIndex] = true
-
-    local currentRoot = getCurrentRoot()
-    local pos = currentRoot and currentRoot.Position
-
-    print(string.format(
-        "[LPT ORBIT DEBUG] Style=%s | NPC=%s | Vertex=%d | Center=(%.2f, %.2f, %.2f) | Target=(%.2f, %.2f, %.2f) | Player=%s",
-        tostring(styleName),
-        tostring(npc.Name),
-        vertexIndex + 1,
-        center.X, center.Y, center.Z,
-        destination.X, destination.Y, destination.Z,
-        pos and string.format("(%.2f, %.2f, %.2f)", pos.X, pos.Y, pos.Z) or "nil"
-    ))
-end
+                if not debugPrintedVertices[vertexIndex] then
+                    debugPrintedVertices[vertexIndex] = true
+                    local playerPosition = root.Position
+                    print(string.format(
+                        "[LPT ORBIT DEBUG] Style=%s | NPC=%s | Vertex=%d | Center=(%.2f, %.2f, %.2f) | Target=(%.2f, %.2f, %.2f) | Player=(%.2f, %.2f, %.2f)",
+                        tostring(styleName),
+                        tostring(npc.Name),
+                        vertexIndex + 1,
+                        center.X, center.Y, center.Z,
+                        destination.X, destination.Y, destination.Z,
+                        playerPosition.X, playerPosition.Y, playerPosition.Z
+                    ))
+                end
 
                 local callOK, moved = pcall(function()
                     return self:FlyToPosition(
@@ -1298,12 +1353,16 @@ end
                 end
 
                 if callOK and moved then
+                    -- Chuyển sang đỉnh tiếp theo ngay; không chờ thêm ở đỉnh hiện tại.
                     vertexIndex = (vertexIndex + 1) % 3
-                    task.wait(0.03)
                 else
                     task.wait(0.1)
                 end
             end
+        end
+
+        if State.TriangleOrbitTokens[styleName] == token then
+            State.TriangleOrbitNPCs[styleName] = nil
         end
 
         if not destroyed then
@@ -1449,28 +1508,21 @@ function ShopModule:GetFightingStyle(styleName, shouldCancel)
         return false
     end
 
-local debugRoot = getRoot(npc)
-
-if debugRoot then
-    local p = debugRoot.Position
-    local look = debugRoot.CFrame.LookVector
-
-    local target = p
-        - look * 4
-        + Vector3.new(0, 2, 0)
-
-    print(string.format(
-        "[LPT NPC DEBUG] Style=%s | NPC=%s | Position=(%.2f, %.2f, %.2f) | Target=(%.2f, %.2f, %.2f)",
-        tostring(styleName),
-        tostring(npc.Name),
-        p.X, p.Y, p.Z,
-        target.X, target.Y, target.Z
-    ))
-else
-    warn("[LPT NPC DEBUG] Không tìm thấy RootPart: " .. tostring(npc.Name))
-end
-
     State.FightingStyleNPCs[styleName] = npc
+
+    local debugRoot = getRoot(npc)
+    if debugRoot then
+        local p = debugRoot.Position
+        local look = debugRoot.CFrame.LookVector
+        local target = p - look * 4 + Vector3.new(0, 2, 0)
+        print(string.format(
+            "[LPT NPC DEBUG] Style=%s | NPC=%s | Position=(%.2f, %.2f, %.2f) | Target=(%.2f, %.2f, %.2f)",
+            tostring(styleName), tostring(npc.Name),
+            p.X, p.Y, p.Z,
+            target.X, target.Y, target.Z
+        ))
+    end
+
     notify("Tìm thấy NPC " .. npc.Name .. "; đang bay thẳng tới NPC")
     if not self:FlyToNPC(npc, shouldCancel) then
         if not cancelled() then
@@ -1480,15 +1532,20 @@ end
         return false
     end
 
-    task.wait(0.25)
     if cancelled() then
         return false
     end
 
     self:InteractNPC(npc)
-    task.wait(0.15)
     if cancelled() then
         return false
+    end
+
+    -- Start orbit immediately after reaching/interacting with the NPC.
+    -- It continues while the style command runs and while the Tool is verified/equipped.
+    local orbitStarted = self:StartTriangleOrbit(styleName, npc)
+    if not orbitStarted then
+        notify("Chưa khởi động được vòng tam giác; sẽ thử lại sau khi xử lý Fighting Style.")
     end
 
     local requestOK, requestResult = invokeFightingStyleCommands(styleName)
@@ -1757,7 +1814,7 @@ function ShopModule:Set(name, enabled)
         end
 
         publishFightingStyleStates()
-        notify("Đã tắt " .. name .. " và dừng bay")
+        notify("Đã tắt: " .. name .. " (đã dừng mọi chuyển động của Fighting Style)")
         return true
     end
 
@@ -1796,28 +1853,25 @@ function ShopModule:Set(name, enabled)
         local orbitNPC = State.FightingStyleNPCs[name]
 
         if orbitNPC and orbitNPC.Parent then
+            -- Keep the toggle/orbit active even if the server didn't confirm the style Tool.
             State.FightingStyleEnabled[name] = true
             State.ActiveFightingStyle = name
-
             publishFightingStyleStates()
 
-            notify("Đang bắt đầu bay tam giác quanh NPC " .. orbitNPC.Name)
-
             local started = self:StartTriangleOrbit(name, orbitNPC)
-
             if not started then
-                notify("Không thể bắt đầu bay tam giác quanh NPC " .. orbitNPC.Name)
+                notify("Không xác nhận được " .. name .. " và chưa khởi động được vòng tam giác.")
+            else
+                notify("Chưa xác nhận được " .. name .. "; vẫn tiếp tục bay tam giác quanh NPC.")
             end
 
             return true
         end
 
         State.FightingStyleEnabled[name] = false
-
         if State.ActiveFightingStyle == name then
             State.ActiveFightingStyle = nil
         end
-
         invalidateStyleOperation(name)
         State.FightingStyleNPCs[name] = nil
         publishFightingStyleStates()
@@ -1976,6 +2030,7 @@ function ShopModule:Destroy()
     table.clear(State.FightingStyleEnabled)
     table.clear(State.FightingStyleNPCs)
     table.clear(State.TriangleOrbitTokens)
+    table.clear(State.TriangleOrbitNPCs)
     table.clear(State.StyleOperationTokens)
 
     for key in pairs(Callbacks) do
