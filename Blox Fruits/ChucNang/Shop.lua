@@ -161,7 +161,6 @@ local FightingStyleCommands = {
 }
 
 local FightingStyleFallbackPositions = {
-    -- Blox Fruits First Sea
     [2753915549] = {
         ["Dark Step"] = { Name = "Pirate Village", Position = Vector3.new(-1152, 25, 3826) },
         ["Electric"] = { Name = "lower Skylands", Position = Vector3.new(-4851, 400, -2561) },
@@ -299,8 +298,6 @@ local function applyNoClipToCharacter()
         restoreNoClipCollisions()
         noClipCharacter = character
 
-        -- Newly added body parts/accessory handles are made non-collidable immediately,
-        -- without waiting for the next Stepped update.
         if character then
             noClipDescendantConnection = character.DescendantAdded:Connect(function(object)
                 if not State.NoClipEnabled or player.Character ~= character then
@@ -633,7 +630,7 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
     end
 
     if game.PlaceId ~= 2753915549 or styleName ~= "Water Kung Fu" then
-        return nil -- Not applicable; keep normal route logic.
+        return nil
     end
 
     local underwaterCity = Vector3.new(61163.85, 11.68, 1819.78)
@@ -1095,7 +1092,6 @@ function ShopModule:FlyToPosition(destination, label, tolerance, shouldCancel, s
             dt = 1 / 60
         end
 
-        -- Recheck after yielding; the character may have respawned during Heartbeat.
         if player.Character ~= character or not root.Parent or humanoid.Health <= 0 then
             return false
         end
@@ -1198,14 +1194,12 @@ function ShopModule:FlyToFallbackOrNPC(styleName, fallback, shouldCancel)
         return nil
     end
 
-    -- If the NPC streamed in while flying, redirect straight to it instead of continuing to the landmark.
     local npc = scanForNPC(true)
     if npc and npc.Parent then
         notify("Đã phát hiện " .. npc.Name .. " trên đường; đổi hướng bay thẳng tới NPC")
         return npc
     end
 
-    -- On arrival, give StreamingEnabled a short period to replicate the NPC.
     for attempt = 1, 16 do
         if shouldCancelOperation(shouldCancel) then
             return nil
@@ -1238,13 +1232,10 @@ function ShopModule:StartTriangleOrbit(styleName, npc)
     State.TriangleOrbitTokens[styleName] = (State.TriangleOrbitTokens[styleName] or 0) + 1
     local token = State.TriangleOrbitTokens[styleName]
     local orbitRadius = 6
-    local orbitSpeed = 55 -- Slower than the long-distance flight speed, so each side is visible.
+    local orbitSpeed = 55
     local offset = root.Position - npcRoot.Position
     local startAngle = math.atan2(offset.Z, offset.X)
 
-    -- The token is the authoritative stop signal. Set(false) and switching to
-    -- another style both increment it; relying on the UI/state flag here can
-    -- stop the orbit prematurely if that flag is refreshed externally.
     local function shouldStop()
         return destroyed
             or State.FightingStyleEnabled[styleName] ~= true
@@ -1273,8 +1264,6 @@ function ShopModule:StartTriangleOrbit(styleName, npc)
                     center.Z + math.sin(angle) * orbitRadius
                 )
 
-                -- Protect the orbit worker from a transient character/root error;
-                -- retry the same vertex instead of silently killing the whole loop.
                 local callOK, moved = pcall(function()
                     return self:FlyToPosition(
                         destination,
@@ -1282,7 +1271,7 @@ function ShopModule:StartTriangleOrbit(styleName, npc)
                         1.5,
                         shouldStop,
                         orbitSpeed,
-                        true -- Avoid a notification for every triangle edge.
+                        true
                     )
                 end)
 
@@ -1335,7 +1324,6 @@ function ShopModule:InteractNPC(npc)
         end
     end
 
-    -- Try a ClickDetector when supported.
     for _, obj in ipairs(npc:GetDescendants()) do
         if obj:IsA("ClickDetector") then
             local clicked = false
@@ -1354,8 +1342,6 @@ function ShopModule:InteractNPC(npc)
         end
     end
 
-    -- Some game versions handle these NPCs entirely through CommF_, so a
-    -- missing prompt/click detector should not prevent the server request.
     return false
 end
 
@@ -1428,7 +1414,6 @@ function ShopModule:GetFightingStyle(styleName, shouldCancel)
             return false
         end
 
-        -- While travelling toward the region, scan for the NPC and immediately redirect when it streams in.
         npc = self:FlyToFallbackOrNPC(styleName, fallback, shouldCancel)
         if cancelled() then
             return false
@@ -1726,7 +1711,7 @@ function ShopModule:Set(name, enabled)
         end
 
         publishFightingStyleStates()
-        notify("Đã tắt: " .. name .. " (đã dừng mọi chuyển động của Fighting Style)")
+        notify("Đã tắt " .. name .. " và dừng bay")
         return true
     end
 
@@ -1734,7 +1719,6 @@ function ShopModule:Set(name, enabled)
         return true
     end
 
-    -- Enforce a single active Fighting Style and invalidate any movement belonging to the previous one.
     for otherStyle in pairs(FightingStyleKeywords) do
         if otherStyle ~= name then
             State.FightingStyleEnabled[otherStyle] = false
