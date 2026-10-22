@@ -250,6 +250,8 @@ local State = {
     FightingStyleEnabled = {},
     FightingStyleNPCs = {},
     TriangleOrbitTokens = {},
+    StyleOperationTokens = {},
+    ActiveFightingStyle = nil,
     NoClipEnabled = false,
 }
 
@@ -327,6 +329,7 @@ local Callbacks = {
     Success = nil,
     Failed = nil,
     Notification = nil,
+    StateChanged = nil,
 }
 
 --========================================================
@@ -345,6 +348,38 @@ local function notify(message)
     else
         print("[LPT Hub Shop]", message)
     end
+end
+
+local function shouldCancelOperation(callback)
+    if destroyed then
+        return true
+    end
+
+    if type(callback) == "function" then
+        local ok, result = pcall(callback)
+        return not ok or result == true
+    end
+
+    return false
+end
+
+local function publishFightingStyleStates()
+    if type(Callbacks.StateChanged) ~= "function" then
+        return
+    end
+
+    for styleName in pairs(FightingStyleKeywords) do
+        pcall(
+            Callbacks.StateChanged,
+            styleName,
+            State.FightingStyleEnabled[styleName] == true
+        )
+    end
+end
+
+local function invalidateStyleOperation(styleName)
+    State.StyleOperationTokens[styleName] = (State.StyleOperationTokens[styleName] or 0) + 1
+    State.TriangleOrbitTokens[styleName] = (State.TriangleOrbitTokens[styleName] or 0) + 1
 end
 
 local function validItem(name)
@@ -418,11 +453,11 @@ local function getCurrentRoot()
     return character and character:FindFirstChild("HumanoidRootPart")
 end
 
-local function waitForIslandTransition(route, startPosition, timeout, label)
+local function waitForIslandTransition(route, startPosition, timeout, label, shouldCancel)
     local deadline = os.clock() + (timeout or 4)
 
     repeat
-        if destroyed then
+        if shouldCancelOperation(shouldCancel) then
             return false
         end
 
@@ -434,7 +469,7 @@ local function waitForIslandTransition(route, startPosition, timeout, label)
             if distanceToDestination <= 1450 and displacement >= 250 then
                 notify("Đã vào khu vực " .. tostring(label or route.Name or "đích đến") .. " bằng cổng trong game")
                 task.wait(0.35)
-                return true
+                return not shouldCancelOperation(shouldCancel)
             end
         end
 
@@ -444,8 +479,8 @@ local function waitForIslandTransition(route, startPosition, timeout, label)
     return false
 end
 
-local function moveThroughPhysicalPortal(module, portalPosition, portalLabel, destinationRoute, destinationName)
-    if destroyed or not portalPosition or not destinationRoute then
+local function moveThroughPhysicalPortal(module, portalPosition, portalLabel, destinationRoute, destinationName, shouldCancel)
+    if shouldCancelOperation(shouldCancel) or not portalPosition or not destinationRoute then
         return false
     end
 
@@ -455,21 +490,33 @@ local function moveThroughPhysicalPortal(module, portalPosition, portalLabel, de
     end
 
     local startPosition = root.Position
-    if not module:FlyToPosition(portalPosition, portalLabel, 2) then
+    if not module:FlyToPosition(portalPosition, portalLabel, 2, shouldCancel) then
+        return false
+    end
+
+    if shouldCancelOperation(shouldCancel) then
         return false
     end
 
     local character = getCharacter()
     root = character and character:FindFirstChild("HumanoidRootPart")
     if root then
-        module:FlyToPosition(portalPosition + Vector3.new(0, 3, 0), portalLabel, 2)
+        if not module:FlyToPosition(portalPosition + Vector3.new(0, 3, 0), portalLabel, 2, shouldCancel) then
+            return false
+        end
     end
 
-    if waitForIslandTransition(destinationRoute, startPosition, 3.5, destinationName) then
+    if shouldCancelOperation(shouldCancel) then
+        return false
+    end
+
+    if waitForIslandTransition(destinationRoute, startPosition, 3.5, destinationName, shouldCancel) then
         return true
     end
 
-    notify("Đã tới " .. portalLabel .. " nhưng cổng chưa dịch chuyển; có thể chưa mở khóa hoặc điểm vào đã đổi")
+    if not shouldCancelOperation(shouldCancel) then
+        notify("Đã tới " .. portalLabel .. " nhưng cổng chưa dịch chuyển; có thể chưa mở khóa hoặc điểm vào đã đổi")
+    end
     return false
 end
 
@@ -580,9 +627,13 @@ local function findCastlePortalFor(destinationName)
     return bestPosition
 end
 
-local function tryFirstSeaUnderwaterEntrance(module, styleName)
-    if destroyed or game.PlaceId ~= 2753915549 or styleName ~= "Water Kung Fu" then
-        return nil
+local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
+    if shouldCancelOperation(shouldCancel) then
+        return false
+    end
+
+    if game.PlaceId ~= 2753915549 or styleName ~= "Water Kung Fu" then
+        return nil -- Not applicable; keep normal route logic.
     end
 
     local underwaterCity = Vector3.new(61163.85, 11.68, 1819.78)
@@ -601,6 +652,10 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName)
     local bestDistance = math.huge
 
     for _, instance in ipairs(workspace:GetDescendants()) do
+        if shouldCancelOperation(shouldCancel) then
+            return false
+        end
+
         if instance:IsA("BasePart") or instance:IsA("Model") then
             local normalized = normalizeName(instance.Name)
             if string.find(normalized, "whirlpool", 1, true) then
@@ -618,13 +673,13 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName)
     whirlpoolPosition = whirlpoolPosition or whirlpoolFallback
     notify("Đang tới xoáy nước vào Underwater City")
 
-    if not module:FlyToPosition(whirlpoolPosition, "Whirlpool — Underwater City", 3) then
+    if not module:FlyToPosition(whirlpoolPosition, "Whirlpool — Underwater City", 3, shouldCancel) then
         return false
     end
 
     local deadline = os.clock() + 5
     repeat
-        if destroyed then
+        if shouldCancelOperation(shouldCancel) then
             return false
         end
 
@@ -632,18 +687,20 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName)
         if root and (root.Position - underwaterCity).Magnitude <= 2600 then
             notify("Đã vào Underwater City qua xoáy nước")
             task.wait(0.35)
-            return true
+            return not shouldCancelOperation(shouldCancel)
         end
 
         task.wait(0.1)
     until os.clock() >= deadline
 
-    notify("Đã tới xoáy nước nhưng chưa được đưa vào Underwater City. Hãy kiểm tra vị trí xoáy nước trong game hoặc điều kiện khu vực.")
+    if not shouldCancelOperation(shouldCancel) then
+        notify("Đã tới xoáy nước nhưng chưa được đưa vào Underwater City. Hãy kiểm tra vị trí xoáy nước trong game hoặc điều kiện khu vực.")
+    end
     return false
 end
 
-local function tryThirdSeaPhysicalPortal(module, styleName)
-    if destroyed or game.PlaceId ~= 7449423635 then
+local function tryThirdSeaPhysicalPortal(module, styleName, shouldCancel)
+    if shouldCancelOperation(shouldCancel) or game.PlaceId ~= 7449423635 then
         return false
     end
 
@@ -696,6 +753,10 @@ local function tryThirdSeaPhysicalPortal(module, styleName)
     end
 
     local function tryFromCastleToDestination()
+        if shouldCancelOperation(shouldCancel) then
+            return false
+        end
+
         local portalPosition = findCastlePortalFor(destinationName)
         if not portalPosition then
             notify("Chưa nhận diện được cổng đi tới " .. destinationName .. " ở Castle on the Sea; sẽ dùng đường bay thẳng nếu cần")
@@ -707,7 +768,8 @@ local function tryThirdSeaPhysicalPortal(module, styleName)
             portalPosition,
             "Portal tới " .. destinationName,
             destinationRoute,
-            destinationName
+            destinationName,
+            shouldCancel
         )
     end
 
@@ -719,7 +781,8 @@ local function tryThirdSeaPhysicalPortal(module, styleName)
                 portal.Position,
                 portal.Name,
                 castleRoute,
-                "Castle on the Sea"
+                "Castle on the Sea",
+                shouldCancel
             )
         end
         return false
@@ -739,13 +802,17 @@ local function tryThirdSeaPhysicalPortal(module, styleName)
         portal.Position,
         portal.Name,
         castleRoute,
-        "Castle on the Sea"
+        "Castle on the Sea",
+        shouldCancel
     )
-    if not reachedCastle then
+    if not reachedCastle or shouldCancelOperation(shouldCancel) then
         return false
     end
 
     task.wait(0.35)
+    if shouldCancelOperation(shouldCancel) then
+        return false
+    end
     return tryFromCastleToDestination()
 end
 
@@ -1051,8 +1118,8 @@ function ShopModule:FlyToPosition(destination, label, tolerance, shouldCancel, s
         and (root.Position - destination).Magnitude <= math.max(tolerance * 2, 16)
 end
 
-function ShopModule:FlyToNPC(npc)
-    if destroyed or not npc or not npc.Parent then
+function ShopModule:FlyToNPC(npc, shouldCancel)
+    if destroyed or shouldCancelOperation(shouldCancel) or not npc or not npc.Parent then
         return false
     end
 
@@ -1065,8 +1132,8 @@ function ShopModule:FlyToNPC(npc)
         - npcRoot.CFrame.LookVector * 4
         + Vector3.new(0, 2, 0)
 
-    local moved = self:FlyToPosition(targetPosition, npc.Name, 5)
-    if not moved then
+    local moved = self:FlyToPosition(targetPosition, npc.Name, 5, shouldCancel)
+    if not moved or shouldCancelOperation(shouldCancel) then
         return false
     end
 
@@ -1081,14 +1148,14 @@ function ShopModule:FlyToNPC(npc)
         return false
     end
 
-    return (root.Position - npcRoot.Position).Magnitude <= 12
+    return not shouldCancelOperation(shouldCancel)
+        and (root.Position - npcRoot.Position).Magnitude <= 12
 end
 
--- Fly toward the island landmark only while the NPC is not yet streamed in.
--- During the flight, periodically rescan Workspace; if the NPC appears, cancel
--- the landmark route and return the NPC so the caller can fly directly to it.
-function ShopModule:FlyToFallbackOrNPC(styleName, fallback)
-    if destroyed or type(fallback) ~= "table" or typeof(fallback.Position) ~= "Vector3" then
+function ShopModule:FlyToFallbackOrNPC(styleName, fallback, shouldCancel)
+    if destroyed or shouldCancelOperation(shouldCancel)
+        or type(fallback) ~= "table"
+        or typeof(fallback.Position) ~= "Vector3" then
         return nil
     end
 
@@ -1099,6 +1166,10 @@ function ShopModule:FlyToFallbackOrNPC(styleName, fallback)
     local function scanForNPC(force)
         if foundNPC and foundNPC.Parent then
             return foundNPC
+        end
+
+        if shouldCancelOperation(shouldCancel) then
+            return nil
         end
 
         local now = os.clock()
@@ -1114,7 +1185,7 @@ function ShopModule:FlyToFallbackOrNPC(styleName, fallback)
     end
 
     local function shouldCancelRoute()
-        if destroyed then
+        if shouldCancelOperation(shouldCancel) then
             return true
         end
         return scanForNPC(false) ~= nil
@@ -1123,20 +1194,20 @@ function ShopModule:FlyToFallbackOrNPC(styleName, fallback)
     notify("Chưa thấy NPC " .. styleName .. "; đang bay về khu vực " .. fallback.Name .. " và quét NPC trên đường")
     self:FlyToPosition(fallback.Position, fallback.Name, 40, shouldCancelRoute)
 
-    if destroyed then
+    if shouldCancelOperation(shouldCancel) then
         return nil
     end
 
-    -- If the NPC streamed in while flying, do not continue toward the landmark.
+    -- If the NPC streamed in while flying, redirect straight to it instead of continuing to the landmark.
     local npc = scanForNPC(true)
     if npc and npc.Parent then
         notify("Đã phát hiện " .. npc.Name .. " trên đường; đổi hướng bay thẳng tới NPC")
         return npc
     end
 
-    -- On arrival, allow StreamingEnabled a short period to replicate the NPC.
+    -- On arrival, give StreamingEnabled a short period to replicate the NPC.
     for attempt = 1, 16 do
-        if destroyed then
+        if shouldCancelOperation(shouldCancel) then
             return nil
         end
 
@@ -1176,6 +1247,8 @@ function ShopModule:StartTriangleOrbit(styleName, npc)
     -- stop the orbit prematurely if that flag is refreshed externally.
     local function shouldStop()
         return destroyed
+            or State.FightingStyleEnabled[styleName] ~= true
+            or State.ActiveFightingStyle ~= styleName
             or State.TriangleOrbitTokens[styleName] ~= token
             or not npc.Parent
     end
@@ -1290,8 +1363,12 @@ end
 -- GET / EQUIP FIGHTING STYLE
 --========================================================
 
-function ShopModule:GetFightingStyle(styleName)
-    if destroyed then
+function ShopModule:GetFightingStyle(styleName, shouldCancel)
+    local function cancelled()
+        return shouldCancelOperation(shouldCancel)
+    end
+
+    if cancelled() then
         return false
     end
 
@@ -1310,18 +1387,21 @@ function ShopModule:GetFightingStyle(styleName)
         return false
     end
 
-    local underwaterRouteResult = tryFirstSeaUnderwaterEntrance(self, styleName)
-    if underwaterRouteResult == false then
+    local underwaterRouteResult = tryFirstSeaUnderwaterEntrance(self, styleName, shouldCancel)
+    if cancelled() or underwaterRouteResult == false then
         return false
     end
 
-    tryThirdSeaPhysicalPortal(self, styleName)
+    tryThirdSeaPhysicalPortal(self, styleName, shouldCancel)
+    if cancelled() then
+        return false
+    end
 
     local npc = self:FindFightingStyleNPC(styleName, true)
 
     if not npc then
         for attempt = 1, 5 do
-            if destroyed then
+            if cancelled() then
                 return false
             end
 
@@ -1331,6 +1411,10 @@ function ShopModule:GetFightingStyle(styleName)
                 break
             end
         end
+    end
+
+    if cancelled() then
+        return false
     end
 
     if not npc then
@@ -1344,9 +1428,11 @@ function ShopModule:GetFightingStyle(styleName)
             return false
         end
 
-        -- This route is only a fallback for StreamingEnabled: if the NPC appears
-        -- before reaching the landmark, immediately redirect to the NPC instead.
-        npc = self:FlyToFallbackOrNPC(styleName, fallback)
+        -- While travelling toward the region, scan for the NPC and immediately redirect when it streams in.
+        npc = self:FlyToFallbackOrNPC(styleName, fallback, shouldCancel)
+        if cancelled() then
+            return false
+        end
         if not npc then
             notify(
                 "Đã kiểm tra khu vực " .. fallback.Name .. " nhưng chưa tìm thấy NPC "
@@ -1356,19 +1442,35 @@ function ShopModule:GetFightingStyle(styleName)
         end
     end
 
+    if cancelled() then
+        return false
+    end
+
     State.FightingStyleNPCs[styleName] = npc
     notify("Tìm thấy NPC " .. npc.Name .. "; đang bay thẳng tới NPC")
-    if not self:FlyToNPC(npc) then
-        State.FightingStyleNPCs[styleName] = nil
-        notify("Không thể tới gần NPC " .. npc.Name)
+    if not self:FlyToNPC(npc, shouldCancel) then
+        if not cancelled() then
+            State.FightingStyleNPCs[styleName] = nil
+            notify("Không thể tới gần NPC " .. npc.Name)
+        end
         return false
     end
 
     task.wait(0.25)
+    if cancelled() then
+        return false
+    end
+
     self:InteractNPC(npc)
     task.wait(0.15)
+    if cancelled() then
+        return false
+    end
 
     local requestOK, requestResult = invokeFightingStyleCommands(styleName)
+    if cancelled() then
+        return false
+    end
     if not requestOK then
         notify("Không thể gửi yêu cầu cho " .. styleName .. ": " .. tostring(requestResult))
         return false
@@ -1376,7 +1478,7 @@ function ShopModule:GetFightingStyle(styleName)
 
     local deadline = os.clock() + 5
     repeat
-        if destroyed then
+        if cancelled() then
             return false
         end
 
@@ -1391,6 +1493,9 @@ function ShopModule:GetFightingStyle(styleName)
 
             if equipOK then
                 task.wait(0.1)
+                if cancelled() then
+                    return false
+                end
                 if tool.Parent == character then
                     return true
                 end
@@ -1399,6 +1504,10 @@ function ShopModule:GetFightingStyle(styleName)
 
         task.wait(0.1)
     until os.clock() >= deadline
+
+    if cancelled() then
+        return false
+    end
 
     local resultText = type(requestResult) == "string" and requestResult or ""
     if resultText ~= "" then
@@ -1409,10 +1518,6 @@ function ShopModule:GetFightingStyle(styleName)
 
     return false
 end
-
---========================================================
--- CALLBACKS
---========================================================
 
 function ShopModule:SetCallback(name, callback)
     if destroyed or Callbacks[name] == nil then
@@ -1489,7 +1594,7 @@ function ShopModule:SetNoClip(enabled)
         State.NoClipEnabled = true
 
         if not noClipConnection then
-            noClipConnection = RunService.Stepped:Connect(function()
+            noClipConnection = RunService.PreSimulation:Connect(function()
                 if destroyed or not State.NoClipEnabled then
                     return
                 end
@@ -1613,27 +1718,58 @@ function ShopModule:Set(name, enabled)
 
     if not enabled then
         State.FightingStyleEnabled[name] = false
-        State.TriangleOrbitTokens[name] = (State.TriangleOrbitTokens[name] or 0) + 1
+        invalidateStyleOperation(name)
         State.FightingStyleNPCs[name] = nil
-        notify("Đã tắt: " .. name .. " (đã dừng bay tam giác)")
+
+        if State.ActiveFightingStyle == name then
+            State.ActiveFightingStyle = nil
+        end
+
+        publishFightingStyleStates()
+        notify("Đã tắt: " .. name .. " (đã dừng mọi chuyển động của Fighting Style)")
         return true
     end
 
-    if State.FightingStyleEnabled[name] == true then
+    if State.FightingStyleEnabled[name] == true and State.ActiveFightingStyle == name then
         return true
     end
 
+    -- Enforce a single active Fighting Style and invalidate any movement belonging to the previous one.
     for otherStyle in pairs(FightingStyleKeywords) do
         if otherStyle ~= name then
             State.FightingStyleEnabled[otherStyle] = false
-            State.TriangleOrbitTokens[otherStyle] = (State.TriangleOrbitTokens[otherStyle] or 0) + 1
+            invalidateStyleOperation(otherStyle)
             State.FightingStyleNPCs[otherStyle] = nil
         end
     end
 
-    local styleSuccess = self:GetFightingStyle(name)
+    State.StyleOperationTokens[name] = (State.StyleOperationTokens[name] or 0) + 1
+    local operationToken = State.StyleOperationTokens[name]
+    State.FightingStyleNPCs[name] = nil
+    State.ActiveFightingStyle = name
+    State.FightingStyleEnabled[name] = true
+    publishFightingStyleStates()
+
+    local function shouldCancel()
+        return destroyed
+            or State.ActiveFightingStyle ~= name
+            or State.FightingStyleEnabled[name] ~= true
+            or State.StyleOperationTokens[name] ~= operationToken
+    end
+
+    local styleSuccess = self:GetFightingStyle(name, shouldCancel)
+    if shouldCancel() then
+        return false
+    end
+
     if not styleSuccess then
         State.FightingStyleEnabled[name] = false
+        if State.ActiveFightingStyle == name then
+            State.ActiveFightingStyle = nil
+        end
+        invalidateStyleOperation(name)
+        State.FightingStyleNPCs[name] = nil
+        publishFightingStyleStates()
 
         if type(Callbacks.Failed) == "function" then
             pcall(Callbacks.Failed, name)
@@ -1645,10 +1781,10 @@ function ShopModule:Set(name, enabled)
     for styleName in pairs(FightingStyleKeywords) do
         State.FightingStyleEnabled[styleName] = styleName == name
         if styleName ~= name then
-            State.TriangleOrbitTokens[styleName] = (State.TriangleOrbitTokens[styleName] or 0) + 1
             State.FightingStyleNPCs[styleName] = nil
         end
     end
+    publishFightingStyleStates()
 
     local orbitNPC = State.FightingStyleNPCs[name]
     if orbitNPC and orbitNPC.Parent then
@@ -1664,10 +1800,6 @@ function ShopModule:Set(name, enabled)
 
     return true
 end
-
---========================================================
--- TOGGLE FIGHTING STYLE
---========================================================
 
 function ShopModule:Toggle(name)
     if destroyed or not validItem(name) then
@@ -1789,9 +1921,11 @@ function ShopModule:Destroy()
     BuyItemRemote = nil
     RedeemCodeRemote = nil
 
+    State.ActiveFightingStyle = nil
     table.clear(State.FightingStyleEnabled)
     table.clear(State.FightingStyleNPCs)
     table.clear(State.TriangleOrbitTokens)
+    table.clear(State.StyleOperationTokens)
 
     for key in pairs(Callbacks) do
         Callbacks[key] = nil
