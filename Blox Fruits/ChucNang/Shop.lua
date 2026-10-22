@@ -943,7 +943,7 @@ end
 -- DIRECT FLIGHT (SHORTEST STRAIGHT-LINE ROUTE)
 --========================================================
 
-function ShopModule:FlyToPosition(destination, label, tolerance, shouldCancel)
+function ShopModule:FlyToPosition(destination, label, tolerance, shouldCancel, speedOverride, suppressNotification)
     if destroyed or typeof(destination) ~= "Vector3" then
         return false
     end
@@ -971,9 +971,12 @@ function ShopModule:FlyToPosition(destination, label, tolerance, shouldCancel)
         return true
     end
 
-    local deadline = os.clock() + math.max(initialDistance / FLY_SPEED * 2.5, 20)
-    notify("Bay thẳng tới " .. tostring(label or "điểm đến")
-        .. " • " .. tostring(math.floor(initialDistance)) .. " studs")
+    local moveSpeed = (type(speedOverride) == "number" and speedOverride > 0) and speedOverride or FLY_SPEED
+    local deadline = os.clock() + math.max(initialDistance / moveSpeed * 2.5, 20)
+    if not suppressNotification then
+        notify("Bay thẳng tới " .. tostring(label or "điểm đến")
+            .. " • " .. tostring(math.floor(initialDistance)) .. " studs")
+    end
 
     while not destroyed and not cancelled() and os.clock() < deadline do
         if player.Character ~= character
@@ -996,14 +999,19 @@ function ShopModule:FlyToPosition(destination, label, tolerance, shouldCancel)
             dt = 1 / 60
         end
 
-        local step = math.min(distance, FLY_SPEED * dt)
+        -- Recheck after yielding; the character may have respawned during Heartbeat.
+        if player.Character ~= character or not root.Parent or humanoid.Health <= 0 then
+            return false
+        end
+
+        local step = math.min(distance, moveSpeed * dt)
         local nextPosition = root.Position + delta.Unit * step
 
         root.CFrame = CFrame.new(nextPosition) * root.CFrame.Rotation
         root.AssemblyLinearVelocity = Vector3.zero
     end
 
-    if not destroyed and not cancelled() then
+    if not destroyed and not cancelled() and not suppressNotification then
         notify("Hết thời gian di chuyển tới " .. tostring(label or "điểm đến"))
     end
 
@@ -1062,18 +1070,21 @@ function ShopModule:StartTriangleOrbit(styleName, npc)
     State.TriangleOrbitTokens[styleName] = (State.TriangleOrbitTokens[styleName] or 0) + 1
     local token = State.TriangleOrbitTokens[styleName]
     local orbitRadius = 6
+    local orbitSpeed = 55 -- Slower than the long-distance flight speed, so each side is visible.
     local offset = root.Position - npcRoot.Position
     local startAngle = math.atan2(offset.Z, offset.X)
 
+    -- The token is the authoritative stop signal. Set(false) and switching to
+    -- another style both increment it; relying on the UI/state flag here can
+    -- stop the orbit prematurely if that flag is refreshed externally.
     local function shouldStop()
         return destroyed
-            or State.FightingStyleEnabled[styleName] ~= true
             or State.TriangleOrbitTokens[styleName] ~= token
             or not npc.Parent
     end
 
     task.spawn(function()
-        notify("Đang bay tam giác quanh " .. npc.Name .. " (bán kính 8 studs). Tắt " .. styleName .. " để dừng.")
+        notify("Đang bay tam giác liên tục quanh " .. npc.Name .. " (bán kính 6 studs). Tắt " .. styleName .. " để dừng.")
         local vertexIndex = 0
 
         while not shouldStop() do
@@ -1081,7 +1092,7 @@ function ShopModule:StartTriangleOrbit(styleName, npc)
             character = getCharacter()
             root = character and character:FindFirstChild("HumanoidRootPart")
 
-            if not npcRoot or not root then
+            if not npcRoot or not root or not root.Parent then
                 task.wait(0.15)
             else
                 local angle = startAngle + (vertexIndex * 2 * math.pi / 3)
@@ -1092,19 +1103,26 @@ function ShopModule:StartTriangleOrbit(styleName, npc)
                     center.Z + math.sin(angle) * orbitRadius
                 )
 
-                local moved = self:FlyToPosition(
-                    destination,
-                    "tam giác quanh " .. npc.Name,
-                    2,
-                    shouldStop
-                )
+                -- Protect the orbit worker from a transient character/root error;
+                -- retry the same vertex instead of silently killing the whole loop.
+                local callOK, moved = pcall(function()
+                    return self:FlyToPosition(
+                        destination,
+                        "tam giác quanh " .. npc.Name,
+                        1.5,
+                        shouldStop,
+                        orbitSpeed,
+                        true -- Avoid a notification for every triangle edge.
+                    )
+                end)
 
                 if shouldStop() then
                     break
                 end
 
-                if moved then
+                if callOK and moved then
                     vertexIndex = (vertexIndex + 1) % 3
+                    task.wait(0.03)
                 else
                     task.wait(0.1)
                 end
