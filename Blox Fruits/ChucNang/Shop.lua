@@ -1504,8 +1504,15 @@ function ShopModule:GetFightingStyle(styleName, shouldCancel)
     return false
 end
 
+local ValidCallbackNames = {
+    Success = true,
+    Failed = true,
+    Notification = true,
+    StateChanged = true,
+}
+
 function ShopModule:SetCallback(name, callback)
-    if destroyed or Callbacks[name] == nil then
+    if destroyed or not ValidCallbackNames[name] then
         return false
     end
 
