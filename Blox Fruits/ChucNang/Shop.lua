@@ -1247,6 +1247,7 @@ function ShopModule:StartTriangleOrbit(styleName, npc)
     task.spawn(function()
         notify("Đang bay tam giác liên tục quanh " .. npc.Name .. " (bán kính 6 studs). Tắt " .. styleName .. " để dừng.")
         local vertexIndex = 0
+        local debugPrintedVertices = {}
 
         while not shouldStop() do
             npcRoot = getRoot(npc)
@@ -1263,6 +1264,23 @@ function ShopModule:StartTriangleOrbit(styleName, npc)
                     center.Y + 2,
                     center.Z + math.sin(angle) * orbitRadius
                 )
+
+if not debugPrintedVertices[vertexIndex] then
+    debugPrintedVertices[vertexIndex] = true
+
+    local currentRoot = getCurrentRoot()
+    local pos = currentRoot and currentRoot.Position
+
+    print(string.format(
+        "[LPT ORBIT DEBUG] Style=%s | NPC=%s | Vertex=%d | Center=(%.2f, %.2f, %.2f) | Target=(%.2f, %.2f, %.2f) | Player=%s",
+        tostring(styleName),
+        tostring(npc.Name),
+        vertexIndex + 1,
+        center.X, center.Y, center.Z,
+        destination.X, destination.Y, destination.Z,
+        pos and string.format("(%.2f, %.2f, %.2f)", pos.X, pos.Y, pos.Z) or "nil"
+    ))
+end
 
                 local callOK, moved = pcall(function()
                     return self:FlyToPosition(
@@ -1430,6 +1448,27 @@ function ShopModule:GetFightingStyle(styleName, shouldCancel)
     if cancelled() then
         return false
     end
+
+local debugRoot = getRoot(npc)
+
+if debugRoot then
+    local p = debugRoot.Position
+    local look = debugRoot.CFrame.LookVector
+
+    local target = p
+        - look * 4
+        + Vector3.new(0, 2, 0)
+
+    print(string.format(
+        "[LPT NPC DEBUG] Style=%s | NPC=%s | Position=(%.2f, %.2f, %.2f) | Target=(%.2f, %.2f, %.2f)",
+        tostring(styleName),
+        tostring(npc.Name),
+        p.X, p.Y, p.Z,
+        target.X, target.Y, target.Z
+    ))
+else
+    warn("[LPT NPC DEBUG] Không tìm thấy RootPart: " .. tostring(npc.Name))
+end
 
     State.FightingStyleNPCs[styleName] = npc
     notify("Tìm thấy NPC " .. npc.Name .. "; đang bay thẳng tới NPC")
