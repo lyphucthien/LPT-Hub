@@ -1240,7 +1240,7 @@ local function checkKey(key)
     end
 
     if data.valid ~= true then
-        return false, tostring(data.error or "KEY không hợp lệ hoặc đã gắn với thiết bị khác"), false
+        return false, tostring(data.error or "KEY Không Hợp Lệ"), false
     end
 
     local expiresAt = tonumber(data.expiresAt)
