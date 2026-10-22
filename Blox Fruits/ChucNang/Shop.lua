@@ -254,10 +254,16 @@ local State = {
 }
 
 local noClipConnection = nil
+local noClipDescendantConnection = nil
 local noClipCharacter = nil
 local noClipOriginalCollisions = {}
 
 local function restoreNoClipCollisions()
+    if noClipDescendantConnection then
+        noClipDescendantConnection:Disconnect()
+        noClipDescendantConnection = nil
+    end
+
     for part, originalCanCollide in pairs(noClipOriginalCollisions) do
         if part and part.Parent then
             pcall(function()
@@ -270,12 +276,41 @@ local function restoreNoClipCollisions()
     noClipCharacter = nil
 end
 
+local function applyNoClipToPart(object)
+    if not object or not object:IsA("BasePart") then
+        return
+    end
+
+    if noClipOriginalCollisions[object] == nil then
+        noClipOriginalCollisions[object] = object.CanCollide
+    end
+
+    if object.CanCollide then
+        object.CanCollide = false
+    end
+end
+
 local function applyNoClipToCharacter()
     local character = player.Character
 
     if character ~= noClipCharacter then
         restoreNoClipCollisions()
         noClipCharacter = character
+
+        -- Newly added body parts/accessory handles are made non-collidable immediately,
+        -- without waiting for the next Stepped update.
+        if character then
+            noClipDescendantConnection = character.DescendantAdded:Connect(function(object)
+                if not State.NoClipEnabled or player.Character ~= character then
+                    return
+                end
+
+                local ok, err = pcall(applyNoClipToPart, object)
+                if not ok then
+                    warn("[LPT Hub Shop] NoClip descendant error: " .. tostring(err))
+                end
+            end)
+        end
     end
 
     if not character then
@@ -283,15 +318,7 @@ local function applyNoClipToCharacter()
     end
 
     for _, object in ipairs(character:GetDescendants()) do
-        if object:IsA("BasePart") then
-            if noClipOriginalCollisions[object] == nil then
-                noClipOriginalCollisions[object] = object.CanCollide
-            end
-
-            if object.CanCollide then
-                object.CanCollide = false
-            end
-        end
+        applyNoClipToPart(object)
     end
 end
 
@@ -931,10 +958,12 @@ function ShopModule:FindFightingStyleNPC(styleName, silent)
         return nil
     end
 
-    notify(
-        "Đã tìm thấy NPC " .. bestNPC.Name
-        .. " (khoảng cách " .. tostring(math.floor(bestDistance)) .. ")"
-    )
+    if not silent then
+        notify(
+            "Đã tìm thấy NPC " .. bestNPC.Name
+            .. " (khoảng cách " .. tostring(math.floor(bestDistance)) .. ")"
+        )
+    end
 
     return bestNPC
 end
@@ -1053,6 +1082,74 @@ function ShopModule:FlyToNPC(npc)
     end
 
     return (root.Position - npcRoot.Position).Magnitude <= 12
+end
+
+-- Fly toward the island landmark only while the NPC is not yet streamed in.
+-- During the flight, periodically rescan Workspace; if the NPC appears, cancel
+-- the landmark route and return the NPC so the caller can fly directly to it.
+function ShopModule:FlyToFallbackOrNPC(styleName, fallback)
+    if destroyed or type(fallback) ~= "table" or typeof(fallback.Position) ~= "Vector3" then
+        return nil
+    end
+
+    local foundNPC = nil
+    local lastScan = 0
+    local scanInterval = 0.45
+
+    local function scanForNPC(force)
+        if foundNPC and foundNPC.Parent then
+            return foundNPC
+        end
+
+        local now = os.clock()
+        if force or now - lastScan >= scanInterval then
+            lastScan = now
+            local candidate = self:FindFightingStyleNPC(styleName, true)
+            if candidate and candidate.Parent then
+                foundNPC = candidate
+            end
+        end
+
+        return foundNPC
+    end
+
+    local function shouldCancelRoute()
+        if destroyed then
+            return true
+        end
+        return scanForNPC(false) ~= nil
+    end
+
+    notify("Chưa thấy NPC " .. styleName .. "; đang bay về khu vực " .. fallback.Name .. " và quét NPC trên đường")
+    self:FlyToPosition(fallback.Position, fallback.Name, 40, shouldCancelRoute)
+
+    if destroyed then
+        return nil
+    end
+
+    -- If the NPC streamed in while flying, do not continue toward the landmark.
+    local npc = scanForNPC(true)
+    if npc and npc.Parent then
+        notify("Đã phát hiện " .. npc.Name .. " trên đường; đổi hướng bay thẳng tới NPC")
+        return npc
+    end
+
+    -- On arrival, allow StreamingEnabled a short period to replicate the NPC.
+    for attempt = 1, 16 do
+        if destroyed then
+            return nil
+        end
+
+        npc = scanForNPC(false)
+        if npc and npc.Parent then
+            notify("Đã tải NPC " .. npc.Name .. " gần " .. fallback.Name .. "; đang bay thẳng tới NPC")
+            return npc
+        end
+
+        task.wait(0.35)
+    end
+
+    return nil
 end
 
 function ShopModule:StartTriangleOrbit(styleName, npc)
@@ -1237,11 +1334,26 @@ function ShopModule:GetFightingStyle(styleName)
     end
 
     if not npc then
-        notify(
-            "Chưa tìm thấy NPC " .. styleName .. " trong khu vực đã tải. "
-            .. "Không bay tới đảo theo yêu cầu; hãy đến gần khu vực có NPC rồi bật lại."
-        )
-        return false
+        local fallback = getFightingStyleFallback(styleName)
+        if not fallback then
+            notify(
+                "Không có tọa độ khu vực dự phòng cho " .. styleName
+                .. " ở Sea hiện tại (PlaceId " .. tostring(game.PlaceId) .. ")."
+                .. " Hãy vào Sea có NPC này rồi bật lại."
+            )
+            return false
+        end
+
+        -- This route is only a fallback for StreamingEnabled: if the NPC appears
+        -- before reaching the landmark, immediately redirect to the NPC instead.
+        npc = self:FlyToFallbackOrNPC(styleName, fallback)
+        if not npc then
+            notify(
+                "Đã kiểm tra khu vực " .. fallback.Name .. " nhưng chưa tìm thấy NPC "
+                .. styleName .. ". NPC có thể chưa tải hoặc tọa độ khu vực đã thay đổi."
+            )
+            return false
+        end
     end
 
     State.FightingStyleNPCs[styleName] = npc
@@ -1401,7 +1513,7 @@ function ShopModule:SetNoClip(enabled)
             return false
         end
 
-        notify("NoClip đã bật")
+        notify("NoClip đã bật: nhân vật có thể đi xuyên vật cản")
         return true
     end
 
@@ -1413,7 +1525,7 @@ function ShopModule:SetNoClip(enabled)
     end
 
     restoreNoClipCollisions()
-    notify("NoClip đã tắt; va chạm đã được khôi phục")
+    notify("NoClip đã tắt; va chạm ban đầu đã được khôi phục")
     return true
 end
 
