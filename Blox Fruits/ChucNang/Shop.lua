@@ -689,7 +689,9 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
         return false
     end
 
-    if game.PlaceId ~= 2753915549 or styleName ~= "Water Kung Fu" then
+    if (game.PlaceId ~= 2753915549
+        and game.PlaceId ~= 85211729168715)
+        or styleName ~= "Water Kung Fu" then
         return nil
     end
 
