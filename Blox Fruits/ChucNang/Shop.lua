@@ -732,7 +732,7 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
     end
 
     local underwaterCity = Vector3.new(61163.85, 11.68, 1819.78)
-    local entrancePart = findWhirlpoolEntrancePart()
+    local whirlpoolCenter = Vector3.new(3865, 5, -1926)
 
     if not entrancePart then
         notify("Không xác định được Entrance; đã dừng để tránh bay sai vị trí")
