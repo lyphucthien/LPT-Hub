@@ -702,7 +702,6 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
 
     local directDistance = (root.Position - underwaterCity).Magnitude
     if directDistance <= 2600 then
-        -- Already in the target area; no need to detour to the whirlpool.
         return true
     end
 
@@ -732,10 +731,6 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
     whirlpoolPosition = whirlpoolPosition or whirlpoolFallback
     local portalDistance = (root.Position - whirlpoolPosition).Magnitude
 
-    -- Compare the complete available choices from the player's current position.
-    -- The whirlpool route is only selected when reaching its entrance is shorter
-    -- than flying straight to Underwater City. Otherwise the normal NPC route flies
-    -- directly to the destination coordinates.
     if portalDistance + 100 >= directDistance then
         notify(string.format(
             "Đường ngắn nhất tới Water Kung Fu: bay thẳng (%.0f studs); xoáy nước là %.0f studs",
