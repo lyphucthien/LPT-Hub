@@ -694,8 +694,8 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
         return nil
     end
 
-    local underwaterCity = Vector3.new(61163.85, 11.68, 1819.78)
-    local whirlpoolCenter = Vector3.new(4050, 3, -1816)
+    local underwaterCity = Vector3.new(61170, 3, 1952)
+    local whirlpoolCenter = Vector3.new(4050, 4, -1816)
 
     local function getPosition(object)
         if object:IsA("BasePart") then
