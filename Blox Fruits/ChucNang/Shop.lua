@@ -700,7 +700,9 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
         return false
     end
 
-    if (root.Position - underwaterCity).Magnitude <= 2600 then
+    local directDistance = (root.Position - underwaterCity).Magnitude
+    if directDistance <= 2600 then
+        -- Already in the target area; no need to detour to the whirlpool.
         return true
     end
 
@@ -728,12 +730,35 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
     end
 
     whirlpoolPosition = whirlpoolPosition or whirlpoolFallback
-    notify("Đang tới xoáy nước vào Underwater City")
+    local portalDistance = (root.Position - whirlpoolPosition).Magnitude
 
-    if not module:FlyToPosition(whirlpoolPosition, "Whirlpool — Underwater City", 3, shouldCancel) then
-        return false
+    -- Compare the complete available choices from the player's current position.
+    -- The whirlpool route is only selected when reaching its entrance is shorter
+    -- than flying straight to Underwater City. Otherwise the normal NPC route flies
+    -- directly to the destination coordinates.
+    if portalDistance + 100 >= directDistance then
+        notify(string.format(
+            "Đường ngắn nhất tới Water Kung Fu: bay thẳng (%.0f studs); xoáy nước là %.0f studs",
+            directDistance,
+            portalDistance
+        ))
+        return nil
     end
 
+    notify(string.format(
+        "Đường ngắn nhất tới Water Kung Fu: qua xoáy nước (%.0f studs thay vì %.0f studs bay thẳng)",
+        portalDistance,
+        directDistance
+    ))
+
+    local startPosition = root.Position
+    if not module:FlyToPosition(whirlpoolPosition, "Whirlpool — Underwater City", 3, shouldCancel) then
+        if shouldCancelOperation(shouldCancel) then
+            return false
+        end
+        notify("Không tới được xoáy nước; chuyển sang đường bay trực tiếp tới Underwater City")
+        return nil
+    end
     local deadline = os.clock() + 5
     repeat
         if shouldCancelOperation(shouldCancel) then
@@ -741,7 +766,8 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
         end
 
         root = getCurrentRoot()
-        if root and (root.Position - underwaterCity).Magnitude <= 2600 then
+        if root and (root.Position - underwaterCity).Magnitude <= 2600
+            and (root.Position - startPosition).Magnitude >= 250 then
             notify("Đã vào Underwater City qua xoáy nước")
             task.wait(0.35)
             return not shouldCancelOperation(shouldCancel)
@@ -751,9 +777,9 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
     until os.clock() >= deadline
 
     if not shouldCancelOperation(shouldCancel) then
-        notify("Đã tới xoáy nước nhưng chưa được đưa vào Underwater City. Hãy kiểm tra vị trí xoáy nước trong game hoặc điều kiện khu vực.")
+        notify("Đã tới xoáy nước nhưng chưa được đưa vào Underwater City. Chuyển sang đường bay trực tiếp.")
     end
-    return false
+    return nil
 end
 
 local function tryThirdSeaPhysicalPortal(module, styleName, shouldCancel)
@@ -772,12 +798,12 @@ local function tryThirdSeaPhysicalPortal(module, styleName, shouldCancel)
         return false
     end
 
-    local targetDistance = (root.Position - destinationRoute.IslandCenter).Magnitude
-    if targetDistance <= 1100 then
+    local castleRoute = ThirdSeaPortalRoutes["Castle on the Sea"]
+    local directDistance = (root.Position - destinationRoute.IslandCenter).Magnitude
+    if directDistance <= 1100 then
         return false
     end
 
-    local castleRoute = ThirdSeaPortalRoutes["Castle on the Sea"]
     local returnPortals = {
         {
             Name = "Mansion Portal",
@@ -809,17 +835,50 @@ local function tryThirdSeaPhysicalPortal(module, styleName, shouldCancel)
         return selected, distance
     end
 
+    local function flyDirectFromCurrentPosition(reason)
+        if reason then
+            notify(reason)
+        end
+
+        return false
+    end
+
     local function tryFromCastleToDestination()
         if shouldCancelOperation(shouldCancel) then
             return false
         end
 
-        local portalPosition = findCastlePortalFor(destinationName)
-        if not portalPosition then
-            notify("Chưa nhận diện được cổng đi tới " .. destinationName .. " ở Castle on the Sea; sẽ dùng đường bay thẳng nếu cần")
+        local currentRoot = getCurrentRoot()
+        if not currentRoot then
             return false
         end
 
+        local portalPosition = findCastlePortalFor(destinationName)
+        if not portalPosition then
+            return flyDirectFromCurrentPosition(
+                "Chưa tìm thấy cổng Castle tới " .. destinationName .. "; chọn bay thẳng nếu đó là đường khả dụng."
+            )
+        end
+
+        local distanceToPortal = (currentRoot.Position - portalPosition).Magnitude
+        local distanceDirect = (currentRoot.Position - destinationRoute.IslandCenter).Magnitude
+        local finalDestinationLeg = (destinationRoute.Entrance - destinationRoute.IslandCenter).Magnitude
+        local portalRouteDistance = distanceToPortal + finalDestinationLeg
+        if portalRouteDistance + 100 >= distanceDirect then
+            return flyDirectFromCurrentPosition(string.format(
+                "Đường ngắn nhất từ Castle tới %s: bay thẳng (%.0f studs), qua cổng ước tính %.0f studs.",
+                destinationName,
+                distanceDirect,
+                portalRouteDistance
+            ))
+        end
+
+        notify(string.format(
+            "Đường ngắn nhất tới %s: qua cổng Castle (ước tính %.0f studs thay vì %.0f studs bay thẳng).",
+            destinationName,
+            portalRouteDistance,
+            distanceDirect
+        ))
         return moveThroughPhysicalPortal(
             module,
             portalPosition,
@@ -830,34 +889,80 @@ local function tryThirdSeaPhysicalPortal(module, styleName, shouldCancel)
         )
     end
 
+    local distanceFromCastle = (root.Position - castleRoute.IslandCenter).Magnitude
+    local isAtCastle = distanceFromCastle <= 1450
+
     if destinationName == "Castle on the Sea" then
-        local portal, portalDistance = nearestReturnPortal(root.Position)
-        if portal and portalDistance + 500 < targetDistance then
-            return moveThroughPhysicalPortal(
-                module,
-                portal.Position,
-                portal.Name,
-                castleRoute,
-                "Castle on the Sea",
-                shouldCancel
-            )
+        if isAtCastle then
+            return false
         end
-        return false
+
+        local portal, portalDistance = nearestReturnPortal(root.Position)
+        if not portal then
+            return false
+        end
+
+        if portalDistance + 100 >= directDistance then
+            return flyDirectFromCurrentPosition(string.format(
+                "Đường ngắn nhất tới Castle on the Sea: bay thẳng (%.0f studs), cổng gần nhất là %.0f studs.",
+                directDistance,
+                portalDistance
+            ))
+        end
+
+        notify(string.format(
+            "Đường ngắn nhất tới Castle on the Sea: qua %s (%.0f studs thay vì %.0f studs bay thẳng).",
+            portal.Name,
+            portalDistance,
+            directDistance
+        ))
+        return moveThroughPhysicalPortal(
+            module,
+            portal.Position,
+            portal.Name,
+            castleRoute,
+            "Castle on the Sea",
+            shouldCancel
+        )
     end
 
-    if (root.Position - castleRoute.IslandCenter).Magnitude <= 1450 then
+    if isAtCastle then
         return tryFromCastleToDestination()
     end
 
-    local portal, portalDistance = nearestReturnPortal(root.Position)
-    if not portal or portalDistance + 1200 >= targetDistance then
+    local returnPortal, returnDistance = nearestReturnPortal(root.Position)
+    if not returnPortal then
         return false
     end
 
+    local outboundPortalPosition = findCastlePortalFor(destinationName)
+    local castleToOutboundDistance = outboundPortalPosition
+        and (outboundPortalPosition - castleRoute.IslandCenter).Magnitude
+        or 900
+    local finalDestinationLeg = (destinationRoute.Entrance - destinationRoute.IslandCenter).Magnitude
+    local estimatedPortalRoute = returnDistance + castleToOutboundDistance + finalDestinationLeg
+
+    if estimatedPortalRoute + 100 >= directDistance then
+        return flyDirectFromCurrentPosition(string.format(
+            "Đường ngắn nhất tới %s: bay thẳng (%.0f studs), tuyến qua cổng ước tính %.0f studs.",
+            destinationName,
+            directDistance,
+            estimatedPortalRoute
+        ))
+    end
+
+    notify(string.format(
+        "Đã chọn tuyến ngắn nhất tới %s: %s -> Castle -> cổng tới đích (ước tính %.0f studs, bay thẳng %.0f studs).",
+        destinationName,
+        returnPortal.Name,
+        estimatedPortalRoute,
+        directDistance
+    ))
+
     local reachedCastle = moveThroughPhysicalPortal(
         module,
-        portal.Position,
-        portal.Name,
+        returnPortal.Position,
+        returnPortal.Name,
         castleRoute,
         "Castle on the Sea",
         shouldCancel
@@ -870,6 +975,7 @@ local function tryThirdSeaPhysicalPortal(module, styleName, shouldCancel)
     if shouldCancelOperation(shouldCancel) then
         return false
     end
+
     return tryFromCastleToDestination()
 end
 
