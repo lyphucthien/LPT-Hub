@@ -595,10 +595,8 @@ local function getPortalMetadata(instance)
 
         table.insert(pieces, tostring(current.Name or ""))
         local lowerName = normalizeName(current.Name)
-        if not portalRoot and (
-            string.find(lowerName, "portal", 1, true)
-            or string.find(lowerName, "indra", 1, true)
-        ) then
+        if not portalRoot and (string.find(lowerName, "portal", 1, true)
+            or string.find(lowerName, "indra", 1, true)) then
             portalRoot = current
         end
         current = current.Parent
