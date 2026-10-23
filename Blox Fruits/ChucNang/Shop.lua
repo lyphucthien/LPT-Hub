@@ -698,18 +698,22 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
     if not fallback
         or typeof(fallback.Position) ~= "Vector3"
         or fallback.Position.X < 50000 then
-
-        print(
-            "[LPT ROUTE DEBUG] Bỏ qua Whirlpool"
-            .. " | PlaceId=" .. tostring(game.PlaceId)
-            .. " | Style=" .. tostring(styleName)
-        )
-
         return nil
     end
 
-    local underwaterCity = Vector3.new(61163.85,11.68,1819.78)
-    local whirlpoolCenter = Vector3.new(3865,5,-1926)
+    local underwaterCity = Vector3.new(61163.85, 11.68, 1819.78)
+    local whirlpoolCenter = Vector3.new(3865, 5, -1926)
+
+    local function isInsideUnderwaterCity()
+        local currentRoot = getCurrentRoot()
+
+        if not currentRoot then
+            return false
+        end
+
+        return (currentRoot.Position - underwaterCity).Magnitude <= 2600
+            or (currentRoot.Position - fallback.Position).Magnitude <= 3200
+    end
 
     local root = getCurrentRoot()
 
@@ -718,25 +722,10 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
         return false
     end
 
-    print(string.format(
-        "[LPT ROUTE DEBUG] PlaceId=%s | Style=%s | Đã chọn tuyến Whirlpool",
-        tostring(game.PlaceId),
-        tostring(styleName)
-    ))
-
-    if (root.Position - underwaterCity).Magnitude <= 2600 then
-        notify("Đã ở gần Underwater City; tiếp tục tới Water Kung Fu Teacher")
+    if isInsideUnderwaterCity() then
+        notify("Đã ở Underwater City; bỏ qua Whirlpool")
         return true
     end
-
-    local directDistance = (root.Position - underwaterCity).Magnitude
-    local portalDistance = (root.Position - whirlpoolCenter).Magnitude
-
-    notify(string.format(
-        "Water Kung Fu: ưu tiên Whirlpool | Cổng %.0f studs | Underwater City %.0f studs",
-        portalDistance,
-        directDistance
-    ))
 
     local startPosition = root.Position
 
@@ -748,8 +737,13 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
         local currentRoot = getCurrentRoot()
 
         return currentRoot ~= nil
-            and (currentRoot.Position - underwaterCity).Magnitude <= 2600
+            and isInsideUnderwaterCity()
             and (currentRoot.Position - startPosition).Magnitude >= 250
+    end
+
+    local function cancelPortalFlight()
+        return shouldCancelOperation(shouldCancel)
+            or enteredUnderwaterCity()
     end
 
     local entryPoints = {
@@ -764,28 +758,34 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
             return false
         end
 
+        if enteredUnderwaterCity() then
+            notify("Đã vào Underwater City; chuyển sang Water Kung Fu Teacher")
+            return true
+        end
+
         notify(string.format(
             "Đang tiếp cận Whirlpool lần %d/%d",
             attempt,
             #entryPoints
         ))
 
-        local moved = module:FlyToPosition(
+        module:FlyToPosition(
             entryPosition,
             "Whirlpool — lối vào Underwater City",
             1.5,
-            shouldCancel
+            cancelPortalFlight
         )
 
         if shouldCancelOperation(shouldCancel) then
             return false
         end
 
-        if not moved then
-            task.wait(0.15)
+        if enteredUnderwaterCity() then
+            notify("Đã qua Whirlpool; đang tới Water Kung Fu Teacher")
+            return true
         end
 
-        local deadline = os.clock() + 1.75
+        local deadline = os.clock() + 3.5
 
         repeat
             if shouldCancelOperation(shouldCancel) then
@@ -793,9 +793,8 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
             end
 
             if enteredUnderwaterCity() then
-                notify("Đã qua Whirlpool và vào Underwater City")
-                task.wait(0.25)
-                return not shouldCancelOperation(shouldCancel)
+                notify("Đã qua Whirlpool; đang tới Water Kung Fu Teacher")
+                return true
             end
 
             task.wait(0.1)
@@ -806,11 +805,7 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
         return false
     end
 
-    notify(
-        "Whirlpool chưa kích hoạt sau 4 lần thử; "
-        .. "chuyển sang tọa độ Water Kung Fu dự phòng"
-    )
-
+    notify("Whirlpool chưa kích hoạt; chuyển sang tọa độ dự phòng")
     return nil
 end
 
