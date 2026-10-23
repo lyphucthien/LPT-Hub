@@ -389,6 +389,9 @@ local Callbacks = {
 -- HELPERS
 --========================================================
 
+local notify
+local shouldCancelOperation
+
 notify = function(message)
     if destroyed then
         return
@@ -506,9 +509,6 @@ local function getCurrentRoot()
     local character = getCharacter()
     return character and character:FindFirstChild("HumanoidRootPart")
 end
-
-local notify
-local shouldCancelOperation
 
 local function waitForIslandTransition(route, startPosition, timeout, label, shouldCancel)
     local deadline = os.clock() + (timeout or 4)
