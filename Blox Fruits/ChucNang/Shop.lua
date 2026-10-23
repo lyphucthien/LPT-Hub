@@ -694,46 +694,24 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
     end
 
     local underwaterCity = Vector3.new(61163.85, 11.68, 1819.78)
+    local whirlpoolCenter = Vector3.new(3865, 5, -1926)
+
     local root = getCurrentRoot()
     if not root then
-        notify("Chưa tìm được nhân vật để đi tới Underwater City")
+        notify("Chưa tìm được nhân vật để đi tới Whirlpool")
         return false
     end
 
-    local directDistance = (root.Position - underwaterCity).Magnitude
-    if directDistance <= 2600 then
+    if (root.Position - underwaterCity).Magnitude <= 2600 then
         return true
     end
 
-    local whirlpoolFallback = Vector3.new(3865, 5, -1926)
-    local whirlpoolPosition = nil
-    local bestDistance = math.huge
-
-    for _, instance in ipairs(workspace:GetDescendants()) do
-        if shouldCancelOperation(shouldCancel) then
-            return false
-        end
-
-        if instance:IsA("BasePart") or instance:IsA("Model") then
-            local normalized = normalizeName(instance.Name)
-            if string.find(normalized, "whirlpool", 1, true) then
-                local position = instance:IsA("BasePart") and instance.Position
-                    or instance:GetPivot().Position
-                local distance = (position - whirlpoolFallback).Magnitude
-                if distance < bestDistance and distance <= 1800 then
-                    bestDistance = distance
-                    whirlpoolPosition = position
-                end
-            end
-        end
-    end
-
-    whirlpoolPosition = whirlpoolPosition or whirlpoolFallback
-    local portalDistance = (root.Position - whirlpoolPosition).Magnitude
+    local directDistance = (root.Position - underwaterCity).Magnitude
+    local portalDistance = (root.Position - whirlpoolCenter).Magnitude
 
     if portalDistance + 100 >= directDistance then
         notify(string.format(
-            "Đường ngắn nhất tới Water Kung Fu: bay thẳng (%.0f studs); xoáy nước là %.0f studs",
+            "Bay thẳng tới Underwater City ngắn hơn: %.0f studs; tuyến Whirlpool %.0f studs.",
             directDistance,
             portalDistance
         ))
@@ -741,39 +719,70 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
     end
 
     notify(string.format(
-        "Đường ngắn nhất tới Water Kung Fu: qua xoáy nước (%.0f studs thay vì %.0f studs bay thẳng)",
+        "Đã chọn tuyến Water Kung Fu qua Whirlpool: %.0f studs tới cổng, thay vì bay thẳng %.0f studs.",
         portalDistance,
         directDistance
     ))
 
     local startPosition = root.Position
-    if not module:FlyToPosition(whirlpoolPosition, "Whirlpool — Underwater City", 3, shouldCancel) then
+
+    local function enteredUnderwaterCity()
         if shouldCancelOperation(shouldCancel) then
             return false
         end
-        notify("Không tới được xoáy nước; chuyển sang đường bay trực tiếp tới Underwater City")
-        return nil
+
+        local currentRoot = getCurrentRoot()
+        return currentRoot ~= nil
+            and (currentRoot.Position - underwaterCity).Magnitude <= 2600
+            and (currentRoot.Position - startPosition).Magnitude >= 250
     end
-    local deadline = os.clock() + 5
-    repeat
+
+    local entryPoints = {
+        whirlpoolCenter,
+        whirlpoolCenter + Vector3.new(0, -5, 0),
+        whirlpoolCenter + Vector3.new(0, -12, 0),
+        whirlpoolCenter + Vector3.new(0, 2, 0),
+    }
+
+    for attempt, entryPosition in ipairs(entryPoints) do
         if shouldCancelOperation(shouldCancel) then
             return false
         end
 
-        root = getCurrentRoot()
-        if root and (root.Position - underwaterCity).Magnitude <= 2600
-            and (root.Position - startPosition).Magnitude >= 250 then
-            notify("Đã vào Underwater City qua xoáy nước")
-            task.wait(0.35)
-            return not shouldCancelOperation(shouldCancel)
+        local moved = module:FlyToPosition(
+            entryPosition,
+            "Whirlpool — lối vào Underwater City",
+            1.5,
+            shouldCancel
+        )
+
+        if shouldCancelOperation(shouldCancel) then
+            return false
         end
 
-        task.wait(0.1)
-    until os.clock() >= deadline
+        if not moved then
+            task.wait(0.15)
+        end
+
+        local deadline = os.clock() + 1.75
+        repeat
+            if shouldCancelOperation(shouldCancel) then
+                return false
+            end
+
+            if enteredUnderwaterCity() then
+                task.wait(0.25)
+                return not shouldCancelOperation(shouldCancel)
+            end
+
+            task.wait(0.1)
+        until os.clock() >= deadline
+    end
 
     if not shouldCancelOperation(shouldCancel) then
-        notify("Đã tới xoáy nước nhưng chưa được đưa vào Underwater City. Chuyển sang đường bay trực tiếp.")
+        notify("Whirlpool chưa kích hoạt dịch chuyển sau nhiều lần tiếp cận; sẽ dùng tọa độ Water Kung Fu dự phòng.")
     end
+
     return nil
 end
 
@@ -1816,7 +1825,7 @@ function ShopModule:Set(name, enabled)
         end
 
         publishFightingStyleStates()
-        notify("Đã tắt: " .. name .. " (đã dừng mọi chuyển động của Fighting Style)")
+        notify("Đã tắt: " .. name .. )
         return true
     end
 
