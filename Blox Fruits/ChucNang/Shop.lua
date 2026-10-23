@@ -689,9 +689,188 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
         return false
     end
 
+    if game.PlaceId ~= 2753915549
+        and game.PlaceId ~= 85211729168715 then
+        return nil
+    end
+
+    local underwaterCity = Vector3.new(61163.85, 11.68, 1819.78)
+    local whirlpoolCenter = Vector3.new(3865, 5, -1926)
+
+    local function getPosition(object)
+        if object:IsA("BasePart") then
+            return object.Position
+        elseif object:IsA("Model") then
+            local ok, pivot = pcall(function()
+                return object:GetPivot()
+            end)
+
+            if ok then
+                return pivot.Position
+            end
+        end
+
+        return nil
+    end
+
+    local function isInsideUnderwaterCity()
+        local root = getCurrentRoot()
+
+        return root ~= nil
+            and (root.Position - underwaterCity).Magnitude <= 3200
+    end
+
+    --====================================================
+    -- ĐANG Ở UNDERWATER CITY: TÌM CỔNG ĐỂ RA
+    --====================================================
+
+    if isInsideUnderwaterCity() then
+        if styleName == "Water Kung Fu" then
+            notify("Đang ở Underwater City; bỏ qua đường vào Whirlpool")
+            return true
+        end
+
+        local root = getCurrentRoot()
+        if not root then
+            return false
+        end
+
+        local bestPortal = nil
+        local bestPosition = nil
+        local bestDistance = math.huge
+        local seen = {}
+
+        for _, object in ipairs(workspace:GetDescendants()) do
+            if not object:IsA("BasePart")
+                and not object:IsA("Model") then
+                continue
+            end
+
+            local objectPosition = getPosition(object)
+
+            if not objectPosition
+                or (objectPosition - underwaterCity).Magnitude > 4000 then
+                continue
+            end
+
+            local metadata, portalRoot = getPortalMetadata(object)
+            metadata = normalizeName(metadata)
+
+            local looksLikePortal =
+                string.find(metadata, "portal", 1, true) ~= nil
+                or string.find(metadata, "whirlpool", 1, true) ~= nil
+                or string.find(metadata, "exit", 1, true) ~= nil
+
+            if not looksLikePortal then
+                continue
+            end
+
+            local candidate = portalRoot or object
+
+            if seen[candidate] then
+                continue
+            end
+            seen[candidate] = true
+
+            local candidatePosition = getPosition(candidate)
+
+            if candidatePosition
+                and (candidatePosition - underwaterCity).Magnitude <= 4000 then
+
+                local distance =
+                    (root.Position - candidatePosition).Magnitude
+
+                if distance < bestDistance then
+                    bestDistance = distance
+                    bestPortal = candidate
+                    bestPosition = candidatePosition
+                end
+            end
+        end
+
+        if not bestPosition then
+            notify(
+                "Không tìm thấy cổng trong Underwater City. "
+                .. "Đã dừng để tránh bay thẳng xuyên bản đồ."
+            )
+
+            print(
+                "[LPT ROUTE DEBUG] Không tìm thấy portal"
+                .. " | PlaceId=" .. tostring(game.PlaceId)
+                .. " | Style=" .. tostring(styleName)
+            )
+
+            return false
+        end
+
+        local portalName = bestPortal.Name or "Portal"
+
+        notify(
+            "Đang bay tới cổng trong Underwater City: "
+            .. portalName
+        )
+
+        print(string.format(
+            "[LPT ROUTE DEBUG] Portal=%s | Position=(%.2f, %.2f, %.2f)",
+            tostring(portalName),
+            bestPosition.X,
+            bestPosition.Y,
+            bestPosition.Z
+        ))
+
+        local function hasExitedCity()
+            local currentRoot = getCurrentRoot()
+
+            return currentRoot ~= nil
+                and (currentRoot.Position - underwaterCity).Magnitude > 4000
+        end
+
+        local function cancelPortalFlight()
+            return shouldCancelOperation(shouldCancel)
+                or hasExitedCity()
+        end
+
+        module:FlyToPosition(
+            bestPosition + Vector3.new(0, 2, 0),
+            "Cổng ra Underwater City",
+            5,
+            cancelPortalFlight
+        )
+
+        if shouldCancelOperation(shouldCancel) then
+            return false
+        end
+
+        local deadline = os.clock() + 5
+
+        repeat
+            if shouldCancelOperation(shouldCancel) then
+                return false
+            end
+
+            if hasExitedCity() then
+                notify("Đã rời Underwater City; tiếp tục tới " .. styleName)
+                return nil
+            end
+
+            task.wait(0.1)
+        until os.clock() >= deadline
+
+        notify(
+            "Đã tới cổng nhưng chưa xác nhận được dịch chuyển. "
+            .. "Không bay thẳng tới NPC để tránh đi sai tuyến."
+        )
+
+        return false
+    end
+
     if styleName ~= "Water Kung Fu" then
         return nil
     end
+
+    --====================================================
+    -- WATER KUNG FU: ĐI VÀO UNDERWATER CITY
+    --====================================================
 
     local fallback = getFightingStyleFallback(styleName)
 
@@ -701,20 +880,6 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
         return nil
     end
 
-    local underwaterCity = Vector3.new(61163.85, 11.68, 1819.78)
-    local whirlpoolCenter = Vector3.new(3865, 5, -1926)
-
-    local function isInsideUnderwaterCity()
-        local currentRoot = getCurrentRoot()
-
-        if not currentRoot then
-            return false
-        end
-
-        return (currentRoot.Position - underwaterCity).Magnitude <= 2600
-            or (currentRoot.Position - fallback.Position).Magnitude <= 3200
-    end
-
     local root = getCurrentRoot()
 
     if not root then
@@ -722,22 +887,13 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
         return false
     end
 
-    if isInsideUnderwaterCity() then
-        notify("Đã ở Underwater City; bỏ qua Whirlpool")
-        return true
-    end
-
     local startPosition = root.Position
 
     local function enteredUnderwaterCity()
-        if shouldCancelOperation(shouldCancel) then
-            return false
-        end
-
         local currentRoot = getCurrentRoot()
 
         return currentRoot ~= nil
-            and isInsideUnderwaterCity()
+            and (currentRoot.Position - underwaterCity).Magnitude <= 3200
             and (currentRoot.Position - startPosition).Magnitude >= 250
     end
 
@@ -758,8 +914,7 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
             return false
         end
 
-        if enteredUnderwaterCity() then
-            notify("Đã vào Underwater City; chuyển sang Water Kung Fu Teacher")
+        if isInsideUnderwaterCity() then
             return true
         end
 
@@ -781,7 +936,7 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
         end
 
         if enteredUnderwaterCity() then
-            notify("Đã qua Whirlpool; đang tới Water Kung Fu Teacher")
+            notify("Đã vào Underwater City; tiếp tục tới Water Kung Fu Teacher")
             return true
         end
 
@@ -793,7 +948,7 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
             end
 
             if enteredUnderwaterCity() then
-                notify("Đã qua Whirlpool; đang tới Water Kung Fu Teacher")
+                notify("Đã vào Underwater City; tiếp tục tới Water Kung Fu Teacher")
                 return true
             end
 
@@ -801,12 +956,8 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
         until os.clock() >= deadline
     end
 
-    if shouldCancelOperation(shouldCancel) then
-        return false
-    end
-
-    notify("Whirlpool chưa kích hoạt; chuyển sang tọa độ dự phòng")
-    return nil
+    notify("Whirlpool chưa kích hoạt; dừng tuyến vào")
+    return false
 end
 
 local function tryThirdSeaPhysicalPortal(module, styleName, shouldCancel)
