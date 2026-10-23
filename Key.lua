@@ -42,16 +42,25 @@ local KEY_FILE = LPT_HUB_FOLDER .. "/LPT_Hub_Key.json"
 local KEY_DURATION = 3 * 60 * 60
 local USE_EDITABLE_IMAGE = true
 
+--============================================================
+-- HALLOWEEN THEME
+--============================================================
+
 local COLORS = {
-    Background = Color3.fromRGB(5, 5, 5),
-    Surface = Color3.fromRGB(20, 20, 20),
+    Background = Color3.fromRGB(12, 8, 18),
+    Surface = Color3.fromRGB(26, 18, 34),
     Text = Color3.fromRGB(240, 240, 240),
-    TextDim = Color3.fromRGB(145, 145, 150),
-    Border = Color3.fromRGB(45, 45, 45),
+    TextDim = Color3.fromRGB(160, 145, 175),
+    Border = Color3.fromRGB(70, 45, 90),
     Danger = Color3.fromRGB(255, 92, 108),
-    Success = Color3.fromRGB(74, 222, 128),
-    Info = Color3.fromRGB(96, 165, 250),
+    Success = Color3.fromRGB(132, 255, 90),
+    Info = Color3.fromRGB(190, 140, 255),
     Warning = Color3.fromRGB(250, 204, 21),
+    Pumpkin = Color3.fromRGB(255, 130, 30),
+    PumpkinLight = Color3.fromRGB(255, 170, 70),
+    Purple = Color3.fromRGB(150, 80, 230),
+    PurpleLight = Color3.fromRGB(190, 140, 255),
+    Moon = Color3.fromRGB(255, 236, 190),
 }
 
 local State = {
@@ -608,6 +617,10 @@ screenGui.IgnoreGuiInset = true
 screenGui.DisplayOrder = 999999
 screenGui.Parent = playerGui
 
+local function alive()
+    return screenGui ~= nil and screenGui.Parent ~= nil
+end
+
 local expiredShown = false
 
 local function showExpiredOverlay()
@@ -622,7 +635,7 @@ local function showExpiredOverlay()
     overlay.Name = "ExpiredOverlay"
     overlay.Size = UDim2.fromScale(1, 1)
     overlay.Position = UDim2.fromScale(0, 0)
-    overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    overlay.BackgroundColor3 = Color3.fromRGB(10, 0, 20)
     overlay.BackgroundTransparency = 1
     overlay.BorderSizePixel = 0
     overlay.Text = ""
@@ -630,9 +643,9 @@ local function showExpiredOverlay()
     overlay.Active = true
     overlay.ZIndex = 100
     overlay.Parent = screenGui
-    tween(overlay, {BackgroundTransparency = 0.45}, 0.25)
+    tween(overlay, {BackgroundTransparency = 0.4}, 0.25)
 
-    local title = makeLabel(overlay, "Title", "Key Đã Hết Hạn", UDim2.fromOffset(600, 50), UDim2.new(0.5, -300, 0.5, -40), Enum.Font.GothamBold, 36, COLORS.Danger)
+    local title = makeLabel(overlay, "Title", "💀 Key Đã Hết Hạn 💀", UDim2.fromOffset(600, 50), UDim2.new(0.5, -300, 0.5, -40), Enum.Font.GothamBold, 36, COLORS.Pumpkin)
     title.TextXAlignment = Enum.TextXAlignment.Center
     title.ZIndex = 101
 
@@ -666,19 +679,45 @@ local keyFrame = Instance.new("Frame")
 keyFrame.Name = "KeyUI"
 keyFrame.Size = UDim2.fromOffset(357, 310)
 keyFrame.Position = UDim2.new(0.5, -178, 0.5, -155)
-keyFrame.BackgroundColor3 = COLORS.Background
+keyFrame.BackgroundColor3 = Color3.new(1, 1, 1)
 keyFrame.BackgroundTransparency = 0.02
 keyFrame.BorderSizePixel = 0
 keyFrame.ClipsDescendants = true
 keyFrame.ZIndex = 10
 keyFrame.Parent = screenGui
-makeCorner(keyFrame, 7)
+makeCorner(keyFrame, 8)
+
+local bgGradient = Instance.new("UIGradient")
+bgGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 18, 62)),
+    ColorSequenceKeypoint.new(0.55, Color3.fromRGB(19, 10, 30)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 5, 13)),
+})
+bgGradient.Rotation = 90
+bgGradient.Parent = keyFrame
 
 local frameStroke = Instance.new("UIStroke")
-frameStroke.Color = Color3.fromRGB(42, 42, 46)
-frameStroke.Thickness = 1
-frameStroke.Transparency = 0.1
+frameStroke.Color = Color3.new(1, 1, 1)
+frameStroke.Thickness = 2
+frameStroke.Transparency = 0
 frameStroke.Parent = keyFrame
+
+local frameStrokeGradient = Instance.new("UIGradient")
+frameStrokeGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, COLORS.Pumpkin),
+    ColorSequenceKeypoint.new(0.5, COLORS.Purple),
+    ColorSequenceKeypoint.new(1, COLORS.Pumpkin),
+})
+frameStrokeGradient.Rotation = 0
+frameStrokeGradient.Parent = frameStroke
+
+task.spawn(function()
+    while alive() do
+        frameStrokeGradient.Rotation = 0
+        tween(frameStrokeGradient, {Rotation = 360}, 6, Enum.EasingStyle.Linear)
+        task.wait(6)
+    end
+end)
 
 local leftPanel = Instance.new("Frame")
 leftPanel.Name = "LeftPanel"
@@ -699,8 +738,26 @@ logo.ScaleType = Enum.ScaleType.Fit
 logo.ZIndex = 12
 logo.Parent = leftPanel
 
-makeLabel(leftPanel, "HeaderTitle", "LPT Hub", UDim2.fromOffset(210, 28), UDim2.fromOffset(108, 23), Enum.Font.GothamBold, 24, Color3.fromRGB(245, 245, 245))
-makeLabel(leftPanel, "HeaderSubtitle", "Key system", UDim2.fromOffset(210, 18), UDim2.fromOffset(109, 49), Enum.Font.Gotham, 12, Color3.fromRGB(105, 105, 105))
+local headerTitle = makeLabel(leftPanel, "HeaderTitle", "LPT Hub", UDim2.fromOffset(210, 28), UDim2.fromOffset(108, 23), Enum.Font.GothamBold, 24, Color3.fromRGB(255, 255, 255))
+
+local headerTitleGradient = Instance.new("UIGradient")
+headerTitleGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, COLORS.Pumpkin),
+    ColorSequenceKeypoint.new(0.5, COLORS.PurpleLight),
+    ColorSequenceKeypoint.new(1, COLORS.Pumpkin),
+})
+headerTitleGradient.Offset = Vector2.new(-1, 0)
+headerTitleGradient.Parent = headerTitle
+
+task.spawn(function()
+    while alive() do
+        headerTitleGradient.Offset = Vector2.new(-1, 0)
+        tween(headerTitleGradient, {Offset = Vector2.new(1, 0)}, 2.6, Enum.EasingStyle.Sine)
+        task.wait(3.4)
+    end
+end)
+
+makeLabel(leftPanel, "HeaderSubtitle", "Key system • Halloween 🎃", UDim2.fromOffset(160, 18), UDim2.fromOffset(109, 49), Enum.Font.Gotham, 12, Color3.fromRGB(185, 150, 140))
 
 local dragHandle = Instance.new("Frame")
 dragHandle.Name = "DragHandle"
@@ -761,13 +818,14 @@ UserInputService.InputChanged:Connect(function(input)
     )
 end)
 
-makeLabel(leftPanel, "LicenseLabel", "License key", UDim2.fromOffset(300, 20), UDim2.fromOffset(29, 88), Enum.Font.GothamMedium, 14, Color3.fromRGB(165, 165, 170))
+makeLabel(leftPanel, "LicenseLabel", "License key", UDim2.fromOffset(300, 20), UDim2.fromOffset(29, 88), Enum.Font.GothamMedium, 14, Color3.fromRGB(200, 180, 215))
 
 local inputBox = Instance.new("Frame")
 inputBox.Name = "KeyInputBox"
 inputBox.Size = UDim2.fromOffset(300, 40)
 inputBox.Position = UDim2.fromOffset(29, 112)
 inputBox.BackgroundColor3 = COLORS.Surface
+inputBox.BackgroundTransparency = 0.1
 inputBox.BorderSizePixel = 0
 inputBox.ZIndex = 11
 inputBox.Parent = leftPanel
@@ -787,7 +845,7 @@ keyIcon.BackgroundTransparency = 1
 keyIcon.ZIndex = 12
 keyIcon.Parent = inputBox
 
-buildKeyIcon(keyIcon, Color3.fromRGB(245, 190, 60))
+buildKeyIcon(keyIcon, COLORS.Pumpkin)
 
 local keyInput = Instance.new("TextBox")
 keyInput.Name = "LicenseInput"
@@ -796,7 +854,7 @@ keyInput.Position = UDim2.fromOffset(31, 0)
 keyInput.BackgroundTransparency = 1
 keyInput.BorderSizePixel = 0
 keyInput.PlaceholderText = "Paste your key here"
-keyInput.PlaceholderColor3 = Color3.fromRGB(94, 94, 94)
+keyInput.PlaceholderColor3 = Color3.fromRGB(120, 100, 135)
 keyInput.Text = ""
 keyInput.TextColor3 = Color3.fromRGB(245, 245, 245)
 keyInput.TextSize = 14
@@ -808,7 +866,7 @@ keyInput.ZIndex = 12
 keyInput.Parent = inputBox
 
 keyInput.Focused:Connect(function()
-    tween(inputStroke, {Color = Color3.fromRGB(100, 100, 100), Transparency = 0}, 0.15)
+    tween(inputStroke, {Color = COLORS.Pumpkin, Transparency = 0}, 0.15)
 end)
 keyInput.FocusLost:Connect(function()
     tween(inputStroke, {Color = COLORS.Border, Transparency = 0.12}, 0.15)
@@ -822,10 +880,10 @@ local getKeyButton = Instance.new("TextButton")
 getKeyButton.Name = "GetKeyButton"
 getKeyButton.Size = UDim2.fromOffset(144, 40)
 getKeyButton.Position = UDim2.fromOffset(29, 188)
-getKeyButton.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+getKeyButton.BackgroundColor3 = Color3.fromRGB(34, 22, 44)
 getKeyButton.BorderSizePixel = 0
 getKeyButton.Text = "Get a key"
-getKeyButton.TextColor3 = Color3.fromRGB(150, 150, 155)
+getKeyButton.TextColor3 = Color3.fromRGB(200, 170, 225)
 getKeyButton.TextSize = 13
 getKeyButton.Font = Enum.Font.GothamMedium
 getKeyButton.AutoButtonColor = false
@@ -833,7 +891,8 @@ getKeyButton.ZIndex = 11
 getKeyButton.Parent = leftPanel
 makeCorner(getKeyButton, 6)
 local getStroke = Instance.new("UIStroke")
-getStroke.Color = Color3.fromRGB(42, 42, 42)
+getStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+getStroke.Color = Color3.fromRGB(85, 55, 110)
 getStroke.Thickness = 1
 getStroke.Parent = getKeyButton
 
@@ -841,8 +900,8 @@ local submitButton = Instance.new("TextButton")
 submitButton.Name = "SubmitButton"
 submitButton.Size = UDim2.fromOffset(144, 40)
 submitButton.Position = UDim2.fromOffset(185, 188)
-submitButton.BackgroundColor3 = Color3.fromRGB(155, 210, 255)
-submitButton.TextColor3 = Color3.fromRGB(10, 30, 50)
+submitButton.BackgroundColor3 = COLORS.Pumpkin
+submitButton.TextColor3 = Color3.fromRGB(30, 10, 0)
 submitButton.BorderSizePixel = 0
 submitButton.Text = "Submit"
 submitButton.TextSize = 13
@@ -858,6 +917,7 @@ local function makeIconButton(name, posX, labelText, iconW, iconH)
     button.Size = UDim2.fromOffset(144, 40)
     button.Position = UDim2.fromOffset(posX, 238)
     button.BackgroundColor3 = COLORS.Surface
+    button.BackgroundTransparency = 0.1
     button.BorderSizePixel = 0
     button.Text = ""
     button.AutoButtonColor = false
@@ -866,7 +926,8 @@ local function makeIconButton(name, posX, labelText, iconW, iconH)
     makeCorner(button, 6)
 
     local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(40, 40, 40)
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Color = Color3.fromRGB(70, 48, 92)
     stroke.Thickness = 1
     stroke.Parent = button
 
@@ -908,7 +969,7 @@ local function addHoverGlow(button, stroke, glowColor, hoverBg)
     local baseStrokeColor = stroke.Color
     local baseThickness = stroke.Thickness
     local baseTransparency = stroke.Transparency
-    hoverBg = hoverBg or Color3.fromRGB(34, 34, 42)
+    hoverBg = hoverBg or Color3.fromRGB(44, 30, 58)
 
     local function showGlow()
         tween(button, {BackgroundColor3 = hoverBg}, 0.15)
@@ -951,21 +1012,215 @@ applyIcon(youtubeHolder, YOUTUBE_W * 2, YOUTUBE_H * 2, buildYouTubeFrames, rende
 local restoreDiscordHover = addHoverGlow(discordButton, discordStroke, Color3.fromRGB(130, 145, 255))
 local restoreYoutubeHover = addHoverGlow(youtubeButton, youtubeStroke, Color3.fromRGB(255, 60, 60))
 
-addHoverGlow(getKeyButton, getStroke, Color3.fromRGB(70, 70, 70), Color3.fromRGB(28, 28, 28))
+addHoverGlow(getKeyButton, getStroke, COLORS.Purple, Color3.fromRGB(46, 30, 60))
 
 getKeyButton.MouseEnter:Connect(function()
     tween(getKeyButton, {TextColor3 = Color3.fromRGB(255, 255, 255)}, 0.15)
 end)
 getKeyButton.MouseLeave:Connect(function()
-    tween(getKeyButton, {TextColor3 = Color3.fromRGB(150, 150, 155)}, 0.15)
+    tween(getKeyButton, {TextColor3 = Color3.fromRGB(200, 170, 225)}, 0.15)
 end)
 
 local submitStroke = Instance.new("UIStroke")
-submitStroke.Color = Color3.fromRGB(155, 210, 255)
+submitStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+submitStroke.Color = COLORS.Pumpkin
 submitStroke.Thickness = 1
 submitStroke.Transparency = 1
 submitStroke.Parent = submitButton
-addHoverGlow(submitButton, submitStroke, Color3.fromRGB(200, 235, 255), Color3.fromRGB(190, 230, 255))
+addHoverGlow(submitButton, submitStroke, Color3.fromRGB(255, 210, 120), COLORS.PumpkinLight)
+
+local submitPulse = Instance.new("UIStroke")
+submitPulse.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+submitPulse.Color = COLORS.PumpkinLight
+submitPulse.Thickness = 3
+submitPulse.Transparency = 0.85
+submitPulse.Parent = submitButton
+
+task.spawn(function()
+    while alive() do
+        tween(submitPulse, {Transparency = 0.45}, 1, Enum.EasingStyle.Sine)
+        task.wait(1)
+        tween(submitPulse, {Transparency = 0.85}, 1, Enum.EasingStyle.Sine)
+        task.wait(1)
+    end
+end)
+
+--============================================================
+-- HALLOWEEN DECORATIONS
+--============================================================
+
+local rng = Random.new()
+
+local decor = Instance.new("Frame")
+decor.Name = "HalloweenDecor"
+decor.Size = UDim2.fromScale(1, 1)
+decor.BackgroundTransparency = 1
+decor.BorderSizePixel = 0
+decor.ZIndex = 9
+decor.Parent = keyFrame
+
+local function makeEmoji(name, emoji, size, position, textSize, transparency)
+    local label = Instance.new("TextLabel")
+    label.Name = name
+    label.Size = size
+    label.Position = position
+    label.BackgroundTransparency = 1
+    label.BorderSizePixel = 0
+    label.Text = emoji
+    label.TextSize = textSize
+    label.TextTransparency = transparency or 0
+    label.Font = Enum.Font.Gotham
+    label.ZIndex = 9
+    label.Parent = decor
+    return label
+end
+
+local fog = Instance.new("Frame")
+fog.Name = "Fog"
+fog.Size = UDim2.new(1, 0, 0, 80)
+fog.Position = UDim2.new(0, 0, 1, -80)
+fog.BackgroundColor3 = Color3.fromRGB(130, 70, 200)
+fog.BorderSizePixel = 0
+fog.ZIndex = 9
+fog.Parent = decor
+
+local fogGradient = Instance.new("UIGradient")
+fogGradient.Rotation = 90
+fogGradient.Transparency = NumberSequence.new({
+    NumberSequenceKeypoint.new(0, 1),
+    NumberSequenceKeypoint.new(1, 0.7),
+})
+fogGradient.Parent = fog
+
+local moonGlow = makeShape(decor, UDim2.fromOffset(58, 58), UDim2.fromOffset(292, 0), COLORS.Moon, 99, 9)
+moonGlow.Name = "MoonGlow"
+moonGlow.BackgroundTransparency = 0.88
+
+local moon = makeShape(decor, UDim2.fromOffset(32, 32), UDim2.fromOffset(305, 13), COLORS.Moon, 99, 9)
+moon.Name = "Moon"
+
+local moonGradient = Instance.new("UIGradient")
+moonGradient.Color = ColorSequence.new(Color3.fromRGB(255, 248, 220), Color3.fromRGB(235, 205, 150))
+moonGradient.Rotation = 45
+moonGradient.Parent = moon
+
+local craters = {
+    {313, 21, 7}, {324, 30, 5}, {318, 36, 4},
+}
+for _, c in ipairs(craters) do
+    local crater = makeShape(decor, UDim2.fromOffset(c[3], c[3]), UDim2.fromOffset(c[1], c[2]), Color3.fromRGB(220, 190, 135), 99, 9)
+    crater.BackgroundTransparency = 0.45
+end
+
+task.spawn(function()
+    while alive() do
+        tween(moonGlow, {BackgroundTransparency = 0.78}, 2, Enum.EasingStyle.Sine)
+        task.wait(2)
+        tween(moonGlow, {BackgroundTransparency = 0.9}, 2, Enum.EasingStyle.Sine)
+        task.wait(2)
+    end
+end)
+
+local spiderLine = Instance.new("Frame")
+spiderLine.Name = "SpiderThread"
+spiderLine.Size = UDim2.fromOffset(1, 22)
+spiderLine.Position = UDim2.fromOffset(283, 0)
+spiderLine.BackgroundColor3 = Color3.fromRGB(210, 210, 225)
+spiderLine.BackgroundTransparency = 0.45
+spiderLine.BorderSizePixel = 0
+spiderLine.ZIndex = 9
+spiderLine.Parent = decor
+
+local spider = makeEmoji("Spider", "🕷️", UDim2.fromOffset(22, 22), UDim2.fromOffset(272, 20), 18, 0)
+
+task.spawn(function()
+    while alive() do
+        tween(spiderLine, {Size = UDim2.fromOffset(1, 44)}, 1.6, Enum.EasingStyle.Sine)
+        tween(spider, {Position = UDim2.fromOffset(272, 42)}, 1.6, Enum.EasingStyle.Sine)
+        task.wait(1.7)
+        tween(spiderLine, {Size = UDim2.fromOffset(1, 22)}, 1.6, Enum.EasingStyle.Sine)
+        tween(spider, {Position = UDim2.fromOffset(272, 20)}, 1.6, Enum.EasingStyle.Sine)
+        task.wait(1.7)
+    end
+end)
+
+local emberColors = {COLORS.Pumpkin, COLORS.PumpkinLight, COLORS.Purple, COLORS.PurpleLight}
+
+local function spawnEmber(startDelay)
+    local size = rng:NextInteger(2, 4)
+    local ember = makeShape(decor, UDim2.fromOffset(size, size), UDim2.fromOffset(0, 320), emberColors[rng:NextInteger(1, #emberColors)], 99, 9)
+    ember.Name = "Ember"
+    ember.BackgroundTransparency = 1
+
+    task.spawn(function()
+        task.wait(startDelay)
+        while alive() do
+            if not keyFrame.Visible then
+                task.wait(1)
+            else
+                local duration = rng:NextNumber(5, 9)
+                local startX = rng:NextInteger(6, 350)
+                local endX = math.clamp(startX + rng:NextInteger(-40, 40), 0, 354)
+
+                ember.BackgroundTransparency = 1
+                ember.Position = UDim2.fromOffset(startX, 318)
+                tween(ember, {Position = UDim2.fromOffset(endX, -10)}, duration, Enum.EasingStyle.Linear)
+                tween(ember, {BackgroundTransparency = 0.15}, duration * 0.3, Enum.EasingStyle.Sine)
+                task.wait(duration * 0.6)
+                tween(ember, {BackgroundTransparency = 1}, duration * 0.4, Enum.EasingStyle.Sine)
+                task.wait(duration * 0.4)
+            end
+        end
+    end)
+end
+
+for i = 1, 16 do
+    spawnEmber(rng:NextNumber(0, 7))
+end
+
+local function spawnBats(startDelay, yPos, duration, textSize)
+    task.spawn(function()
+        task.wait(startDelay)
+        while alive() do
+            if not keyFrame.Visible then
+                task.wait(1)
+            else
+                local bat = makeEmoji("Bat", "🦇", UDim2.fromOffset(30, 30), UDim2.fromOffset(-34, yPos), textSize, 0.05)
+                local endY = yPos + rng:NextInteger(-14, 14)
+                tween(bat, {Position = UDim2.fromOffset(372, endY)}, duration, Enum.EasingStyle.Linear)
+                task.wait(duration)
+                bat:Destroy()
+                task.wait(rng:NextInteger(2, 5))
+            end
+        end
+    end)
+end
+
+spawnBats(1, 22, 7, 20)
+spawnBats(4, 276, 9, 16)
+
+local ghost = makeEmoji("Ghost", "👻", UDim2.fromOffset(26, 26), UDim2.fromOffset(311, 283), 20, 0.1)
+
+task.spawn(function()
+    while alive() do
+        tween(ghost, {Position = UDim2.fromOffset(307, 276)}, 1.3, Enum.EasingStyle.Sine)
+        task.wait(1.3)
+        tween(ghost, {Position = UDim2.fromOffset(315, 283)}, 1.3, Enum.EasingStyle.Sine)
+        task.wait(1.3)
+    end
+end)
+
+local footer = makeLabel(leftPanel, "HalloweenFooter", "🎃  Happy Halloween  🎃", UDim2.fromOffset(270, 18), UDim2.fromOffset(29, 284), Enum.Font.GothamMedium, 11, COLORS.Pumpkin)
+footer.TextXAlignment = Enum.TextXAlignment.Center
+
+task.spawn(function()
+    while alive() do
+        tween(footer, {TextColor3 = COLORS.PumpkinLight}, 0.9, Enum.EasingStyle.Sine)
+        task.wait(0.9)
+        tween(footer, {TextColor3 = COLORS.Pumpkin}, 0.9, Enum.EasingStyle.Sine)
+        task.wait(0.9)
+    end
+end)
 
 --============================================================
 -- STATUS AND GAME DETECTION
@@ -1302,7 +1557,7 @@ local function copyButtonLink(button, link, stroke, restoreHover)
             if restoreHover then
                 restoreHover()
             else
-                stroke.Color = Color3.fromRGB(40, 40, 40)
+                stroke.Color = Color3.fromRGB(70, 48, 92)
                 stroke.Thickness = 1
             end
         end
@@ -1333,33 +1588,33 @@ local function attemptSubmit()
 
     local keyIsValid, keyError, keyExpired = checkKey(key)
 
-if not keyIsValid then
-    if keyExpired then
-        State.KeyValid = false
-        State.Key = nil
-        State.ExpiresAt = nil
+    if not keyIsValid then
+        if keyExpired then
+            State.KeyValid = false
+            State.Key = nil
+            State.ExpiresAt = nil
 
-        setStatus("Key Đã Hết Hạn", COLORS.Danger)
-        showExpiredOverlay()
-        deleteSavedKey()
+            setStatus("Key Đã Hết Hạn", COLORS.Danger)
+            showExpiredOverlay()
+            deleteSavedKey()
 
-        keyInput.Text = ""
-    else
-        setStatus(keyError or "KEY Không Hợp Lệ", COLORS.Danger)
+            keyInput.Text = ""
+        else
+            setStatus(keyError or "KEY Không Hợp Lệ", COLORS.Danger)
+        end
+
+        tween(inputStroke, {Color = COLORS.Danger,Transparency = 0}, 0.1)
+        task.wait(0.15)
+        tween(inputStroke, {Color = COLORS.Border,Transparency = 0.15}, 0.2)
+
+        State.Submitting = false
+        return
     end
-
-    tween(inputStroke, {Color = COLORS.Danger,Transparency = 0}, 0.1)
-    task.wait(0.15)
-    tween(inputStroke, {Color = COLORS.Border,Transparency = 0.15}, 0.2)
-
-    State.Submitting = false
-    return
-end
 
     State.KeyValid = true
     State.Key = key
     saveKey(key)
-    setStatus("Key Hợp Lệ", COLORS.Success)
+    setStatus("Key Hợp Lệ 🎃", COLORS.Success)
     State.Submitting = false
     task.wait(0.7)
     loadMainUI()
