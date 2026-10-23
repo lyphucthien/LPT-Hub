@@ -1825,7 +1825,7 @@ function ShopModule:Set(name, enabled)
         end
 
         publishFightingStyleStates()
-        notify("Đã tắt: " .. name .. )
+        notify("Đã tắt: " .. name .. " (đã dừng mọi chuyển động của Fighting Style)")
         return true
     end
 
