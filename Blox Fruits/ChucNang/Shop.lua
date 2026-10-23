@@ -687,6 +687,40 @@ local function findCastlePortalFor(destinationName)
     return bestPosition
 end
 
+local function findWhirlpoolEntrancePart()
+    local reference = Vector3.new(3865, 5, -1926)
+    local bestPart = nil
+    local bestDistance = math.huge
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name == "Entrance" then
+            local distance = (obj.Position - reference).Magnitude
+
+            if distance < bestDistance then
+                bestDistance = distance
+                bestPart = obj
+            end
+        end
+    end
+
+    if bestPart then
+        print(string.format(
+            "[LPT WHIRLPOOL] Entrance thật: (%.2f, %.2f, %.2f) | Lệch %.0f studs",
+            bestPart.Position.X,
+            bestPart.Position.Y,
+            bestPart.Position.Z,
+            bestDistance
+        ))
+
+        if bestDistance <= 6000 then
+            return bestPart
+        end
+    end
+
+    warn("[LPT WHIRLPOOL] Không xác định được Entrance gần vị trí dự kiến")
+    return nil
+end
+
 local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
     if shouldCancelOperation(shouldCancel) then
         return false
@@ -698,7 +732,14 @@ local function tryFirstSeaUnderwaterEntrance(module, styleName, shouldCancel)
     end
 
     local underwaterCity = Vector3.new(61163.85, 11.68, 1819.78)
-    local whirlpoolCenter = Vector3.new(3865, 5, -1926)
+    local entrancePart = findWhirlpoolEntrancePart()
+
+    if not entrancePart then
+        notify("Không xác định được Entrance; đã dừng để tránh bay sai vị trí")
+        return false
+    end
+
+    local whirlpoolCenter = entrancePart.Position
 
     local function getPosition(object)
         if object:IsA("BasePart") then
