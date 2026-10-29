@@ -15,7 +15,7 @@ local DEFAULTS = {
     CruiseHeight = 55,
     ChestWait = 6,
     MaxChestAttempts = 2,
-    ServerPages = 3,
+    ServerPages = 1000,
     HopRetryDelay = 10,
     ScanInterval = 1.5,
     ScriptURL = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/KaitunBloxFruits.lua",
@@ -309,65 +309,190 @@ local function collectChests(id)
 end
 
 local function requestServerPage(cursor)
-    local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
-    if cursor and cursor ~= "" then url ..= "&cursor=" .. HttpService:UrlEncode(cursor) end
-    local ok, result = pcall(function() return HttpService:JSONDecode(game:HttpGet(url)) end)
-    return ok and result or nil
+    local url = "https://games.roblox.com/v1/games/"
+        .. tostring(game.PlaceId)
+        .. "/servers/Public?sortOrder=Asc&limit=100"
+
+    if cursor and cursor ~= "" then
+        url ..= "&cursor=" .. HttpService:UrlEncode(cursor)
+    end
+
+    local ok, result = pcall(function()
+        local response = game:HttpGet(url)
+        return HttpService:JSONDecode(response)
+    end)
+
+    if not ok or type(result) ~= "table" then
+        return nil
+    end
+
+    return result
 end
 
 local function queueContinuation()
     local url = CONFIG.ScriptURL
+
     if not url:match("^https://raw%.githubusercontent%.com/")
         or url:find("USERNAME", 1, true)
         or url:find("REPOSITORY", 1, true) then
-        log("Chưa hop: hãy thay ScriptURL bằng GitHub Raw URL thật.", "error")
+        log("Chưa hop: hãy đặt ScriptURL thành GitHub Raw URL hợp lệ.", "error")
         return false
     end
 
-    -- Queue runs in the destination client after the teleport completes.
+    -- Script chỉ được tải lại sau khi client đã vào server đích.
     local queue = (type(queue_on_teleport) == "function" and queue_on_teleport)
         or (type(queueonteleport) == "function" and queueonteleport)
         or (type(syn) == "table" and type(syn.queue_on_teleport) == "function" and syn.queue_on_teleport)
         or (type(fluxus) == "table" and type(fluxus.queue_on_teleport) == "function" and fluxus.queue_on_teleport)
 
     if type(queue) ~= "function" then
-        log("Executor không hỗ trợ queue_on_teleport; không thể tự tải script sau khi vào server mới.", "error")
+        log("Executor không hỗ trợ queue_on_teleport; không thể tự chạy lại sau khi vào server mới.", "error")
         return false
     end
 
-    local code = ("task.wait(2); loadstring(game:HttpGet(%q))()") :format(url)
+    local code = ("task.wait(3); loadstring(game:HttpGet(%q))()") :format(url)
     local ok, err = pcall(queue, code)
+
     if not ok then
         log("Không thể xếp script chạy sau teleport: " .. tostring(err), "error")
         return false
     end
-    log("Đã xếp script để tải sau khi vào server đích.", "success")
+
+    return true
+end
+
+local function getEligiblePublicServers(id)
+    local candidates = {}
+    local seen = {}
+    local cursor = nil
+    local pageNumber = 0
+    local maxPages = math.max(1, math.floor(tonumber(CONFIG.ServerPages) or 1000))
+
+    log("Đang quét danh sách server công khai của sea hiện tại...", "info")
+
+    repeat
+        if id and not isActive(id) then
+            return candidates
+        end
+
+        pageNumber += 1
+        local page = requestServerPage(cursor)
+
+        if not page then
+            log("Không đọc được trang server số " .. pageNumber .. ". Có thể API đang giới hạn yêu cầu.", "warn")
+            break
+        end
+
+        for _, server in ipairs(page.data or {}) do
+            local serverId = server.id
+            local players = tonumber(server.playing)
+
+            -- Chỉ chọn server có ít hơn 12 người; server đủ 12 người bị loại.
+            if serverId
+                and serverId ~= game.JobId
+                and players ~= nil
+                and players < 12
+                and not State.VisitedServers[serverId]
+                and not seen[serverId] then
+                seen[serverId] = true
+                table.insert(candidates, {
+                    Id = serverId,
+                    Players = players,
+                })
+            end
+        end
+
+        cursor = page.nextPageCursor
+    until not cursor or pageNumber >= maxPages
+
+    log(string.format(
+        "Đã quét %d trang; tìm thấy %d server chưa ghé có dưới 12 người.",
+        pageNumber,
+        #candidates
+    ), "info")
+
+    return candidates
+end
+
+local function tryTeleportToServer(serverId)
+    if not queueContinuation() then
+        return false
+    end
+
+    local ok, err = pcall(function()
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, serverId, Player)
+    end)
+
+    if not ok then
+        log("Không vào được server " .. tostring(serverId) .. ": " .. tostring(err), "warn")
+        return false
+    end
+
+    State.VisitedServers[serverId] = true
+    Stats.Servers += 1
+    log("Đang kết nối server đích (script sẽ tải sau khi vào server)...", "success")
     return true
 end
 
 local function serverHop(id)
-    if not isActive(id) then return false end
-    log("Đang tìm server mới...", "info")
-    if not queueContinuation() then return false end
-    local cursor
-    for _ = 1, CONFIG.ServerPages do
-        if not isActive(id) then return false end
-        local page = requestServerPage(cursor)
-        if not page then break end
-        for _, server in ipairs(page.data or {}) do
-            if not isActive(id) then return false end
-            if server.id ~= game.JobId and not State.VisitedServers[server.id] and server.playing < server.maxPlayers then
-                State.VisitedServers[server.id] = true
-                Stats.Servers += 1
-                log("Đang chuyển server...", "success")
-                local ok = pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, Player) end)
-                if ok then return true end
-            end
-        end
-        cursor = page.nextPageCursor
-        if not cursor then break end
+    if not isActive(id) then
+        return false
     end
-    log("Không tìm được server trống chưa ghé.", "error")
+
+    local candidates = getEligiblePublicServers(id)
+
+    -- Thử lần lượt mọi ứng viên đã lấy được; nếu lời gọi teleport lỗi,
+    -- chuyển sang server kế tiếp thay vì dừng ở ứng viên đầu tiên.
+    for _, server in ipairs(candidates) do
+        if not isActive(id) then
+            return false
+        end
+
+        if not State.VisitedServers[server.Id] then
+            log(string.format(
+                "Đang thử server có %d/12 người...",
+                server.Players
+            ), "info")
+
+            if tryTeleportToServer(server.Id) then
+                return true
+            end
+
+            -- Đánh dấu ứng viên lỗi trong phiên này để tránh lặp lại liên tục.
+            State.VisitedServers[server.Id] = true
+            task.wait(0.25)
+        end
+    end
+
+    log("Đã thử hết các server phù hợp tìm được. Sẽ làm mới danh sách để thử lại.", "warn")
+
+    -- Làm mới danh sách đã ghé, nhưng giữ server hiện tại để không hop ngược ngay.
+    table.clear(State.VisitedServers)
+    if game.JobId ~= "" then
+        State.VisitedServers[game.JobId] = true
+    end
+
+    candidates = getEligiblePublicServers(id)
+
+    for _, server in ipairs(candidates) do
+        if not isActive(id) then
+            return false
+        end
+
+        log(string.format(
+            "Thử lại server có %d/12 người...",
+            server.Players
+        ), "info")
+
+        if tryTeleportToServer(server.Id) then
+            return true
+        end
+
+        State.VisitedServers[server.Id] = true
+        task.wait(0.25)
+    end
+
+    log("Không thể vào server phù hợp nào trong danh sách hiện có. Thử lại sau.", "error")
     return false
 end
 
@@ -605,7 +730,7 @@ local function buildUI()
     addSetting(settingsList, "Độ cao bay", "CruiseHeight", 1, 500, 0)
     addSetting(settingsList, "Chờ xác minh (giây)", "ChestWait", 1, 60, 1)
     addSetting(settingsList, "Số lần thử mỗi rương", "MaxChestAttempts", 1, 10, 0)
-    addSetting(settingsList, "Số trang server", "ServerPages", 1, 10, 0)
+    addSetting(settingsList, "Số trang server tối đa", "ServerPages", 1, 1000, 0)
     addSetting(settingsList, "Chu kỳ quét (giây)", "ScanInterval", 0.5, 30, 1)
     local reset = addButton(settings, "Khôi phục cài đặt mặc định", resetSettings, COLORS.GoldDark); reset.Position, reset.Size = UDim2.new(0, 245, 1, -52), UDim2.fromOffset(245, 38)
 
