@@ -28,6 +28,61 @@ end
 
 ENV.LPTChestKaitun = ENV.LPTChestKaitun or {}
 local State = ENV.LPTChestKaitun
+
+-- Auto-select Pirates on the first join and retain the preference across server hops.
+ENV.LPT_SelectedTeam = ENV.LPT_SelectedTeam or "Pirates"
+local SELECTED_TEAM = ENV.LPT_SelectedTeam
+
+local function findTeamButton(chooseTeam)
+    if not chooseTeam then return nil end
+    local wanted = string.lower(SELECTED_TEAM)
+    for _, object in ipairs(chooseTeam:GetDescendants()) do
+        if object:IsA("GuiButton") then
+            local name = string.lower(object.Name)
+            local label = object:IsA("TextButton") and string.lower(object.Text or "") or ""
+            if name == wanted or name:find(wanted, 1, true) or label == wanted or label:find(wanted, 1, true) then
+                return object
+            end
+        end
+    end
+    return nil
+end
+
+task.spawn(function()
+    local playerGui = Player:WaitForChild("PlayerGui")
+    local deadline = os.clock() + 90
+    while os.clock() < deadline do
+        -- Blox Fruits commonly exposes the picker as PlayerGui.Main.ChooseTeam.
+        local mainGui = playerGui:FindFirstChild("Main")
+        local chooseTeam = mainGui and mainGui:FindFirstChild("ChooseTeam", true)
+        if chooseTeam and chooseTeam.Visible then
+            local button = findTeamButton(chooseTeam)
+            if button and button.Visible and button.Active then
+                local clicked = pcall(function()
+                    if typeof(firesignal) == "function" then
+                        firesignal(button.Activated)
+                    else
+                        button:Activate()
+                    end
+                end)
+                if not clicked then
+                    pcall(function() button:Activate() end)
+                end
+                -- Avoid repeated clicks while the game processes the selection.
+                task.wait(1)
+                if not chooseTeam.Parent or not chooseTeam.Visible then
+                    print("[LPT Chest] Đã chọn team Pirates.")
+                    return
+                end
+            end
+        elseif mainGui and not (mainGui:FindFirstChild("ChooseTeam", true)) then
+            -- The team picker is absent; do not interfere with normal gameplay.
+            task.wait(1)
+        end
+        task.wait(0.25)
+    end
+    warn("[LPT Chest] Không tìm thấy nút chọn Pirates trong 90 giây.")
+end)
 State.VisitedServers = State.VisitedServers or {}
 if game.JobId ~= "" then
     State.VisitedServers[game.JobId] = true
