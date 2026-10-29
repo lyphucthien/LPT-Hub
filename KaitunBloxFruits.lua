@@ -18,8 +18,7 @@ local DEFAULTS = {
     ServerPages = 3,
     HopRetryDelay = 10,
     ScanInterval = 1.5,
-    -- Replace this placeholder before using automatic continuation after a hop.
-    ScriptURL = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/main/KaitunBloxFruits.lua",
+    ScriptURL = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/KaitunBloxFruits.lua",
 }
 
 local CONFIG = {}
@@ -125,6 +124,30 @@ local function log(message, kind)
     table.insert(Logs, 1, { Time = os.date("%H:%M:%S"), Message = tostring(message), Kind = kind or "info" })
     while #Logs > 80 do table.remove(Logs) end
     print("[LPT Chest] " .. tostring(message))
+end
+
+-- Important-item watcher. Detection is safe, but boss summon/combat remotes are game-specific
+-- and are intentionally not guessed. The UI log tells the user when either item is detected.
+local SeenSpecialItems = {}
+local SPECIAL_ITEMS = {
+    ["God's Chalice"] = "Chén Thánh (Sea 3)",
+    ["God's Chalice"] = "Chén Thánh (Sea 3)",
+    ["Fist of Darkness"] = "Fist of Darkness (Sea 2)",
+    ["Blackbeard's Key"] = "Key Râu Đen (nếu game/mod hiển thị tên này)",
+}
+
+local function scanSpecialItems()
+    local containers = { Player:FindFirstChild("Backpack"), Player.Character }
+    for _, container in ipairs(containers) do
+        if container then
+            for _, item in ipairs(container:GetChildren()) do
+                if item:IsA("Tool") and SPECIAL_ITEMS[item.Name] and not SeenSpecialItems[item.Name] then
+                    SeenSpecialItems[item.Name] = true
+                    log("Phát hiện vật phẩm: " .. SPECIAL_ITEMS[item.Name] .. ". Cần cấu hình cơ chế triệu hồi boss đúng với phiên bản game để tự spawn/đánh.", "success")
+                end
+            end
+        end
+    end
 end
 
 -- Chest collection logic
@@ -293,15 +316,33 @@ local function requestServerPage(cursor)
 end
 
 local function queueContinuation()
-    if CONFIG.ScriptURL:find("USERNAME", 1, true) or CONFIG.ScriptURL:find("REPOSITORY", 1, true) then
+    local url = CONFIG.ScriptURL
+    if not url:match("^https://raw%.githubusercontent%.com/")
+        or url:find("USERNAME", 1, true)
+        or url:find("REPOSITORY", 1, true) then
         log("Chưa hop: hãy thay ScriptURL bằng GitHub Raw URL thật.", "error")
         return false
     end
-    local queued = pcall(function()
-        local queue = queue_on_teleport or (syn and syn.queue_on_teleport)
-        if queue then queue(("loadstring(game:HttpGet(%q))()"):format(CONFIG.ScriptURL)) end
-    end)
-    return queued
+
+    -- Queue runs in the destination client after the teleport completes.
+    local queue = (type(queue_on_teleport) == "function" and queue_on_teleport)
+        or (type(queueonteleport) == "function" and queueonteleport)
+        or (type(syn) == "table" and type(syn.queue_on_teleport) == "function" and syn.queue_on_teleport)
+        or (type(fluxus) == "table" and type(fluxus.queue_on_teleport) == "function" and fluxus.queue_on_teleport)
+
+    if type(queue) ~= "function" then
+        log("Executor không hỗ trợ queue_on_teleport; không thể tự tải script sau khi vào server mới.", "error")
+        return false
+    end
+
+    local code = ("task.wait(2); loadstring(game:HttpGet(%q))()") :format(url)
+    local ok, err = pcall(queue, code)
+    if not ok then
+        log("Không thể xếp script chạy sau teleport: " .. tostring(err), "error")
+        return false
+    end
+    log("Đã xếp script để tải sau khi vào server đích.", "success")
+    return true
 end
 
 local function serverHop(id)
@@ -351,7 +392,7 @@ local function text(parent, value, size, color, font)
 end
 
 local function addButton(parent, title, callback, color)
-    local button = create("TextButton", { BackgroundColor3 = color or COLORS.Card, Text = title, TextColor3 = COLORS.White, TextSize = 13, Font = Enum.Font.GothamSemibold, AutoButtonColor = true, Size = UDim2.new(1, 0, 0, 42) }, parent)
+    local button = create("TextButton", { BackgroundColor3 = color or COLORS.Card, Text = title, TextColor3 = COLORS.White, TextSize = 14, Font = Enum.Font.GothamSemibold, AutoButtonColor = true, Size = UDim2.new(1, 0, 0, 42) }, parent)
     round(button, 8); outline(button)
     addConnection(button.Activated:Connect(function() if callback then callback() end end))
     return button
@@ -545,17 +586,17 @@ local function buildUI()
     Content = create("Frame", { BackgroundColor3 = COLORS.Panel, BorderSizePixel = 0 }, Main)
     round(Content, 10); outline(Content)
 
-    local overview, settings, logs, controls = makePage("Tổng quan"), makePage("Cài đặt"), makePage("Nhật ký"), makePage("Điều khiển")
-    local statsCard = makeCard(overview, "THỐNG KÊ PHIÊN", 182)
+    local overview, settings, logs = makePage("Tổng quan"), makePage("Cài đặt"), makePage("Nhật ký")
+    local statsCard = makeCard(overview, "THỐNG KÊ PHIÊN", 174)
     local grid = create("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 42), Size = UDim2.new(1, -24, 1, -54) }, statsCard)
     create("UIGridLayout", { CellSize = UDim2.new(0.5, -5, 0, 76), CellPadding = UDim2.fromOffset(10, 10), FillDirectionMaxCells = 2, SortOrder = Enum.SortOrder.LayoutOrder }, grid)
     ChestValue = makeStat(grid, "RƯƠNG ĐÃ NHẶT", "0")
     ServerValue = makeStat(grid, "SERVER ĐÃ HOP", "0")
     BeliValue = makeStat(grid, "BELI NHẬN ĐƯỢC", "$0")
     RuntimeValue = makeStat(grid, "THỜI GIAN", "00:00:00")
-    local info = makeCard(overview, "TRẠNG THÁI", 90)
-    local infoText = text(info, "Nhấn Bắt đầu để quét rương. Script xác minh Beli khi có thể, và dùng rương biến mất làm phương án dự phòng.", 11, COLORS.Muted)
-    infoText.Position, infoText.Size, infoText.TextWrapped = UDim2.fromOffset(14, 38), UDim2.new(1, -28, 0, 42), true
+    local info = makeCard(overview, "TRẠNG THÁI & MỤC TIÊU", 100)
+    local infoText = text(info, "Tự quét rương và xác minh Beli khi có thể. Tính năng tự triệu hồi/đánh boss cần xác định đúng cơ chế game trước khi bật.", 11, COLORS.Muted)
+    infoText.Position, infoText.Size, infoText.TextWrapped, infoText.TextYAlignment = UDim2.fromOffset(14, 38), UDim2.new(1, -28, 0, 52), true, Enum.TextYAlignment.Top
 
     local settingsCard = makeCard(settings, "THÔNG SỐ BAY & QUÉT", 405)
     local settingsList = create("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 40), Size = UDim2.new(1, -24, 1, -52) }, settingsCard)
@@ -571,9 +612,10 @@ local function buildUI()
     local logCard = makeCard(logs, "NHẬT KÝ HOẠT ĐỘNG", 390)
     LogList = create("ScrollingFrame", { BackgroundTransparency = 1, BorderSizePixel = 0, Position = UDim2.fromOffset(12, 40), Size = UDim2.new(1, -24, 1, -52), CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollBarThickness = 3, ScrollBarImageColor3 = COLORS.Gold }, logCard)
     create("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }, LogList)
-    local controlCard = makeCard(controls, "ĐIỀU KHIỂN", 235)
+
+    local controlCard = makeCard(overview, "ĐIỀU KHIỂN NHANH", 238)
     local controlsList = create("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 42), Size = UDim2.new(1, -24, 1, -54) }, controlCard)
-    create("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, controlsList)
+    create("UIGridLayout", { CellSize = UDim2.new(0.5, -5, 0, 48), CellPadding = UDim2.fromOffset(10, 9), FillDirectionMaxCells = 2, SortOrder = Enum.SortOrder.LayoutOrder }, controlsList)
     addButton(controlsList, "▶  BẮT ĐẦU", function()
         if Running then log("Script đã chạy.", "warn"); return end
         Stopped, Paused, Running = false, false, true
@@ -582,10 +624,11 @@ local function buildUI()
         log("Đã bắt đầu quét rương.", "success")
         task.spawn(function()
             while isActive(id) do
+                scanSpecialItems()
                 local found = collectChests(id)
                 if isActive(id) and not found then serverHop(id) end
                 local untilTime = os.clock() + CONFIG.ScanInterval
-                while os.clock() < untilTime and (Running and not Stopped and id == WorkerId) do task.wait(.1) end
+                while os.clock() < untilTime and Running and not Stopped and id == WorkerId do task.wait(.1) end
             end
         end)
     end, COLORS.Green)
@@ -600,7 +643,7 @@ local function buildUI()
         if Running then task.spawn(function() serverHop(WorkerId) end) else log("Hãy bắt đầu trước để hop server.", "warn") end
     end, COLORS.Blue)
 
-    for _, name in ipairs({ "Tổng quan", "Cài đặt", "Nhật ký", "Điều khiển" }) do
+    for _, name in ipairs({ "Tổng quan", "Cài đặt", "Nhật ký" }) do
         NavButtons[name] = addButton(Nav, name, function() showPage(name) end, COLORS.Panel)
     end
 
@@ -639,3 +682,10 @@ local function buildUI()
 end
 
 buildUI()
+
+task.spawn(function()
+    while ScreenGui and ScreenGui.Parent and not Stopped do
+        scanSpecialItems()
+        task.wait(1)
+    end
+end)
