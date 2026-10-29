@@ -244,18 +244,21 @@ end
 
 local function flyToChest(part, id)
     if not part or not part:IsDescendantOf(workspace) then return false end
-    local root, flight = getRoot(), beginFlight()
-    if not root or not flight then return false end
-    local function finish(result) endFlight(flight); return result end
-    local target = part.Position
-    local horizontal = Vector3.new(target.X - root.Position.X, 0, target.Z - root.Position.Z).Magnitude
-    if horizontal > 60 then
-        local altitude = math.max(root.Position.Y, target.Y + CONFIG.CruiseHeight)
-        if root.Position.Y < altitude - 3 and not moveRootTo(Vector3.new(root.Position.X, altitude, root.Position.Z), id) then return finish(false) end
-        if not moveRootTo(Vector3.new(target.X, altitude, target.Z), id) then return finish(false) end
+    local root = getRoot()
+    if not root then return false end
+
+    local flight = beginFlight()
+    if not flight then return false end
+    local function finish(result)
+        endFlight(flight)
+        return result
     end
+
+    -- Di chuyển trực tiếp từ vị trí hiện tại đến điểm ngay phía trên rương.
+    -- Không bay lên độ cao hành trình và không tạo waypoint ngang trung gian.
     if not part:IsDescendantOf(workspace) then return finish(false) end
-    return finish(moveRootTo(part.Position + Vector3.new(0, 2, 0), id))
+    local destination = part.Position + Vector3.new(0, 2, 0)
+    return finish(moveRootTo(destination, id))
 end
 
 local function verifyChest(chest, previousBeli, id)
