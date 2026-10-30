@@ -17,7 +17,7 @@ local YOUTUBE_LINK = "https://youtube.com/@lyphucthien1803"
 local KEY_API_URL = "https://lyphucthien.vercel.app/api/get-key"
 local RAW_LINK = "https://raw.githubusercontent.com/lyphucthien/LPT-Hub/main/"
 
-local UNIVERSAL_SCRIPT = RAW_LINK .. "Script%20Cho%20Game%20Ko%20H%E1%BB%97%20Tr%E1%BB%A3/Script.lua"
+local UNIVERSAL_SCRIPT = RAW_LINK .. "Script%20Supports%20All%20Games.lua"
 
 local GAME_HO_TRO = {
     ["+1 Speed Keyboard Escape"] = {
