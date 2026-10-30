@@ -220,8 +220,40 @@ local CHEST_LOAD_TIMEOUT = 45
 local CHEST_SCAN_INTERVAL = 2
 local CHEST_COLLECT_TIMEOUT = 8
 local CHEST_RETRY_LIMIT = 3
-local CHEST_STABLE_WAIT = 20
+local CHEST_STABLE_WAIT = 15
 local SERVER_MAX_WAIT = 120
+
+local function waitForWorldLoaded(token)
+    setStatus("Waiting for Workspace to load...")
+
+    if not game:IsLoaded() then
+        game.Loaded:Wait()
+    end
+
+    if not running or workerToken ~= token then
+        return false
+    end
+
+    local stableScans = 0
+
+    while running and workerToken == token do
+        local descendants = #Workspace:GetDescendants()
+
+        if descendants > 0 then
+            stableScans += 1
+        else
+            stableScans = 0
+        end
+
+        if stableScans >= 5 then
+            return true
+        end
+
+        task.wait(1)
+    end
+
+    return false
+end
 
 local function setEnabled(enabled)
     running = enabled
