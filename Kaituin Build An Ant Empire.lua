@@ -21,8 +21,7 @@ end)
 local running = false
 local workerToken = 0
 local currentTarget = nil
-
-local GUI_NAME = "PumpkinChestHelper"
+local GUI_NAME = "AutoFarmPumpkinChest"
 
 pcall(function()
     local oldGui = player:WaitForChild("PlayerGui"):FindFirstChild(GUI_NAME)
@@ -217,118 +216,246 @@ end
 
 local hopToNewServer
 
+local CHEST_LOAD_TIMEOUT = 45
+local CHEST_SCAN_INTERVAL = 2
+local CHEST_COLLECT_TIMEOUT = 8
+local CHEST_RETRY_LIMIT = 3
+local CHEST_STABLE_WAIT = 20
+local SERVER_MAX_WAIT = 120
+
 local function setEnabled(enabled)
     running = enabled
     workerToken += 1
+
     local myToken = workerToken
 
     if running then
         toggle.Text = "ON"
         toggle.BackgroundColor3 = Color3.fromRGB(45, 145, 80)
-        setStatus("Searching for Pumpkin Chest...")
+        setStatus("Waiting for chests to load...")
+
         task.spawn(function()
             local visited = {}
-            local emptyScans = 0
+            local discovered = {}
+            local attempts = {}
+
+            local startTime = os.clock()
+            local lastNewChestTime = startTime
+            local hadChest = false
 
             while running and workerToken == myToken do
+                local elapsed = os.clock() - startTime
+
+                if elapsed >= SERVER_MAX_WAIT then
+                    setStatus("Server scan timeout. Fast Hop...")
+                    task.wait(1)
+
+                    if running and workerToken == myToken then
+                        hopToNewServer()
+                    end
+                    break
+                end
+
                 local character = getCharacter()
                 local root = getRoot(character)
 
                 if not character or not root then
                     setStatus("Waiting for character...")
                     task.wait(1)
-                else
-                    local target = nil
-                    local targetDistance = math.huge
-                    local chests = findChests()
+                    continue
+                end
 
-                    for _, chest in ipairs(chests) do
-                        if not visited[chest] then
-                            local pos = getChestPosition(chest)
-                            if pos then
-                                local distance = (root.Position - pos).Magnitude
-                                if distance < targetDistance then
-                                    targetDistance = distance
-                                    target = chest
-                                end
-                            end
-                        end
+                -- Scan all available chests
+                local chests = findChests()
+                local newChestFound = false
+
+                for _, chest in ipairs(chests) do
+                    if not discovered[chest] then
+                        discovered[chest] = true
+                        newChestFound = true
+                        hadChest = true
                     end
+                end
 
-                    if not target then
-                        if #chests > 0 then
-                            hopToNewServer()
-                            break
-                        else
-                            emptyScans += 1
+                if newChestFound then
+                    lastNewChestTime = os.clock()
+                end
 
-                            setStatus("No chest found (" .. emptyScans .. "/5)")
+                -- Find nearest uncollected chest
+                local target = nil
+                local targetDistance = math.huge
 
-                            if emptyScans >= 5 then
-                                hopToNewServer()
-                                break
-                            end
+                for _, chest in ipairs(chests) do
+                    if not visited[chest] then
+                        local position = getChestPosition(chest)
 
-                            task.wait(2)
-                        end
-                    else
-                        emptyScans = 0
-                        currentTarget = target
-                        local position = getChestPosition(target)
+                        if position then
+                            local distance =
+                                (root.Position - position).Magnitude
 
-                        if not position then
-                            visited[target] = true
-                        else
-                            setStatus("Moving to " .. target.Name .. "...")
-                            local destination = position + Vector3.new(0, 4, 0)
-                            local ok = pcall(function()
-                                root.CFrame = CFrame.new(destination)
-                            end)
-
-                            if not ok then
-                                setStatus("Could not move to chest.")
-                                task.wait(1)
-                            else
-                                task.wait(0.5)
-
-                                if not running or workerToken ~= myToken then
-                                    break
-                                end
-
-                                local prompt = findPrompt(target)
-                                if prompt then
-                                    local activated = false
-                                    local success = pcall(function()
-                                        if prompt.Enabled then
-                                            prompt:InputHoldBegin()
-                                            task.wait(math.max(0.15, prompt.HoldDuration))
-                                            prompt:InputHoldEnd()
-                                            activated = true
-                                        end
-                                    end)
-
-                                    if not success or not activated then
-                                        setStatus("At chest; press E if needed.")
-                                        task.wait(1.5)
-                                    else
-                                        setStatus("Tried interaction; checking next chest...")
-                                        task.wait(1)
-                                    end
-                                else
-                                    setStatus("At chest; no ProximityPrompt found.")
-                                    task.wait(1.5)
-                                end
-
-                                visited[target] = true
+                            if distance < targetDistance then
+                                targetDistance = distance
+                                target = chest
                             end
                         end
                     end
                 end
+
+                if not target then
+                    local waitTime = os.clock() - lastNewChestTime
+
+                    if not hadChest then
+                        if elapsed < CHEST_LOAD_TIMEOUT then
+                            setStatus(
+                                "Loading chests... "
+                                .. math.floor(elapsed)
+                                .. "/"
+                                .. CHEST_LOAD_TIMEOUT
+                                .. "s"
+                            )
+                        else
+                            setStatus("No chests loaded. Fast Hop...")
+                            task.wait(1)
+
+                            if running and workerToken == myToken then
+                                hopToNewServer()
+                            end
+                            break
+                        end
+                    else
+                        if waitTime >= CHEST_STABLE_WAIT then
+                            setStatus("All chests processed. Fast Hop...")
+                            task.wait(1)
+
+                            if running and workerToken == myToken then
+                                hopToNewServer()
+                            end
+                            break
+                        else
+                            setStatus(
+                                "Waiting for new chests... "
+                                .. math.floor(waitTime)
+                                .. "/"
+                                .. CHEST_STABLE_WAIT
+                                .. "s"
+                            )
+                        end
+                    end
+
+                    task.wait(CHEST_SCAN_INTERVAL)
+                    continue
+                end
+
+                -- Process nearest chest
+                currentTarget = target
+
+                local position = getChestPosition(target)
+
+                if not position then
+                    task.wait(CHEST_SCAN_INTERVAL)
+                    continue
+                end
+
+                attempts[target] = (attempts[target] or 0) + 1
+
+                setStatus(
+                    "Moving to chest... ("
+                    .. attempts[target]
+                    .. "/"
+                    .. CHEST_RETRY_LIMIT
+                    .. ")"
+                )
+
+                -- Teleport to chest
+                local success = pcall(function()
+                    root.CFrame = CFrame.new(
+                        position + Vector3.new(0, 4, 0)
+                    )
+                end)
+
+                if not success then
+                    setStatus("Could not move to chest.")
+                    task.wait(1)
+                    continue
+                end
+
+                task.wait(0.5)
+
+                if not running or workerToken ~= myToken then
+                    break
+                end
+
+                -- Find and activate ProximityPrompt
+                local prompt = findPrompt(target)
+                local activated = false
+
+                if prompt and prompt.Enabled then
+                    local interactionSuccess = pcall(function()
+                        prompt:InputHoldBegin()
+
+                        task.wait(
+                            math.max(0.15, prompt.HoldDuration)
+                        )
+
+                        prompt:InputHoldEnd()
+                        activated = true
+                    end)
+
+                    if not interactionSuccess then
+                        activated = false
+                    end
+                end
+
+                if not activated then
+                    setStatus("Interaction unavailable. Retrying...")
+                else
+                    setStatus("Interacting with chest...")
+                end
+
+                -- Check whether chest was collected
+                local collected = false
+                local checkStart = os.clock()
+
+                while os.clock() - checkStart < CHEST_COLLECT_TIMEOUT do
+                    if not running or workerToken ~= myToken then
+                        break
+                    end
+
+                    if not target:IsDescendantOf(Workspace) then
+                        collected = true
+                        break
+                    end
+
+                    task.wait(0.5)
+                end
+
+                if not running or workerToken ~= myToken then
+                    break
+                end
+
+                if collected then
+                    visited[target] = true
+
+                    setStatus("Chest collected! Searching next...")
+                else
+                    if attempts[target] >= CHEST_RETRY_LIMIT then
+                        visited[target] = true
+
+                        setStatus("Chest retry limit reached. Skipping...")
+                    else
+                        setStatus("Chest still exists. Retrying...")
+                        task.wait(1)
+                    end
+                end
+
+                currentTarget = nil
+                task.wait(0.5)
             end
         end)
     else
         toggle.Text = "OFF"
         toggle.BackgroundColor3 = Color3.fromRGB(145, 55, 55)
+
         currentTarget = nil
         setStatus("Off")
     end
