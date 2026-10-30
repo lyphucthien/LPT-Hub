@@ -8,6 +8,16 @@ if not player then
     return
 end
 
+local TeleportService = game:GetService("TeleportService")
+
+local AUTO_START = false
+
+pcall(function()
+    local env = getgenv()
+    AUTO_START = env.PumpkinChestAutoStart == true
+    env.PumpkinChestAutoStart = false
+end)
+
 local running = false
 local workerToken = 0
 local currentTarget = nil
@@ -205,6 +215,8 @@ local function setStatus(text)
     end
 end
 
+local hopToNewServer
+
 local function setEnabled(enabled)
     running = enabled
     workerToken += 1
@@ -216,6 +228,7 @@ local function setEnabled(enabled)
         setStatus("Searching for Pumpkin Chest...")
         task.spawn(function()
             local visited = {}
+            local emptyScans = 0
 
             while running and workerToken == myToken do
                 local character = getCharacter()
@@ -227,8 +240,9 @@ local function setEnabled(enabled)
                 else
                     local target = nil
                     local targetDistance = math.huge
+                    local chests = findChests()
 
-                    for _, chest in ipairs(findChests()) do
+                    for _, chest in ipairs(chests) do
                         if not visited[chest] then
                             local pos = getChestPosition(chest)
                             if pos then
@@ -242,10 +256,23 @@ local function setEnabled(enabled)
                     end
 
                     if not target then
-                        visited = {}
-                        setStatus("No chest found; checking again...")
-                        task.wait(2)
+                        if #chests > 0 then
+                            hopToNewServer()
+                            break
+                        else
+                            emptyScans += 1
+
+                            setStatus("No chest found (" .. emptyScans .. "/5)")
+
+                            if emptyScans >= 5 then
+                                hopToNewServer()
+                                break
+                            end
+
+                            task.wait(2)
+                        end
                     else
+                        emptyScans = 0
                         currentTarget = target
                         local position = getChestPosition(target)
 
@@ -307,9 +334,84 @@ local function setEnabled(enabled)
     end
 end
 
+local hopping = false
+
+hopToNewServer = function()
+    if hopping then return end
+    hopping = true
+
+    local maxRetries = 3
+    local attempt = 0
+
+    local queueCode = [[
+        task.spawn(function()
+            if not game:IsLoaded() then
+                game.Loaded:Wait()
+            end
+
+            local player = game:GetService("Players").LocalPlayer
+
+            if not player.Character then
+                player.CharacterAdded:Wait()
+            end
+
+            task.wait(2)
+
+            getgenv().PumpkinChestAutoStart = true
+
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/lyphucthien/LPT-Hub/refs/heads/main/Kaituin%20Build%20An%20Ant%20Empire.lua"))()
+        end)
+    ]]
+
+    local queueFunction = queue_on_teleport or queueonteleport
+
+    if not queueFunction then
+        setStatus("Teleport queue unavailable!")
+        hopping = false
+        return
+    end
+
+    while attempt < maxRetries do
+        attempt += 1
+        setStatus("Fast Hop: Attempt " .. attempt .. "/" .. maxRetries)
+
+        local queued = pcall(function()
+            queueFunction(queueCode)
+        end)
+
+        if not queued then
+            setStatus("Queue failed. Retrying...")
+            task.wait(1)
+        else
+            local success = pcall(function()
+                TeleportService:Teleport(game.PlaceId, player)
+            end)
+
+            if success then
+                setStatus("Teleport requested. Waiting...")
+                return
+            end
+
+            setStatus("Teleport failed. Retrying...")
+            task.wait(1)
+        end
+    end
+
+    hopping = false
+    setStatus("Hop failed after 3 attempts. Try again manually.")
+end
+
 toggle.Activated:Connect(function()
     setEnabled(not running)
 end)
+
+if AUTO_START then
+    task.delay(3, function()
+        if gui.Parent then
+            setEnabled(true)
+        end
+    end)
+end
 
 player.CharacterAdded:Connect(function()
     if running then
