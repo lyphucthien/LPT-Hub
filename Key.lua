@@ -11,7 +11,7 @@ end
 
 local playerGui = player:WaitForChild("PlayerGui")
 
-local GET_KEY_LINK = "https://work.ink/34tV/lpt-hub-script-key-mission"
+local GET_KEY_LINK = "https://lyphucthien.vercel.app/get-key"
 local DISCORD_LINK = "https://discord.gg/gyZ27Hw9qu"
 local YOUTUBE_LINK = "https://youtube.com/@lyphucthien1803"
 local KEY_API_URL = "https://lyphucthien.vercel.app/api/get-key"
