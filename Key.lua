@@ -615,6 +615,7 @@ screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.IgnoreGuiInset = true
 screenGui.DisplayOrder = 999999
+screenGui.AutoLocalize = false
 screenGui.Parent = playerGui
 
 local function alive()
